@@ -34,6 +34,7 @@ npm run bots -- --room ABCDE --attack      # …and swing at each other now and 
 |---|---|---|
 | Move | ← → / A D | Left stick, D-pad |
 | Jump (hold for higher) | Space, ↑, W, Z, K | A / B |
+| Double jump | Jump again in mid-air | A / B again |
 | Drop through planks | ↓ + Jump | Down + A |
 | Attack (shoves other players, breaks boxes) | J, X | X / □ |
 | Pause menu | Esc | Start |
@@ -109,7 +110,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 
 | File | Contents |
 |---|---|
-| `movement.ts` | `jumpHeight` + `timeToApex` (gravity and jump velocity are derived; a held jump peaks at exactly `jumpHeight`), fall multiplier, run speed, ground/air acceleration and deceleration, turn boost, jump cut (variable jump), coyote time, jump buffer, drop-through time |
+| `movement.ts` | `jumpHeight` + `timeToApex` (gravity and jump velocity are derived; a held jump peaks at exactly `jumpHeight`), fall multiplier, run speed, ground/air acceleration and deceleration, turn boost, jump cut (variable jump), air jumps (`airJumps` count and `airJumpHeight`; 0 turns the double jump off), coyote time, jump buffer, drop-through time |
 | `players.ts` | max players, slot labels and colors, hitbox, hearts (`maxHp`), respawn delay, name rules |
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
@@ -155,7 +156,7 @@ The player presentation is split into small parts, under `apps/web/src/game/`:
 | Part | File | Job |
 |---|---|---|
 | Signals | `player/playerSignals.ts` | Builds the state-machine input from the predicted body (you) or the interpolated sample (others). |
-| State machine | `player/PlayerStateMachine.ts` on `fsm/StateMachine.ts` | `idle`, `run`, `jump`, `fall`, `attack`, `hurt`, `dead`, with any-state interrupts. Emits cues such as `jump`, `land`, `attack`, `hurt`, `death`, `respawn`. Phaser-free and unit-tested. |
+| State machine | `player/PlayerStateMachine.ts` on `fsm/StateMachine.ts` | `idle`, `run`, `jump`, `fall`, `attack`, `hurt`, `dead`, with any-state interrupts; an air jump restarts `jump`. Emits cues such as `jump`, `doubleJump`, `land`, `attack`, `hurt`, `death`, `respawn`. Phaser-free and unit-tested. |
 | Animation controller | `player/PlayerAnimationController.ts` | Maps states to clips for the current character, chains intro → loop (Fall), and fires frame events (footsteps). |
 | Clip data | `characters/characterArt.ts` | Sheet layout, rows, frame counts, frame rates, per-character voice pitch. Attack and Hurt clip lengths come from `combat.ts`, so animation and simulation stay in sync. |
 | Sound controller | `audio/SoundController.ts` | Plays cues from the presentation event bus, with throttling, voice limits, distance falloff and stereo pan for other players. |
@@ -166,7 +167,7 @@ If the sheet fails to load, `BootScene` draws a placeholder sheet on the same gr
 
 ### Audio
 
-Sound effects are synthesized when the game boots (`audio/sfxSynth.ts`, with recipes in `audio/soundCues.ts`), so no audio files are needed. Cues: `jump`, `land`, `step`, `attack`, `hit`, `hurt`, `death`, `respawn`, `coin`, `gem`, `checkpoint`, `levelComplete`, and for traps `bounce`, `boxHit`, `boxBreak`, `thud` (rock-head impacts, quieter with distance) and `shake` (falling platforms). To use a recorded sound for a cue, put the file in `packages/shared/data/audio/` and set that cue's `file` (for example `audio/jump.ogg`). If the file fails to load, the synthesized version is used.
+Sound effects are synthesized when the game boots (`audio/sfxSynth.ts`, with recipes in `audio/soundCues.ts`), so no audio files are needed. Cues: `jump`, `doubleJump`, `land`, `step`, `attack`, `hit`, `hurt`, `death`, `respawn`, `coin`, `gem`, `checkpoint`, `levelComplete`, and for traps `bounce`, `boxHit`, `boxBreak`, `thud` (rock-head impacts, quieter with distance) and `shake` (falling platforms). To use a recorded sound for a cue, put the file in `packages/shared/data/audio/` and set that cue's `file` (for example `audio/jump.ogg`). If the file fails to load, the synthesized version is used.
 
 The pause menu has a sound on/off toggle and a volume slider, saved per browser. Browsers keep audio locked until the first click or key press; nothing is queued while it is locked.
 

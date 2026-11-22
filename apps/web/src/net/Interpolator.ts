@@ -15,6 +15,8 @@ export interface RemoteSample {
   attack: number;
   attackSeq: number;
   hurt: number;
+  /** Mid-air jumps left; a decrease while airborne is a double jump. */
+  airJumpsLeft: number;
   /** Server tick until which traps can't hurt the player (drawn blinking). */
   invulnUntil: number;
 }
@@ -99,6 +101,7 @@ export class Interpolator {
         attack: newSwing ? pb.attack : lerp(pa.attack, pb.attack, t),
         attackSeq: pb.attackSeq,
         hurt: newHit ? pb.hurt : lerp(pa.hurt, pb.hurt, t),
+        airJumpsLeft: pb.airJumpsLeft,
         invulnUntil: pb.invulnUntil,
       });
     }

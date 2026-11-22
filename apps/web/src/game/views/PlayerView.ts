@@ -14,7 +14,7 @@ export interface PlayerViewOptions {
   isSelf: boolean;
   hitbox: HitboxSize;
   characterId: CharacterId;
-  /** Receives every cue (jump, land, step, attack, hurt, death, respawn) for sound and effects. */
+  /** Receives every cue (jump, doubleJump, land, step, attack, hurt, death, respawn) for sound and effects. */
   onCue: (event: PlayerCueEvent) => void;
 }
 
@@ -106,7 +106,7 @@ export class PlayerView {
     const { squash } = VIEW_CONFIG;
     for (const cue of cues) {
       if (cue === 'land') this.pulse(squash.landX, squash.landY);
-      else if (cue === 'jump') this.pulse(squash.jumpX, squash.jumpY);
+      else if (cue === 'jump' || cue === 'doubleJump') this.pulse(squash.jumpX, squash.jumpY);
       this.emit(cue);
     }
   }

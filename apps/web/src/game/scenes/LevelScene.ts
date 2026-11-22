@@ -45,7 +45,7 @@ import type { GameServices } from '../services';
 import { listen, onSceneEnd } from '../util/listen';
 import { Backdrop } from '../views/Backdrop';
 import { EntityViews } from '../views/EntityViews';
-import { floatText, puff } from '../views/effects';
+import { airPuff, floatText, puff } from '../views/effects';
 import { PlayerView } from '../views/PlayerView';
 import { TrapViews } from '../traps/TrapViews';
 import { SCENE_KEYS } from './keys';
@@ -454,6 +454,7 @@ export class LevelScene extends Phaser.Scene {
       sound?.play('hit', at);
       if (isSelf) this.cameras.main.shake(100, 0.003);
     }
+    if (cue === 'doubleJump') airPuff(this, x, y);
     sound?.play(cue, at);
   };
 
@@ -592,6 +593,7 @@ export class LevelScene extends Phaser.Scene {
             vx: round(body.vx),
             vy: round(body.vy),
             grounded: body.grounded,
+            airJumpsLeft: body.airJumpsLeft,
             alive: body.alive,
             facing: body.facing,
             attack: round(body.attack),

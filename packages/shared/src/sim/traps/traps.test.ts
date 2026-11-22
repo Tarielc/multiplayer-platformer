@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveMovement } from '../../config/movement';
+import { MOVEMENT_TUNING, resolveMovement } from '../../config/movement';
 import { msToTicks } from '../../config/net';
 import { PLAYER_CONFIG } from '../../config/players';
 import { TRAP_CONFIG } from '../../config/traps';
@@ -228,12 +228,16 @@ describe('traps: health and damage', () => {
 });
 
 describe('traps: bouncing and boxes', () => {
-  it('launches players off trampolines', () => {
+  it('launches players off trampolines, giving their air jumps back', () => {
     const world = worldWith([trap('trampoline', 320, 160)]);
     place(world, 320, 100);
+    const body = world.getPlayer('a')!.body;
+    body.airJumpsLeft = 0; // spent on the way down
     const events = ticks(world, 30);
     expect(events).toContainEqual({ type: 'bounce', playerId: 'a', trapId: world.level.traps[0]!.id });
-    expect(world.getPlayer('a')!.body.y + HITBOX.height).toBeLessThan(100);
+    expect(body.y + HITBOX.height).toBeLessThan(100);
+    expect(body.grounded).toBe(false);
+    expect(body.airJumpsLeft).toBe(MOVEMENT_TUNING.airJumps);
   });
 
   it('breaks boxes by stomping, bouncing each time, after their number of hits', () => {

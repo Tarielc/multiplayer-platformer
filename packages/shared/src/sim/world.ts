@@ -152,7 +152,7 @@ export class GameWorld {
     const player: WorldPlayer = {
       id,
       slot,
-      body: createBody(respawnPoint.x, respawnPoint.y, this.ctx.hitbox, this.tick - 1),
+      body: createBody(respawnPoint.x, respawnPoint.y, this.ctx.hitbox, this.tick - 1, this.ctx.movement.airJumps),
       score: 0,
       deaths: 0,
       collected: 0,
@@ -473,7 +473,7 @@ export class GameWorld {
   }
 
   private respawn(player: WorldPlayer): void {
-    resetBody(player.body, player.respawnPoint.x, player.respawnPoint.y, this.ctx.hitbox);
+    resetBody(player.body, player.respawnPoint.x, player.respawnPoint.y, this.ctx.hitbox, this.ctx.movement.airJumps);
     player.respawnTicks = 0;
     player.hp = this.playerConfig.maxHp;
     player.tp += 1;
@@ -496,6 +496,7 @@ function toNetPlayer(p: WorldPlayer, ack: number): NetPlayerState {
     coyote: b.coyote,
     buffer: b.buffer,
     drop: b.drop,
+    airJumpsLeft: b.airJumpsLeft,
     alive: b.alive,
     respawnIn: p.respawnTicks,
     score: p.score,

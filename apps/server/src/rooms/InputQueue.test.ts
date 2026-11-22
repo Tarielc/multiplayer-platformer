@@ -67,6 +67,17 @@ describe('InputQueue', () => {
     expect(drainAll(queue)).toEqual([Button.LEFT]);
   });
 
+  it('keeps jump and attack held through a stall, so resuming is not a fresh press', () => {
+    const queue = new InputQueue(CONFIG);
+    queue.push(1, Button.RIGHT | Button.JUMP | Button.ATTACK);
+    drainAll(queue);
+    for (let i = 0; i < CONFIG.stallTicks; i++) drainAll(queue);
+    expect(drainAll(queue)).toEqual([Button.JUMP | Button.ATTACK]); // movement stops, presses don't end
+    queue.reset();
+    for (let i = 0; i <= CONFIG.stallTicks; i++) drainAll(queue);
+    expect(drainAll(queue)).toEqual([NEUTRAL_INPUT]);
+  });
+
   it('forgets everything on reset (new level run or reconnect)', () => {
     const queue = new InputQueue(CONFIG);
     queue.push(50, 0);

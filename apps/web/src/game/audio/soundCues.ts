@@ -8,6 +8,7 @@ import type { SfxRecipe } from './sfxSynth';
  */
 export const SOUND_CUES = [
   'jump',
+  'doubleJump',
   'land',
   'step',
   'attack',
@@ -61,6 +62,17 @@ const cue = (def: Partial<SoundCueDef> & Pick<SoundCueDef, 'recipe'>): SoundCueD
 export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
   jump: cue({
     recipe: { layers: [{ wave: 'square', duty: 0.25, freq: 260, freqEnd: 640, attack: 0.004, sustain: 0.04, decay: 0.12, lowpass: 5000, gain: 0.5 }] },
+    volume: 0.45,
+    voiced: true,
+  }),
+  /** Mid-air jump: a higher chirp than the jump, with a puff of air under it. */
+  doubleJump: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.125, freq: 420, freqEnd: 1100, attack: 0.003, sustain: 0.03, decay: 0.12, lowpass: 6000, gain: 0.4 },
+        { wave: 'noise', freq: 1200, freqEnd: 4200, attack: 0.01, sustain: 0.02, decay: 0.1, lowpass: 5000, gain: 0.35 },
+      ],
+    },
     volume: 0.45,
     voiced: true,
   }),

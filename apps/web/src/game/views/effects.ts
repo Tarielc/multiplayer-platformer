@@ -25,6 +25,30 @@ export function puff(scene: Phaser.Scene, x: number, y: number, tint: number, co
   }
 }
 
+/** Small cloud kicked out under the feet (mid-air jump): puffs spread sideways and down. */
+export function airPuff(scene: Phaser.Scene, x: number, y: number, tint = 0xffffff, count = 6): void {
+  for (let i = 0; i < count; i++) {
+    // Angles across the lower half (+y is down), flattened into a wide, low cloud.
+    const angle = Math.PI * (0.08 + (0.84 * (i + Math.random() * 0.6)) / count);
+    const distance = 8 + Math.random() * 8;
+    const particle = scene.add
+      .image(x, y, TEXTURES.puff)
+      .setTint(tint)
+      .setScale(0.5 + Math.random() * 0.4)
+      .setDepth(VIEW_CONFIG.depth.effects);
+    scene.tweens.add({
+      targets: particle,
+      x: x + Math.cos(angle) * distance * 1.5,
+      y: y + Math.sin(angle) * distance * 0.5,
+      alpha: 0,
+      scale: 0.15,
+      duration: 280 + Math.random() * 120,
+      ease: 'Cubic.easeOut',
+      onComplete: () => particle.destroy(),
+    });
+  }
+}
+
 /** Rising, fading text ("+10", "Checkpoint!"). */
 export function floatText(scene: Phaser.Scene, x: number, y: number, text: string, color: string): void {
   const label = scene.add

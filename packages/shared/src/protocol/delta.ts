@@ -14,6 +14,7 @@ const PLAYER_FIELDS = [
   'coyote',
   'buffer',
   'drop',
+  'airJumpsLeft',
   'alive',
   'respawnIn',
   'score',

@@ -40,7 +40,7 @@ While playing, the client sends one `{ t: 'input', seq, buttons }` per fixed ste
 
 - **Order:** duplicate and out-of-order frames (`seq` ≤ last received) are dropped. The queue holds at most 30 frames.
 - **Catch-up:** each tick adds 1 to a budget (capped at 6) and applies up to 3 frames while budget remains. Frames that arrive in a burst after a network hiccup are caught up quickly. Over time a client can never simulate faster than real time, so speeding up the send rate gains nothing.
-- **Stalls:** with no frames, the player freezes, which keeps prediction exact. After 15 ticks with nothing (a hidden tab or a network stall), the server steps the player with neutral input.
+- **Stalls:** with no frames, the player freezes, which keeps prediction exact. After 15 ticks with nothing (a hidden tab or a network stall), the server steps the player without movement input. Jump and Attack stay as they last were, so a button still held when input resumes is not a fresh press (no phantom double jump or swing after a lag spike).
 - **Acks:** every player state carries `ack`, the `seq` of the last frame the server applied. The client uses it to drop confirmed inputs.
 
 Players are not lockstepped. A laggy player's frames are applied whenever they arrive, and never slow down anyone else.

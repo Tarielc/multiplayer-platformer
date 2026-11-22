@@ -174,15 +174,18 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | Player hitbox | 20×28 px. Needs 2×2 tiles of clearance (1×1 at 32 px). |
 | Full jump height | 112 px = **7 tiles** (3.5) (a held jump peaks at exactly this height after 0.4 s). Ledges up to 96 px (6 tiles) high are comfortable. |
 | Short hop | Releasing jump while rising multiplies the remaining upward speed by 0.45, once. |
+| Double jump | One extra jump in mid-air (`airJumps`) that rises 80 px = **5 tiles** (2.5) from wherever it starts. Jumping again at the apex reaches 192 px = **12 tiles** (6). Landing, trampolines and box stomps give it back. |
 | Run speed | 220 px/s (≈ 13.8 tiles/s, or 6.9), reached in 0.1 s from standstill |
-| Running jump distance | ≈ 160 px = 10 tiles (5) of horizontal travel, back to the same height. Gaps up to 128 px (8 tiles) are comfortable; 160 px is an expert jump. |
-| Coyote time | 100 ms after walking off a ledge |
-| Jump buffer | 120 ms before landing |
+| Running jump distance | ≈ 160 px = 10 tiles (5) of horizontal travel, back to the same height. Gaps up to 128 px (8 tiles) are comfortable; 160 px is an expert jump. With the double jump: ≈ 260 px = 16 tiles (8). |
+| Coyote time | 100 ms after walking off a ledge (after that, a press spends the air jump) |
+| Jump buffer | 120 ms before landing, once the air jump is spent |
 | Drop-through | One-way tiles are ignored for 220 ms after Down + Jump |
 | Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom (`hazardTileHitbox`, tuned for 32 px spike tiles; the terrain tileset has no hazard tiles, so the samples use lava zones) |
 | Kill plane | 96 px below the bottom of the map |
 | Respawn delay | 0.9 s |
 | View | 960×540 px = 60×34 tiles (30×17). Maps smaller than the view are centered. |
+
+A spot meant to be reachable only with a trampoline or a fan has to be out of double-jump reach (more than 12 tiles up, or 16 across). Otherwise, set `tuning: { airJumps: 0 }` on the level in the manifest to turn the double jump off there.
 
 ## Prototyping with ASCII
 
@@ -258,11 +261,11 @@ It **overwrites** those maps, so after editing a sample in Tiled, either stop us
 
 ### Is it finishable?
 
-`npm run levels:solve` checks that one player can reach the exit of every level without losing a heart. It searches over moves (runs, jumps of different heights and steering, waits, attacks) in the real simulation, traps and timing included, and prints the route with `--verbose`:
+`npm run levels:solve` checks that one player can reach the exit of every level without losing a heart. It searches over moves (runs, jumps of different heights and steering, double jumps, waits, attacks) in the real simulation, traps and timing included, and prints the route with `--verbose`:
 
 ```
 level-3 "Sunset Ruins" (14 traps)
-  ✓ finished in 15 moves, 14.4 s of play, 0 hearts lost (316 nodes, 1607 states, 4.4s)
+  ✓ finished in 16 moves, 17.0 s of play, 0 hearts lost (21 nodes, 324 states, 0.3s)
 ```
 
 When it fails it reports how close it got and what ended the branches (`trap hit`, `death (hazard)`, `death (crush)`…). Optional areas (bonus coins up a trampoline, a box-blocked nook) are not checked. Use `--level <id>` for one level.

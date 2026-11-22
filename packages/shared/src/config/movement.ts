@@ -3,7 +3,8 @@
  * so neither the Phaser scenes nor the server loop contain magic numbers.
  *
  * Jump physics are authored the designer-friendly way (height + time to apex) and
- * compiled into gravity / launch velocity:  g = 2h / t²,  v0 = 2h / t.
+ * compiled into gravity / launch velocity:  g = 2h / t²,  v0 = 2h / t. Air jumps are authored
+ * as a height too and launch at  √(2·g·airJumpHeight).
  */
 export interface MovementTuning {
   /** Apex height of a full (held) jump, in pixels. */
@@ -28,6 +29,10 @@ export interface MovementTuning {
   turnMultiplier: number;
   /** Variable jump: upward velocity is multiplied by this when jump is released early. */
   jumpCutMultiplier: number;
+  /** Extra jumps allowed in mid-air before landing again (1 = double jump, 0 = none). */
+  airJumps: number;
+  /** Apex height of a full (held) air jump, in pixels, measured from where it starts. */
+  airJumpHeight: number;
   /** Grace period after walking off a ledge during which a jump is still allowed. */
   coyoteTimeMs: number;
   /** A jump pressed this long before landing still triggers on touchdown. */
@@ -37,7 +42,7 @@ export interface MovementTuning {
 }
 
 export const MOVEMENT_TUNING: Readonly<MovementTuning> = {
-  jumpHeight: 112, // 3.5 tiles at 32px
+  jumpHeight: 112, // 7 tiles at 16 px
   timeToApex: 0.4,
   fallGravityMultiplier: 1.6,
   maxFallSpeed: 900,
@@ -48,6 +53,8 @@ export const MOVEMENT_TUNING: Readonly<MovementTuning> = {
   airDeceleration: 900,
   turnMultiplier: 1.6,
   jumpCutMultiplier: 0.45,
+  airJumps: 1,
+  airJumpHeight: 80, // 5 tiles
   coyoteTimeMs: 100,
   jumpBufferMs: 120,
   dropThroughMs: 220,
@@ -58,6 +65,9 @@ export interface CompiledMovement {
   gravity: number;
   fallGravity: number;
   jumpVelocity: number;
+  /** Extra mid-air jumps per airtime (whole number ≥ 0). */
+  airJumps: number;
+  airJumpVelocity: number;
   maxFallSpeed: number;
   maxRunSpeed: number;
   groundAcceleration: number;
@@ -74,11 +84,14 @@ export interface CompiledMovement {
 export function compileMovement(tuning: MovementTuning): CompiledMovement {
   const { jumpHeight: h, timeToApex: t } = tuning;
   if (h <= 0 || t <= 0) throw new Error('MovementTuning: jumpHeight and timeToApex must be > 0');
+  if (tuning.airJumps < 0 || tuning.airJumpHeight < 0) throw new Error('MovementTuning: airJumps and airJumpHeight must be >= 0');
   const gravity = (2 * h) / (t * t);
   return {
     gravity,
     fallGravity: gravity * tuning.fallGravityMultiplier,
     jumpVelocity: (2 * h) / t,
+    airJumps: Math.floor(tuning.airJumps),
+    airJumpVelocity: Math.sqrt(2 * gravity * tuning.airJumpHeight),
     maxFallSpeed: tuning.maxFallSpeed,
     maxRunSpeed: tuning.maxRunSpeed,
     groundAcceleration: tuning.groundAcceleration,

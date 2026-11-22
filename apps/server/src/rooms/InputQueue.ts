@@ -1,9 +1,16 @@
-import { NEUTRAL_INPUT, sanitizeButtons, type NetConfig } from '@platformer/shared';
+import { Button, NEUTRAL_INPUT, sanitizeButtons, type NetConfig } from '@platformer/shared';
 
 interface InputFrame {
   seq: number;
   buttons: number;
 }
+
+/**
+ * Buttons that act on a *press* (edge-detected by the simulation). Stall steps keep them as they
+ * last were: releasing them would turn the same button, still held when input resumes, into a
+ * fresh press, i.e. a phantom double jump or swing after every lag spike.
+ */
+const EDGE_BUTTONS = Button.JUMP | Button.ATTACK;
 
 /**
  * Per-player input buffer consumed by the server's fixed tick.
@@ -13,13 +20,16 @@ interface InputFrame {
  *   `maxPerTick` frames while budget remains. Late frames after jitter are caught up, but a
  *   client can never simulate faster than real time (speed-hack protection).
  * - With no input the player is frozen (keeps prediction exact). After `stallTicks` without
- *   input (tab hidden, network stall) the player is stepped with neutral input so they still
- *   fall and don't hang in mid-air for everyone else.
+ *   input (tab hidden, network stall) the player is stepped without movement input so they
+ *   still fall and don't hang in mid-air for everyone else. Jump and Attack stay as they last
+ *   were (see `EDGE_BUTTONS`).
  */
 export class InputQueue {
   private queue: InputFrame[] = [];
   private budget = 0;
   private idleTicks = 0;
+  /** Buttons of the last applied frame. */
+  private lastButtons = NEUTRAL_INPUT;
   lastReceivedSeq = 0;
   lastProcessedSeq = 0;
   dropped = 0;
@@ -34,6 +44,7 @@ export class InputQueue {
     this.queue = [];
     this.budget = 0;
     this.idleTicks = 0;
+    this.lastButtons = NEUTRAL_INPUT;
     this.lastReceivedSeq = 0;
     this.lastProcessedSeq = 0;
   }
@@ -59,6 +70,7 @@ export class InputQueue {
       this.budget -= 1;
       processed += 1;
       this.lastProcessedSeq = frame.seq;
+      this.lastButtons = frame.buttons;
       apply(frame.buttons);
     }
     if (processed > 0) {
@@ -67,7 +79,7 @@ export class InputQueue {
     }
     this.idleTicks += 1;
     if (this.idleTicks > this.config.stallTicks) {
-      apply(NEUTRAL_INPUT);
+      apply(this.lastButtons & EDGE_BUTTONS);
       return 1;
     }
     return 0;

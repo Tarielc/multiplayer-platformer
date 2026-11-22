@@ -48,6 +48,7 @@ function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlay
     coyote: 0,
     buffer: 0,
     drop: 0,
+    airJumpsLeft: 1,
     alive: true,
     respawnIn: 0,
     score: 0,

@@ -18,6 +18,8 @@ export interface NetPlayerState {
   coyote: number;
   buffer: number;
   drop: number;
+  /** Mid-air jumps left (a decrease while airborne is a double jump). */
+  airJumpsLeft: number;
   alive: boolean;
   /** Ticks until respawn while dead. */
   respawnIn: number;
@@ -67,6 +69,7 @@ export function bodyFromNetState(state: NetPlayerState): MovementBody {
     coyote: state.coyote,
     buffer: state.buffer,
     drop: state.drop,
+    airJumpsLeft: state.airJumpsLeft,
     alive: state.alive,
     attackHeld: state.attackHeld,
     attack: state.attack,

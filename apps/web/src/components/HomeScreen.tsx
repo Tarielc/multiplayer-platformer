@@ -158,7 +158,7 @@ export function HomeScreen() {
         <ul>
           <li>
             <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd> move · <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd>{' '}
-            jump (hold for higher)
+            jump (hold for higher, press again in mid-air to double jump)
           </li>
           <li>
             <kbd>J</kbd> / <kbd>X</kbd> attack (shoves other players)

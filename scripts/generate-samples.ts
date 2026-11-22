@@ -267,7 +267,8 @@ class Sketch {
 
 // Level metrics at 16 px tiles (default tuning): a full jump rises 112 px = 7 tiles, ledges up to
 // 6 tiles are comfortable, a running jump clears ~10 tiles (8 is comfortable), and the 20×28
-// player needs 2×2 tiles of clearance.
+// player needs 2×2 tiles of clearance. The double jump adds 80 px = 5 tiles: 12 tiles up from the
+// ground, ~16 tiles across with a run.
 
 /**
  * Green Hills (gentle intro): grass, bronze and steel blocks, brick, wood platforms. Traps:

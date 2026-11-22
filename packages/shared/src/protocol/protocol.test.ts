@@ -23,6 +23,7 @@ function player(id: string, overrides: Partial<NetPlayerState> = {}): NetPlayerS
     coyote: 0.1,
     buffer: 0,
     drop: 0,
+    airJumpsLeft: 1,
     alive: true,
     respawnIn: 0,
     score: 0,

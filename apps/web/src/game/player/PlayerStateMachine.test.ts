@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PlayerSignals } from './playerSignals';
 import { PlayerStateMachine, type PlayerCue } from './PlayerStateMachine';
 
-const GROUND: PlayerSignals = { alive: true, grounded: true, vx: 0, vy: 0, attack: 0, attackSeq: 0, hurt: 0, tp: 0 };
+const GROUND: PlayerSignals = { alive: true, grounded: true, vx: 0, vy: 0, attack: 0, attackSeq: 0, hurt: 0, airJumpsLeft: 1, tp: 0 };
 const DT = 16;
 
 function run(fsm: PlayerStateMachine, signals: Partial<PlayerSignals>, frames = 1): PlayerCue[] {
@@ -106,6 +106,43 @@ describe('PlayerStateMachine: cues', () => {
     // Walk off a ledge, then jump in the air during coyote time.
     expect(run(fsm, { grounded: false, vy: 20 })).toEqual([]);
     expect(run(fsm, { grounded: false, vy: -300 })).toEqual(['jump']);
+  });
+
+  it('cues a double jump and restarts the jump clip, rising or falling', () => {
+    const fsm = started();
+    const entries: string[] = [];
+    fsm.onChange((c) => entries.push(`${c.to}${c.reentered ? '!' : ''}`));
+    expect(run(fsm, { grounded: false, vy: -300 })).toEqual(['jump']);
+    // Still rising, so only the spent air jump tells it apart from the first jump.
+    expect(run(fsm, { grounded: false, vy: -470, airJumpsLeft: 0 })).toEqual(['doubleJump']);
+    expect(fsm.state).toBe('jump');
+    expect(run(fsm, { grounded: false, vy: 100, airJumpsLeft: 0 })).toEqual([]);
+    expect(fsm.state).toBe('fall');
+    expect(run(fsm, {})).toEqual(['land']); // landing refills it silently
+    // Walk off a ledge and air jump on the way down.
+    run(fsm, { grounded: false, vy: 200 });
+    expect(run(fsm, { grounded: false, vy: -470, airJumpsLeft: 0 })).toEqual(['doubleJump']);
+    expect(entries).toEqual(['jump', 'jump!', 'fall', 'idle', 'fall', 'jump']);
+  });
+
+  it('cues only the double jump when a jump and an air jump arrive in one update', () => {
+    const fsm = started();
+    expect(run(fsm, { grounded: false, vy: -470, airJumpsLeft: 0 })).toEqual(['doubleJump']);
+    expect(fsm.state).toBe('jump');
+  });
+
+  it('does not cue a double jump for a refill in the air (trampoline) or a respawn', () => {
+    const fsm = started({ grounded: false, vy: 100, airJumpsLeft: 0 });
+    expect(run(fsm, { grounded: false, vy: -500, airJumpsLeft: 1 })).toEqual(['jump']); // bounce
+    run(fsm, { alive: false, airJumpsLeft: 0 });
+    expect(run(fsm, { grounded: false, vy: 10, tp: 1, airJumpsLeft: 1 })).toEqual(['respawn']);
+  });
+
+  it('keeps an attack or hurt clip showing through an air jump', () => {
+    const fsm = started();
+    expect(run(fsm, { attack: 0.35, attackSeq: 1, grounded: false, vy: -300 })).toEqual(['attack', 'jump']);
+    expect(run(fsm, { attack: 0.3, attackSeq: 1, grounded: false, vy: -470, airJumpsLeft: 0 })).toEqual(['doubleJump']);
+    expect(fsm.state).toBe('attack');
   });
 
   it('starts silently when a player first appears mid-action', () => {

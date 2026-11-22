@@ -5,7 +5,7 @@ export const PLAYER_STATES = ['idle', 'run', 'jump', 'fall', 'attack', 'hurt', '
 export type PlayerState = (typeof PLAYER_STATES)[number];
 
 /** One-shot presentation moments (sounds, effects). Derived from signal edges. */
-export type PlayerCue = 'jump' | 'land' | 'attack' | 'hurt' | 'death' | 'respawn';
+export type PlayerCue = 'jump' | 'doubleJump' | 'land' | 'attack' | 'hurt' | 'death' | 'respawn';
 
 export interface PlayerStateTuning {
   /** Grounded speed (px/s) at which idle becomes run … */
@@ -20,15 +20,20 @@ interface Frame {
   s: PlayerSignals;
   newSwing: boolean;
   newHit: boolean;
+  newAirJump: boolean;
 }
+
+const NO_EDGES = { newSwing: false, newHit: false, newAirJump: false } as const;
 
 /**
  * Presentation state machine for one player: turns per-frame `PlayerSignals` into an animation
  * state (idle, run, jump, fall, attack, hurt, dead) and a list of cues.
  *
- * Priority (checked every frame, "any state"): dead > new hit > new swing. Attack and Hurt hold
- * while their timers run, then fall back to locomotion. New swings/hits are detected as
- * *increases* of `attackSeq`/`hurt`, so a misprediction that is rolled back never replays one.
+ * Priority (checked every frame, "any state"): dead > new hit > new swing > new air jump. Attack
+ * and Hurt hold while their timers run, then fall back to locomotion; an air jump restarts the
+ * Jump clip unless one of them is showing. New swings/hits are detected as *increases* of
+ * `attackSeq`/`hurt`, so a misprediction that is rolled back never replays one; air jumps as a
+ * *decrease* of `airJumpsLeft` while airborne (landing and bounces refill it).
  *
  * Phaser-free, so it is unit-tested in node.
  */
@@ -41,10 +46,11 @@ export class PlayerStateMachine {
     const locomotion = (f: Frame) => this.locomotion(f.s);
     this.machine = new StateMachine<PlayerState, Frame>({
       initial: 'idle',
-      anyState: ({ s, newHit, newSwing }) => {
+      anyState: ({ s, newHit, newSwing, newAirJump }, current) => {
         if (!s.alive) return 'dead';
         if (newHit) return { to: 'hurt', reenter: true };
         if (newSwing) return { to: 'attack', reenter: true };
+        if (newAirJump && current !== 'attack' && current !== 'hurt') return { to: 'jump', reenter: true };
       },
       states: {
         idle: { update: locomotion },
@@ -78,7 +84,7 @@ export class PlayerStateMachine {
     const prev = this.prev;
     this.prev = { ...s };
     if (!prev) {
-      this.machine.update({ s, newSwing: false, newHit: false }, dtMs);
+      this.machine.update({ s, ...NO_EDGES }, dtMs);
       return [];
     }
 
@@ -94,16 +100,19 @@ export class PlayerStateMachine {
     }
     if (newHit) cues.push('hurt');
     if (newSwing) cues.push('attack');
+    const newAirJump = s.alive && !respawned && !s.grounded && s.airJumpsLeft < prev.airJumpsLeft;
     if (s.alive && !respawned) {
-      // A real jump: velocity turns upward without being knocked back.
-      if (s.vy < 0 && prev.vy >= 0 && s.hurt <= 0 && !newHit) cues.push('jump');
+      // A real jump: velocity turns upward without being knocked back. A remote player's jump
+      // and air jump can land in one update; the air jump's cue covers both.
+      if (newAirJump) cues.push('doubleJump');
+      else if (s.vy < 0 && prev.vy >= 0 && s.hurt <= 0 && !newHit) cues.push('jump');
       if (s.grounded && !prev.grounded) {
         if (this.suppressLand) this.suppressLand = false;
         else cues.push('land');
       }
     }
 
-    this.machine.update({ s, newSwing, newHit }, dtMs);
+    this.machine.update({ s, newSwing, newHit, newAirJump }, dtMs);
     return cues;
   }
 

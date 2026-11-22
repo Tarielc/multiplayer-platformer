@@ -30,6 +30,8 @@ export interface MovementBody {
   buffer: number;
   /** Seconds left ignoring one-way platforms (drop-through). */
   drop: number;
+  /** Mid-air jumps left before landing (refilled on the ground and by bounces). */
+  airJumpsLeft: number;
   alive: boolean;
   /** Attack button state on the previous step (edge detection). */
   attackHeld: boolean;
@@ -94,7 +96,7 @@ const NO_COLLIDERS: readonly TrapCollider[] = [];
  * Creates a body standing with its feet at (feetX, feetY). `stepTick` is the tick before its
  * first step.
  */
-export function createBody(feetX: number, feetY: number, hitbox: HitboxSize, stepTick = -1): MovementBody {
+export function createBody(feetX: number, feetY: number, hitbox: HitboxSize, stepTick = -1, airJumps = 0): MovementBody {
   return {
     x: feetX - hitbox.width / 2,
     y: feetY - hitbox.height,
@@ -107,6 +109,7 @@ export function createBody(feetX: number, feetY: number, hitbox: HitboxSize, ste
     coyote: 0,
     buffer: 0,
     drop: 0,
+    airJumpsLeft: airJumps,
     alive: true,
     attackHeld: false,
     attack: 0,
@@ -121,7 +124,7 @@ export function createBody(feetX: number, feetY: number, hitbox: HitboxSize, ste
  * Teleports a body to a new feet position and clears motion and action timers (respawn).
  * Keeps the button edges (`jumpHeld`, `attackHeld`), `attackSeq` and `stepTick`.
  */
-export function resetBody(body: MovementBody, feetX: number, feetY: number, hitbox: HitboxSize): void {
+export function resetBody(body: MovementBody, feetX: number, feetY: number, hitbox: HitboxSize, airJumps = 0): void {
   body.x = feetX - hitbox.width / 2;
   body.y = feetY - hitbox.height;
   body.vx = 0;
@@ -131,6 +134,7 @@ export function resetBody(body: MovementBody, feetX: number, feetY: number, hitb
   body.coyote = 0;
   body.buffer = 0;
   body.drop = 0;
+  body.airJumpsLeft = airJumps;
   body.alive = true;
   body.attack = 0;
   body.attackCooldown = 0;
@@ -194,7 +198,8 @@ export function stepPlayerMovement(
   }
 
   // Down + jump on a one-way platform drops through it instead of jumping.
-  if (down && jumpPressed && body.grounded && standingOnOneWayOnly(body, ctx, colliders)) {
+  const dropping = down && jumpPressed && body.grounded && standingOnOneWayOnly(body, ctx, colliders);
+  if (dropping) {
     body.drop = m.dropThroughTime;
     body.buffer = 0;
     body.coyote = 0;
@@ -209,6 +214,14 @@ export function stepPlayerMovement(
     body.grounded = false;
     body.buffer = 0;
     body.coyote = 0;
+  } else if (jumpPressed && !dropping && body.airJumpsLeft > 0) {
+    // Air jump: a fresh press in mid-air (coyote time over) relaunches at once, whatever the
+    // current vertical speed, and can be cut short like a ground jump. With none left, the
+    // press stays buffered for the landing as before.
+    body.vy = -m.airJumpVelocity;
+    body.jumping = true;
+    body.buffer = 0;
+    body.airJumpsLeft -= 1;
   }
 
   // Variable jump height: releasing early cuts the remaining upward velocity once.
@@ -354,12 +367,14 @@ function moveY(
       body.vy = -landedOn.bounce;
       body.jumping = false;
       body.coyote = 0;
+      body.airJumpsLeft = ctx.movement.airJumps;
       if (landedOn.kind === 'box') contacts.stomped = landedOn.id;
       else contacts.bounced = landedOn.id;
       return true;
     }
     body.vy = 0;
     body.grounded = true;
+    body.airJumpsLeft = ctx.movement.airJumps;
     contacts.ground = landedOn ? landedOn.id : -1;
     return true;
   }

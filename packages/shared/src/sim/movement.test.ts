@@ -23,7 +23,7 @@ function makeCtx(rows: string[], tuning?: Partial<MovementTuning>): MovementCont
 function spawnBody(ctx: MovementContext, slot = 0): MovementBody {
   const spawn = ctx.level.spawns.find((s) => s.slot === slot);
   if (!spawn) throw new Error(`no spawn for slot ${slot}`);
-  return createBody(spawn.x, spawn.y, ctx.hitbox);
+  return createBody(spawn.x, spawn.y, ctx.hitbox, -1, ctx.movement.airJumps);
 }
 
 function run(body: MovementBody, ctx: MovementContext, buttons: number, ticks: number): void {
@@ -69,6 +69,13 @@ describe('compileMovement', () => {
 
   it('rejects non-positive jump values', () => {
     expect(() => compileMovement({ ...MOVEMENT_TUNING, timeToApex: 0 })).toThrow();
+    expect(() => compileMovement({ ...MOVEMENT_TUNING, airJumps: -1 })).toThrow();
+  });
+
+  it('derives the air jump launch velocity from its height and the rising gravity', () => {
+    const m = compileMovement({ ...MOVEMENT_TUNING, jumpHeight: 100, timeToApex: 0.5, airJumpHeight: 50 });
+    expect(m.airJumpVelocity).toBeCloseTo(Math.sqrt(2 * 800 * 50)); // v = sqrt(2gh)
+    expect(m.airJumps).toBe(MOVEMENT_TUNING.airJumps);
   });
 });
 
@@ -220,12 +227,31 @@ describe('stepPlayerMovement: jumping', () => {
     });
 
     it('refuses the jump once the window has passed', () => {
-      const ctx = makeCtx(LEDGE);
+      const ctx = makeCtx(LEDGE, { airJumps: 0 });
       const body = walkOffLedge(ctx);
       run(body, ctx, Button.RIGHT, 10); // ~167 ms in the air
       stepPlayerMovement(body, Button.RIGHT | Button.JUMP, ctx);
       expect(body.vy).toBeGreaterThan(0);
       expect(body.jumping).toBe(false);
+    });
+
+    it('spends the air jump instead once the window has passed', () => {
+      const ctx = makeCtx(LEDGE);
+      const body = walkOffLedge(ctx);
+      expect(body.airJumpsLeft).toBe(1);
+      run(body, ctx, Button.RIGHT, 10);
+      stepPlayerMovement(body, Button.RIGHT | Button.JUMP, ctx);
+      expect(body.vy).toBeLessThan(0);
+      expect(body.vy).toBeGreaterThan(-ctx.movement.airJumpVelocity); // gravity already applied
+      expect(body.airJumpsLeft).toBe(0);
+    });
+
+    it('keeps the air jump after a coyote jump', () => {
+      const ctx = makeCtx(LEDGE);
+      const body = walkOffLedge(ctx);
+      stepPlayerMovement(body, Button.RIGHT | Button.JUMP, ctx);
+      expect(body.jumping).toBe(true);
+      expect(body.airJumpsLeft).toBe(1);
     });
   });
 
@@ -261,16 +287,106 @@ describe('stepPlayerMovement: jumping', () => {
       return body;
     }
 
+    // Buffering applies to presses that can't air jump (none left).
+    const NO_AIR_JUMPS = { airJumps: 0 };
+
     it('jumps on touchdown when pressed shortly before landing', () => {
-      const body = pressBeforeLanding(makeCtx(DROP), 3); // 50 ms early, buffer is 120 ms
+      const body = pressBeforeLanding(makeCtx(DROP, NO_AIR_JUMPS), 3); // 50 ms early, buffer is 120 ms
       expect(body.vy).toBeLessThan(0);
       expect(body.grounded).toBe(false);
     });
 
     it('ignores presses that came too early', () => {
-      const body = pressBeforeLanding(makeCtx(DROP), 12); // 200 ms early
+      const body = pressBeforeLanding(makeCtx(DROP, NO_AIR_JUMPS), 12); // 200 ms early
       expect(body.grounded).toBe(true);
       expect(body.vy).toBe(0);
+    });
+
+    it('air jumps at once instead when an air jump is left', () => {
+      const ctx = makeCtx(DROP);
+      const land = landingTick(ctx);
+      const body = spawnBody(ctx);
+      run(body, ctx, NEUTRAL_INPUT, land - 3);
+      stepPlayerMovement(body, Button.JUMP, ctx);
+      expect(body.vy).toBeLessThan(0);
+      expect(body.airJumpsLeft).toBe(0);
+      expect(body.buffer).toBe(0); // not buffered as well
+    });
+  });
+
+  describe('double jump', () => {
+    /** Ground jump held for `firstTicks`, released for one tick, then an air jump held for `holdTicks`. */
+    function doubleJump(ctx: MovementContext, firstTicks: number, holdTicks = Infinity) {
+      const body = grounded(ctx);
+      run(body, ctx, Button.JUMP, firstTicks);
+      run(body, ctx, NEUTRAL_INPUT, 1);
+      const startY = body.y;
+      let minY = body.y;
+      let ticks = 0;
+      do {
+        stepPlayerMovement(body, ticks < holdTicks ? Button.JUMP : NEUTRAL_INPUT, ctx);
+        minY = Math.min(minY, body.y);
+        ticks += 1;
+      } while (body.vy < 0 && ticks < 240);
+      return { body, height: startY - minY };
+    }
+
+    it('rises the configured air jump height from wherever it starts', () => {
+      const ctx = makeCtx(FLAT);
+      const { body, height } = doubleJump(ctx, 24); // at about the first apex
+      expect(height).toBeCloseTo(MOVEMENT_TUNING.airJumpHeight, 0);
+      expect(body.airJumpsLeft).toBe(0);
+      // Rising or falling makes no difference: the air jump replaces the vertical speed.
+      expect(doubleJump(ctx, 8).height).toBeCloseTo(MOVEMENT_TUNING.airJumpHeight, 0);
+      expect(doubleJump(ctx, 40).height).toBeCloseTo(MOVEMENT_TUNING.airJumpHeight, 0);
+    });
+
+    it('reaches the ground jump and air jump heights combined', () => {
+      const ctx = makeCtx(FLAT);
+      const body = grounded(ctx);
+      const groundY = body.y;
+      let minY = body.y;
+      for (let tick = 0; tick < 120; tick++) {
+        stepPlayerMovement(body, tick === 24 ? NEUTRAL_INPUT : Button.JUMP, ctx);
+        minY = Math.min(minY, body.y);
+      }
+      expect(groundY - minY).toBeGreaterThan(MOVEMENT_TUNING.jumpHeight + MOVEMENT_TUNING.airJumpHeight - 2);
+    });
+
+    it('can be cut short by releasing the button, like a ground jump', () => {
+      const ctx = makeCtx(FLAT);
+      const tap = doubleJump(ctx, 24, 3).height;
+      expect(tap).toBeGreaterThan(0);
+      expect(tap).toBeLessThan(MOVEMENT_TUNING.airJumpHeight * 0.6);
+    });
+
+    it('allows airJumps jumps per airtime and refills them on landing', () => {
+      const ctx = makeCtx(FLAT);
+      const { body } = doubleJump(ctx, 24, 10);
+      run(body, ctx, NEUTRAL_INPUT, 1);
+      const vy = body.vy;
+      stepPlayerMovement(body, Button.JUMP, ctx); // a third press does nothing
+      expect(body.vy).toBeGreaterThan(vy);
+      run(body, ctx, NEUTRAL_INPUT, 120);
+      expect(body.grounded).toBe(true);
+      expect(body.airJumpsLeft).toBe(1);
+    });
+
+    it('supports more air jumps, or none, through the tuning', () => {
+      const triple = makeCtx(FLAT, { airJumps: 2 });
+      const body = grounded(triple);
+      expect(body.airJumpsLeft).toBe(2);
+      run(body, triple, Button.JUMP, 10);
+      for (const left of [1, 0]) {
+        run(body, triple, NEUTRAL_INPUT, 1);
+        run(body, triple, Button.JUMP, 10);
+        expect(body.airJumpsLeft).toBe(left);
+        expect(body.vy).toBeLessThan(0);
+      }
+      const none = makeCtx(FLAT, { airJumps: 0 });
+      const plain = doubleJump(none, 24, 10).body;
+      expect(plain.airJumpsLeft).toBe(0);
+      expect(plain.vy).toBeGreaterThanOrEqual(0); // the second press did nothing
     });
   });
 });
@@ -318,6 +434,8 @@ describe('stepPlayerMovement: one-way platforms', () => {
     const body = onPlatform(ctx);
     run(body, ctx, NEUTRAL_INPUT, 1); // release jump so the next press is a fresh edge
     stepPlayerMovement(body, Button.DOWN | Button.JUMP, ctx);
+    expect(body.vy).toBeGreaterThanOrEqual(0); // the press drops, it doesn't air jump too
+    expect(body.airJumpsLeft).toBe(1);
     run(body, ctx, NEUTRAL_INPUT, 60);
     expect(body.grounded).toBe(true);
     expect(feet(body)).toBe(224);

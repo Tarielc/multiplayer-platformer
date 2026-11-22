@@ -18,6 +18,8 @@ export interface PlayerSignals {
   attackSeq: number;
   /** Seconds of hit stun left; an increase means a new hit. */
   hurt: number;
+  /** Mid-air jumps left; a decrease while airborne means a double jump. */
+  airJumpsLeft: number;
   /** Teleport counter (respawns); a change re-seeds edge detection. */
   tp: number;
 }
@@ -31,6 +33,7 @@ export function signalsFromBody(body: Readonly<MovementBody>, tp: number): Playe
     attack: body.attack,
     attackSeq: body.attackSeq,
     hurt: body.hurt,
+    airJumpsLeft: body.airJumpsLeft,
     tp,
   };
 }
@@ -44,6 +47,7 @@ export function signalsFromSample(sample: Readonly<RemoteSample>): PlayerSignals
     attack: sample.attack,
     attackSeq: sample.attackSeq,
     hurt: sample.hurt,
+    airJumpsLeft: sample.airJumpsLeft,
     tp: sample.tp,
   };
 }

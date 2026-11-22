@@ -1,8 +1,8 @@
 /**
  * Proves every shipped level can be finished by one player without losing a heart.
  *
- * A best-first search over "macro" moves (run, jump with different holds and steering, wait,
- * attack) on the real `GameWorld`, cloned at every node: traps, their timing, boxes, wind and
+ * A best-first search over "macro" moves (run, jump with different holds and steering, double
+ * jump, wait, attack) on the real `GameWorld`, cloned at every node: traps, their timing, boxes, wind and
  * falling platforms are all simulated exactly as on the server. Each macro plays its inputs,
  * then neutral input until the player stands on something. A branch ends when the player
  * dies or loses a heart; the search succeeds when the level completes.
@@ -61,8 +61,13 @@ for (const [d, dir] of [
   MACROS.push({ name: `runJump${d}`, inputs: seq([dir, 12], [J | dir, 26], [dir, 40]) });
   MACROS.push({ name: `jump${d} late`, inputs: seq([J, 18], [J | dir, 8], [dir, 30]) });
   MACROS.push({ name: `attack${d}`, inputs: seq([dir | A, 1], [0, 16]) });
+  // Double jumps: release, then press again near the apex (or early, or after going straight up).
+  MACROS.push({ name: `doubleJump${d}`, inputs: seq([J | dir, 24], [dir, 1], [J | dir, 22], [dir, 40]) });
+  MACROS.push({ name: `doubleJump${d} early`, inputs: seq([J | dir, 12], [dir, 1], [J | dir, 22], [dir, 30]) });
+  MACROS.push({ name: `doubleJump${d} late`, inputs: seq([J, 24], [0, 1], [J, 10], [J | dir, 12], [dir, 30]) });
 }
 MACROS.push({ name: 'jumpUp', inputs: seq([J, 26]) });
+MACROS.push({ name: 'doubleJumpUp', inputs: seq([J, 24], [0, 1], [J, 22]) });
 for (const n of [12, 30, 60]) MACROS.push({ name: `wait${n}`, inputs: seq([0, n]) });
 
 interface Node {
