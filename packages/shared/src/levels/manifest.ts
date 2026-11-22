@@ -86,8 +86,15 @@ export const LEVELS = defineLevels([
     id: 'level-3',
     name: 'Sunset Ruins',
     map: 'maps/level-3.json',
-    next: null,
+    next: 'level-4',
     background: 'peach',
+  },
+  {
+    id: 'level-4',
+    name: 'Small Test Room',
+    map: 'maps/level-4.json',
+    next: null,
+    background: 'blue',
   },
 ]);
 
