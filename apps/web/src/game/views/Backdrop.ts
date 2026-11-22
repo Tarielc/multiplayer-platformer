@@ -1,29 +1,29 @@
 import type * as Phaser from 'phaser';
+import { backgroundKey, backgroundOffsetY, resolveBackground } from '../art/backgroundArt';
 import { VIEW_CONFIG } from '../config';
 
-/** Procedural parallax layers fixed to the camera, scrolled by a fraction of camera movement. */
+/**
+ * The world background: one seamless tile repeated over the whole view, fixed to the camera and
+ * drifting down forever (an endless, slow loop). If the tile failed to load, the level's
+ * background colour shows instead.
+ */
 export class Backdrop {
-  private readonly layers: { sprite: Phaser.GameObjects.TileSprite; factor: number; baseY: number }[] = [];
+  private readonly sprite: Phaser.GameObjects.TileSprite | null = null;
+  private elapsedMs = 0;
 
-  constructor(scene: Phaser.Scene) {
-    VIEW_CONFIG.parallax.forEach((layer, index) => {
-      if (!scene.textures.exists(layer.texture)) return;
-      const source = scene.textures.get(layer.texture).getSourceImage();
-      const baseY = Math.round(VIEW_CONFIG.height * layer.y);
-      const sprite = scene.add
-        .tileSprite(0, baseY, VIEW_CONFIG.width, source.height, layer.texture)
-        .setOrigin(0, 0)
-        .setScrollFactor(0)
-        .setAlpha(layer.alpha)
-        .setDepth(VIEW_CONFIG.depth.backdrop + index);
-      this.layers.push({ sprite, factor: layer.scrollFactor, baseY });
-    });
+  constructor(scene: Phaser.Scene, tile: string | undefined) {
+    const key = backgroundKey(resolveBackground(tile));
+    if (!scene.textures.exists(key)) return;
+    this.sprite = scene.add
+      .tileSprite(0, 0, VIEW_CONFIG.width, VIEW_CONFIG.height, key)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(VIEW_CONFIG.depth.backdrop);
   }
 
-  update(camera: Phaser.Cameras.Scene2D.Camera): void {
-    for (const layer of this.layers) {
-      layer.sprite.tilePositionX = camera.scrollX * layer.factor;
-      layer.sprite.y = layer.baseY - camera.scrollY * layer.factor * 0.5;
-    }
+  update(frameMs: number): void {
+    if (!this.sprite) return;
+    this.elapsedMs += frameMs;
+    this.sprite.tilePositionY = backgroundOffsetY(this.elapsedMs);
   }
 }

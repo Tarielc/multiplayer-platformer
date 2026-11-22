@@ -19,7 +19,16 @@ export interface LevelManifestEntry {
   tuning?: Partial<MovementTuning>;
   /** Used when the Tiled map has no background color. */
   backgroundColor?: string;
+  /**
+   * Endless scrolling background tile (`BACKGROUND_TILES`, file in `data/backgrounds/`).
+   * Presentation only. Defaults to the first tile.
+   */
+  background?: string;
 }
+
+/** Seamless 64×64 tiles in `packages/shared/data/backgrounds/`, by name. */
+export const BACKGROUND_TILES = ['blue', 'peach', 'gray', 'green', 'pink', 'lavender', 'yellow'] as const;
+export type BackgroundTile = (typeof BACKGROUND_TILES)[number];
 
 export interface LevelManifest {
   readonly entries: readonly LevelManifestEntry[];
@@ -62,6 +71,7 @@ export const LEVELS = defineLevels([
     name: 'Green Hills',
     map: 'maps/level-1.json',
     next: 'level-2',
+    background: 'green',
   },
   {
     id: 'level-2',
@@ -70,12 +80,14 @@ export const LEVELS = defineLevels([
     next: 'level-3',
     // Example of a per-level override: slightly floatier jumps up the tower.
     tuning: { timeToApex: 0.42 },
+    background: 'lavender',
   },
   {
     id: 'level-3',
     name: 'Sunset Ruins',
     map: 'maps/level-3.json',
     next: null,
+    background: 'peach',
   },
 ]);
 

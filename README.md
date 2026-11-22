@@ -118,7 +118,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | `traps.ts` | trap damage, knockback and invulnerability; per-trap sizes, speeds and timings (see [Traps and health](#traps-and-health)) |
 | `net.ts` | tick and snapshot rates, interpolation delay, input queue limits, room timers, reconnect and rate limits |
 
-Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42 }`). The Phaser view settings (camera, parallax, effects) are in `apps/web/src/game/config.ts`.
+Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42 }`). The Phaser view settings (camera, effects) are in `apps/web/src/game/config.ts`.
 
 ### Levels
 
@@ -175,7 +175,7 @@ The pause menu has a sound on/off toggle and a volume slider, saved per browser.
 
 The levels use `packages/shared/data/tilesets/terrain-tileset.png` (16×16 tiles): wall, ground and brick sets with inner corners, block sets, and one-way platforms. Everything is solid except the platforms. See [Terrain tileset](docs/level-authoring.md#terrain-tileset) for the layout and the auto-tiling legend.
 
-The start sign, checkpoint flags and finish trophies are sprite sheets in `packages/shared/data/sprites/markers/` (64×64 frames, one row per animation; layout in `traps/trapArt.ts`). Collectibles and backgrounds are drawn procedurally in `apps/web/src/game/art/textures.ts`. Swap in real images by loading them in `BootScene` and pointing `EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
+The start sign, checkpoint flags and finish trophies are sprite sheets in `packages/shared/data/sprites/markers/` (64×64 frames, one row per animation; layout in `traps/trapArt.ts`). Collectibles are drawn procedurally in `apps/web/src/game/art/textures.ts`. Swap in real images by loading them in `BootScene` and pointing `EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
 
 ## React ↔ Phaser integration
 

@@ -1,4 +1,6 @@
 import * as Phaser from 'phaser';
+import { BACKGROUND_TILES } from '@platformer/shared';
+import { backgroundKey, backgroundPath } from '../art/backgroundArt';
 import { createProceduralTextures } from '../art/textures';
 import { prepareSoundCues, queueSoundOverrides } from '../audio/SoundController';
 import { ensureCharacterSheet, registerCharacterAnimations } from '../characters/characterAnimations';
@@ -35,6 +37,9 @@ export class BootScene extends Phaser.Scene {
       this.load.spritesheet(key, `${this.services.assetBase}/${path}`, { frameWidth, frameHeight });
     }
     queueTrapSheets(this, this.services.assetBase);
+    for (const name of BACKGROUND_TILES) {
+      if (!this.textures.exists(backgroundKey(name))) this.load.image(backgroundKey(name), `${this.services.assetBase}/${backgroundPath(name)}`);
+    }
     queueSoundOverrides(this, this.services.assetBase);
   }
 

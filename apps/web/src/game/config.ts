@@ -8,7 +8,6 @@ export interface ViewConfig {
   backgroundColor: string;
   camera: { lerp: number; deadzoneWidth: number; deadzoneHeight: number };
   /** Parallax backdrop layers (procedural textures from BootScene). */
-  parallax: { texture: string; scrollFactor: number; alpha: number; y: number }[];
   label: { fontFamily: string; fontSize: number; offsetY: number };
   squash: { landX: number; landY: number; jumpX: number; jumpY: number; durationMs: number };
   /** Blinking while invulnerable after a trap hit: on/off period and the dimmed alpha. */
@@ -38,10 +37,6 @@ export const VIEW_CONFIG: Readonly<ViewConfig> = {
   height: 540,
   backgroundColor: '#10131f',
   camera: { lerp: 0.14, deadzoneWidth: 96, deadzoneHeight: 72 },
-  parallax: [
-    { texture: 'bg-far', scrollFactor: 0.15, alpha: 0.55, y: 0.38 },
-    { texture: 'bg-near', scrollFactor: 0.35, alpha: 0.7, y: 0.52 },
-  ],
   label: { fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 10, offsetY: 8 },
   squash: { landX: 1.12, landY: 0.88, jumpX: 0.9, jumpY: 1.1, durationMs: 110 },
   invulnerable: { blinkPeriodMs: 70, blinkAlpha: 0.25 },

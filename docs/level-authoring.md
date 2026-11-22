@@ -46,7 +46,7 @@ Rules:
 - Tile layers draw in Tiled's order, behind the players.
 - A tile layer with the bool property `foreground = true` draws **in front of** the players. Use it for grass tufts, pillars or arches the players walk behind.
 - Layer opacity is respected. Group layers are flattened, and a hidden group hides its children.
-- Image layers, layer offsets and parallax factors are ignored. The parallax backdrop is procedural (`apps/web/src/game/views/Backdrop.ts`).
+- Image layers, layer offsets and parallax factors are ignored. The world background is a seamless 64×64 tile that drifts down in an endless loop (`apps/web/src/game/views/Backdrop.ts`). Pick it per level with `background` in the manifest (`blue`, `peach`, `gray`, `green`, `pink`, `lavender` or `yellow`; images in `packages/shared/data/backgrounds/`). Add a tile by adding the PNG and its name to `BACKGROUND_TILES`.
 - Background: the map's *Background Color*, else a string map property `backgroundColor`, else the manifest's `backgroundColor`, else the default from `apps/web/src/game/config.ts`.
 
 ## Objects

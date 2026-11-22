@@ -192,7 +192,7 @@ export class LevelScene extends Phaser.Scene {
     this.presentation.on('world', this.onWorldCue);
 
     this.setupCamera(level);
-    this.backdrop = new Backdrop(this);
+    this.backdrop = new Backdrop(this, this.entry.background);
     this.buildTilemap(json as TiledMap);
     this.entityViews = new EntityViews(this, level);
     this.trapViews = new TrapViews(this, traps, (event) => this.presentation.emit('world', event));
@@ -310,7 +310,7 @@ export class LevelScene extends Phaser.Scene {
     trapViews.update(predictor.renderTick(alpha) ?? renderTick, frameMs);
     if (debug) trapViews.debugBoxes(boxes);
     entityViews.update(frameMs);
-    this.backdrop?.update(this.cameras.main);
+    this.backdrop?.update(frameMs);
     this.debugDraw?.draw(boxes);
     this.reportStats(frameMs);
   }

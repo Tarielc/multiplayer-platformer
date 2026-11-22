@@ -13,8 +13,6 @@ export const TEXTURES = {
   marker: 'marker',
   lava: 'lava',
   danger: 'danger',
-  bgFar: 'bg-far',
-  bgNear: 'bg-near',
 } as const;
 
 type Draw = (ctx: CanvasRenderingContext2D, width: number, height: number) => void;
@@ -113,17 +111,4 @@ export function createProceduralTextures(scene: Phaser.Scene): void {
     }
   });
 
-  // Parallax hills: horizontally tileable (all sine periods divide the width).
-  const hills =
-    (color: string, base: number, amps: [number, number, number]): Draw =>
-    (ctx, w, h) => {
-      ctx.fillStyle = color;
-      for (let x = 0; x < w; x++) {
-        const t = (x / w) * Math.PI * 2;
-        const y = base - amps[0] * Math.sin(t) - amps[1] * Math.sin(t * 3 + 1) - amps[2] * Math.sin(t * 7 + 2);
-        ctx.fillRect(x, Math.round(y), 1, h - Math.round(y));
-      }
-    };
-  canvasTexture(scene, TEXTURES.bgFar, 512, 360, hills('rgba(32, 44, 92, 0.55)', 90, [34, 16, 6]));
-  canvasTexture(scene, TEXTURES.bgNear, 512, 320, hills('rgba(24, 64, 72, 0.6)', 70, [18, 12, 5]));
 }
