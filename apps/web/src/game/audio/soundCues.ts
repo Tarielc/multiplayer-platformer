@@ -29,6 +29,7 @@ export const SOUND_CUES = [
   'kiss',
   'heal',
   'drone',
+  'clawSnap',
   'grab',
   'drop',
   'grow',
@@ -348,6 +349,19 @@ export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
     },
     volume: 0.45,
     maxVoices: 2,
+  }),
+  /** The drone's claw snaps shut (a grab attempt, caught or not). */
+  clawSnap: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.125, freq: 1600, freqEnd: 900, attack: 0.001, sustain: 0.008, decay: 0.035, lowpass: 4500, gain: 0.35 },
+        { wave: 'noise', freq: 7000, freqEnd: 3000, attack: 0.001, sustain: 0.004, decay: 0.03, lowpass: 6000, gain: 0.45 },
+        { wave: 'square', duty: 0.125, freq: 1300, freqEnd: 800, attack: 0.001, sustain: 0.006, decay: 0.03, lowpass: 4000, gain: 0.2, delay: 0.045 },
+      ],
+    },
+    volume: 0.4,
+    detuneJitter: 70,
+    minIntervalMs: 80,
   }),
   /** A claw or a tongue catches something. */
   grab: cue({

@@ -5,7 +5,7 @@ import type { PlayerCue } from './player/PlayerStateMachine';
 export type PlayerCueName = PlayerCue | 'step' | AbilityCueName;
 
 /** Moments of a special ability, emitted by the owner's view as its phase changes. */
-export type AbilityCueName = 'healStart' | 'kiss' | 'drone' | 'grow' | 'shrink' | 'tongue' | 'gulp' | 'spit';
+export type AbilityCueName = 'healStart' | 'kiss' | 'drone' | 'clawSnap' | 'grow' | 'shrink' | 'tongue' | 'gulp' | 'spit';
 
 export interface PlayerCueEvent {
   cue: PlayerCueName;

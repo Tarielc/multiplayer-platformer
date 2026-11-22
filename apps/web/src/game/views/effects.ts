@@ -3,14 +3,14 @@ import { TEXTURES } from '../art/textures';
 import { VIEW_CONFIG } from '../config';
 
 /** Burst of puffs (death, respawn). */
-export function puff(scene: Phaser.Scene, x: number, y: number, tint: number, count = 10): void {
+export function puff(scene: Phaser.Scene, x: number, y: number, tint: number, count = 10, spread = 1): void {
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
-    const distance = 12 + Math.random() * 16;
+    const distance = (12 + Math.random() * 16) * spread;
     const particle = scene.add
       .image(x, y, TEXTURES.puff)
       .setTint(tint)
-      .setScale(0.7 + Math.random() * 0.7)
+      .setScale((0.7 + Math.random() * 0.7) * Math.max(0.5, spread))
       .setDepth(VIEW_CONFIG.depth.effects);
     scene.tweens.add({
       targets: particle,

@@ -27,6 +27,7 @@ import {
   type AbilityAnimDef,
 } from './abilityArt';
 import { playFx } from './abilityFx';
+import { puff } from '../views/effects';
 
 export interface AbilityFrame extends AbilitySignals {
   /** Bottom-centre of the hitbox, world px. */
@@ -73,6 +74,13 @@ const PHASE_CUES: Partial<Record<number, AbilityCueName>> = {
   [Phase.TONGUE_GULP]: 'gulp',
   [Phase.TONGUE_SPIT]: 'spit',
 };
+/**
+ * The claw's grab attempt (ms after the press): it drops, snaps shut, and if nothing was caught
+ * by `emptyAt` it rattles, puffs air and reels back up, opening again on the way.
+ */
+const LUNGE = { dropMs: 80, closeMs: 190, emptyAt: 200, riseMs: 160, depth: 12 } as const;
+const LUNGE_MS = LUNGE.dropMs + LUNGE.closeMs + LUNGE.riseMs;
+
 /** Frames of a tongue aim row: windup 0-1, shoot 2, hold 3-4, retract 5, spit 6-7. */
 const TONGUE_OUT_PHASES: ReadonlySet<number> = new Set([Phase.TONGUE_SHOOT, Phase.TONGUE_PULL, Phase.TONGUE_RETRACT]);
 
@@ -105,6 +113,10 @@ export class AbilityView {
   private heldSince = 0;
   private lastCargo: number = Cargo.NONE;
   private cargoSince = -1000;
+  private lastSpecialSeq: number | null = null;
+  private lungeStart = -Infinity;
+  private lungeEmpty = false;
+  private lungeSnapped = false;
   private droneFlip = false;
   private lastHealFrame = -1;
   private trailMs = 0;
@@ -154,6 +166,17 @@ export class AbilityView {
     if (f.cargo !== this.lastCargo) {
       this.lastCargo = f.cargo;
       this.cargoSince = this.clock;
+      this.lungeStart = -Infinity; // caught something (or let go): the claw state takes over
+    }
+    if (f.specialSeq !== this.lastSpecialSeq) {
+      // A press while flying with an empty claw is a grab attempt (with cargo it is a drop).
+      const press = this.lastSpecialSeq !== null && f.phase === Phase.DRONE_PILOT && f.cargo === Cargo.NONE;
+      this.lastSpecialSeq = f.specialSeq;
+      if (press && f.alive) {
+        this.lungeStart = this.clock;
+        this.lungeEmpty = false;
+        this.lungeSnapped = false;
+      }
     }
     if (!f.alive) {
       // A giant dies big; the pose goes away with the clip, like the normal Death clip.
@@ -305,11 +328,13 @@ export class AbilityView {
     else if (f.droneVx < -5) this.droneFlip = true;
     else if (f.phase !== Phase.DRONE_PILOT) this.droneFlip = f.facing < 0;
     const i = frameAt(def, ms);
+    const lunge = this.lunge(f);
     this.drone
       .setTexture(key, frameName(anim, i))
       .setFlipX(this.droneFlip)
       .setOrigin(0.5, 0.5)
-      .setPosition(f.droneX, f.droneY)
+      .setPosition(f.droneX, f.droneY + lunge.droneDy)
+      .setRotation(lunge.tilt)
       .setVisible(true);
 
     // Cable and claw: reeled in while deploying / recalling.
@@ -321,19 +346,58 @@ export class AbilityView {
     const flip = this.droneFlip ? -1 : 1;
     const winch = { x: f.droneX + (winchPoint[0] + 0.5 - 24) * flip, y: f.droneY + (winchPoint[1] + 0.5 - 24) };
     const gripY = f.droneY + d.gripY;
-    const clawTop = Math.max(winch.y, gripY - 5 - (gripY - 5 - winch.y) * reel);
+    const clawTop = Math.max(winch.y, gripY - 5 - (gripY - 5 - winch.y) * reel) + lunge.clawDy;
     const clawKey = ABILITY_SHEETS.claw.key;
     const holding = f.cargo !== Cargo.NONE && f.phase === Phase.DRONE_PILOT;
-    const clawAnim = holding ? 'close' : this.clock - this.cargoSince < 140 ? 'release' : 'open';
+    let clawAnim = holding ? 'close' : this.clock - this.cargoSince < 140 ? 'release' : 'open';
+    let clawMs = this.clock - this.cargoSince;
+    if (lunge.claw) [clawAnim, clawMs] = lunge.claw;
     const clawDef = abilityAnim(clawKey, clawAnim);
     if (clawDef) {
-      const ci = frameAt(clawDef, this.clock - this.cargoSince);
-      this.claw.setTexture(clawKey, frameName(clawAnim, ci)).setOrigin(0.5, 0).setPosition(f.droneX, clawTop).setVisible(true);
+      const ci = frameAt(clawDef, clawMs);
+      this.claw
+        .setTexture(clawKey, frameName(clawAnim, ci))
+        .setOrigin(0.5, 0)
+        .setPosition(f.droneX + lunge.clawDx, clawTop)
+        .setVisible(true);
     }
     if (clawTop > winch.y + 1) {
       this.cable.fillStyle(TONGUE_COLORS.outline, 1).fillRect(Math.round(winch.x) - 1, winch.y, 2, clawTop - winch.y);
       this.cable.fillStyle(0x8b93af, 1).fillRect(Math.round(winch.x) - 1, winch.y, 1, clawTop - winch.y);
     }
+  }
+
+  /** Offsets and claw clip of the current grab attempt (all zero when there is none). */
+  private lunge(f: AbilityFrame): { clawDy: number; clawDx: number; droneDy: number; tilt: number; claw: [string, number] | null } {
+    const since = this.clock - this.lungeStart;
+    if (f.phase !== Phase.DRONE_PILOT || f.cargo !== Cargo.NONE || since < 0 || since >= LUNGE_MS) {
+      return { clawDy: 0, clawDx: 0, droneDy: 0, tilt: 0, claw: null };
+    }
+    const { dropMs, closeMs, emptyAt, riseMs, depth } = LUNGE;
+    const closeAt = dropMs;
+    const riseAt = dropMs + closeMs;
+    let clawDy: number;
+    if (since < closeAt) clawDy = depth * (1 - (1 - since / dropMs) ** 2); // ease out
+    else if (since < riseAt) clawDy = depth;
+    else clawDy = depth * (1 - (since - riseAt) / riseMs);
+
+    if (since >= closeAt && !this.lungeSnapped) {
+      this.lungeSnapped = true;
+      this.cue('clawSnap', f.droneX, f.droneY + C.drone.gripY + depth);
+    }
+    // Still nothing in the claw after the snap: rattle the empty jaws and puff a little air.
+    const empty = since >= emptyAt;
+    if (empty && !this.lungeEmpty) {
+      this.lungeEmpty = true;
+      puff(this.scene, f.droneX, f.droneY + C.drone.gripY + depth + 8, 0xffffff, 4, 0.35);
+    }
+    const rattle = empty && since < riseAt ? (Math.floor(since / 30) % 2 === 0 ? 1 : -1) : 0;
+    const tilt = empty ? Math.sin(((since - emptyAt) / (LUNGE_MS - emptyAt)) * Math.PI * 3) * 0.06 * (1 - (since - emptyAt) / (LUNGE_MS - emptyAt)) : 0;
+    let claw: [string, number];
+    if (since < closeAt) claw = ['open', 0];
+    else if (since < riseAt) claw = ['close', since - closeAt];
+    else claw = ['release', since - riseAt];
+    return { clawDy, clawDx: rattle, droneDy: since >= closeAt && since < emptyAt ? 1 : 0, tilt, claw };
   }
 
   private frog(f: AbilityFrame, ms: number): boolean {

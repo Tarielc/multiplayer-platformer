@@ -12,6 +12,8 @@ export interface AbilitySignals {
   phase: number;
   phaseTime: number;
   specialCooldown: number;
+  /** Special presses so far (the drone pilot's grab attempts show as claw lunges). */
+  specialSeq: number;
   aim: number;
   reach: number;
   giant: number;
@@ -29,6 +31,7 @@ export function abilitySignals(s: Readonly<AbilitySignals>): AbilitySignals {
     phase: s.phase,
     phaseTime: s.phaseTime,
     specialCooldown: s.specialCooldown,
+    specialSeq: s.specialSeq,
     aim: s.aim,
     reach: s.reach,
     giant: s.giant,

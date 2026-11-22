@@ -23,6 +23,7 @@ export interface RemoteSample {
   phase: number;
   phaseTime: number;
   specialCooldown: number;
+  specialSeq: number;
   aim: number;
   reach: number;
   giant: number;
@@ -120,6 +121,7 @@ export class Interpolator {
         phase: samePhase || snap ? pb.phase : t >= 0.5 ? pb.phase : pa.phase,
         phaseTime: samePhase ? lerp(pa.phaseTime, pb.phaseTime, t) : t >= 0.5 || snap ? pb.phaseTime : pa.phaseTime,
         specialCooldown: snap ? pb.specialCooldown : lerp(pa.specialCooldown, pb.specialCooldown, t),
+        specialSeq: pb.specialSeq,
         aim: pb.aim,
         reach: samePhase ? lerp(pa.reach, pb.reach, t) : pb.reach,
         giant: snap ? pb.giant : lerp(pa.giant, pb.giant, t),
