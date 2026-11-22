@@ -1,8 +1,9 @@
 import type { TrapKind } from '@platformer/shared';
 
 /**
- * Trap art as data (no Phaser import, so tests can check it). Sheets live in
- * `packages/shared/data/sprites/traps/`, one row per animation, frames left to right.
+ * Trap and level-marker art as data (no Phaser import, so tests can check it). Sheets live in
+ * `packages/shared/data/sprites/traps/` and `sprites/markers/` (start sign, checkpoint flag,
+ * finish trophy), one row per animation, frames left to right.
  *
  * `bodyX`/`bodyY` say where the simulation body's top-left sits inside a frame, so views can
  * draw a sprite exactly over the collision box the server uses (`TRAP_TUNING` sizes). For the
@@ -18,7 +19,10 @@ export type TrapSheetName =
   | 'spikeHead'
   | 'box1'
   | 'box2'
-  | 'box3';
+  | 'box3'
+  | 'start'
+  | 'checkpoint'
+  | 'finish';
 
 export interface TrapSheet {
   key: string;
@@ -35,11 +39,15 @@ export interface TrapSheet {
   placeholderColor: number;
 }
 
-const sheet = (name: string, def: Omit<TrapSheet, 'key' | 'path'> & { file?: string }): TrapSheet => ({
+const sheet = (name: string, def: Omit<TrapSheet, 'key' | 'path'> & { file?: string; dir?: string }): TrapSheet => ({
   key: `trap:${name}`,
-  path: `sprites/traps/${def.file ?? name}.png`,
+  path: `sprites/${def.dir ?? 'traps'}/${def.file ?? name}.png`,
   ...def,
 });
+
+/** Level markers: 64×64 frames drawn with their bottom on the ground (no collision body). */
+const marker = (name: string, rowFrames: number[], placeholderColor: number): TrapSheet =>
+  sheet(name, { dir: 'markers', frameWidth: 64, frameHeight: 64, columns: Math.max(...rowFrames), rowFrames, bodyX: 0, bodyY: 0, placeholderColor });
 
 const box = (file: string, hitFrames: number): TrapSheet =>
   sheet(file, { frameWidth: 28, frameHeight: 24, columns: 4, rowFrames: [1, hitFrames, 4], bodyX: 4, bodyY: 2, placeholderColor: 0xb5713c });
@@ -83,7 +91,26 @@ export const TRAP_SHEETS: Readonly<Record<TrapSheetName, TrapSheet>> = {
   box1: box('box1', 3),
   box2: box('box2', 4),
   box3: box('box3', 2),
+  // Rows: idle, moving (wobbles when a player runs past).
+  start: marker('start', [1, 17], 0xe8b53a),
+  // Rows: bare pole, flag out (on activation), flag idle (loop).
+  checkpoint: marker('checkpoint', [1, 26, 10], 0x9aa0c3),
+  // Rows: idle, pressed (a player reached the exit).
+  finish: marker('finish', [1, 8], 0xffd23f),
 };
+
+/**
+ * Where marker sprites stand (origin, as a fraction of the frame): the bottom row is the ground.
+ * The start sign is placed so its checkered start line lies under the first spawn point.
+ */
+export const MARKER_ORIGIN = {
+  start: { x: 43 / 64, y: 1 },
+  checkpoint: { x: 0.5, y: 1 },
+  finish: { x: 0.5, y: 1 },
+} as const;
+
+/** Pixels from the frame bottom to the top of the trophy (for the "n/m at exit" label). */
+export const FINISH_ART_HEIGHT = 44;
 
 export const TRAP_SHEET_NAMES = Object.keys(TRAP_SHEETS) as TrapSheetName[];
 
@@ -117,6 +144,10 @@ export const TRAP_CLIPS = {
   'box1:hit': { sheet: 'box1', row: 1, from: 0, frames: 3, frameRate: 16, loop: false },
   'box2:hit': { sheet: 'box2', row: 1, from: 0, frames: 4, frameRate: 16, loop: false },
   'box3:hit': { sheet: 'box3', row: 1, from: 0, frames: 2, frameRate: 12, loop: false },
+  'start:moving': { sheet: 'start', row: 1, from: 0, frames: 17, frameRate: 20, loop: false },
+  'checkpoint:flagOut': { sheet: 'checkpoint', row: 1, from: 0, frames: 26, frameRate: 24, loop: false },
+  'checkpoint:flagIdle': { sheet: 'checkpoint', row: 2, from: 0, frames: 10, frameRate: 14, loop: true },
+  'finish:pressed': { sheet: 'finish', row: 1, from: 0, frames: 8, frameRate: 14, loop: false },
 } as const satisfies Record<string, TrapClip>;
 
 export type TrapClipName = keyof typeof TRAP_CLIPS;

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { TRAP_KINDS, TRAP_TUNING } from '@platformer/shared';
 import { describe, expect, it } from 'vitest';
-import { BOX_DEBRIS, TRAP_CLIPS, TRAP_SHEET_NAMES, TRAP_SHEETS, fanFrameCount, sheetForTrap, trapFrame, type TrapClipName } from './trapArt';
+import { BOX_DEBRIS, FINISH_ART_HEIGHT, MARKER_ORIGIN, TRAP_CLIPS, TRAP_SHEET_NAMES, TRAP_SHEETS, fanFrameCount, sheetForTrap, trapFrame, type TrapClipName } from './trapArt';
 
 const sheetFile = (path: string) => fileURLToPath(new URL(`../../../../../packages/shared/data/${path}`, import.meta.url));
 
@@ -42,6 +42,20 @@ describe('trap art', () => {
       const sheet = TRAP_SHEETS[sheetForTrap('box', variant)];
       expect(sheet.rowFrames[BOX_DEBRIS.row]).toBe(BOX_DEBRIS.pieces);
     }
+  });
+
+  it('stands the start, checkpoint and finish markers on the ground', () => {
+    for (const name of ['start', 'checkpoint', 'finish'] as const) {
+      const sheet = TRAP_SHEETS[name];
+      expect(sheet.path, name).toBe(`sprites/markers/${name}.png`);
+      expect(MARKER_ORIGIN[name].y, name).toBe(1); // bottom row on the ground
+      expect(MARKER_ORIGIN[name].x, name).toBeGreaterThan(0);
+      expect(MARKER_ORIGIN[name].x, name).toBeLessThan(1);
+    }
+    expect(FINISH_ART_HEIGHT).toBeLessThanOrEqual(TRAP_SHEETS.finish.frameHeight);
+    // The checkpoint waves its flag after raising it; both clips come from the same sheet.
+    expect(TRAP_CLIPS['checkpoint:flagOut'].loop).toBe(false);
+    expect(TRAP_CLIPS['checkpoint:flagIdle'].loop).toBe(true);
   });
 
   it('draws each sprite over the collision body the server uses', () => {

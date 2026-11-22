@@ -9,9 +9,6 @@ import type * as Phaser from 'phaser';
 export const TEXTURES = {
   coin: 'coin',
   gem: 'gem',
-  flagDown: 'flag-down',
-  flagUp: 'flag-up',
-  door: 'door',
   puff: 'puff',
   marker: 'marker',
   lava: 'lava',
@@ -66,48 +63,6 @@ export function createProceduralTextures(scene: Phaser.Scene): void {
     diamond(2.5);
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.fillRect(6, 6, 3, 3);
-  });
-
-  const flag = (up: boolean): Draw => (ctx, w, h) => {
-    ctx.fillStyle = '#5a5f7a';
-    ctx.fillRect(3, 2, 3, h - 4);
-    ctx.fillStyle = '#3b3f55';
-    ctx.fillRect(0, h - 4, 10, 4);
-    ctx.fillStyle = up ? '#7ee081' : '#9aa0c3';
-    const top = up ? 4 : h - 22;
-    ctx.beginPath();
-    ctx.moveTo(6, top);
-    ctx.lineTo(w, top + 7);
-    ctx.lineTo(6, top + 14);
-    ctx.closePath();
-    ctx.fill();
-  };
-  canvasTexture(scene, TEXTURES.flagDown, 24, 64, flag(false));
-  canvasTexture(scene, TEXTURES.flagUp, 24, 64, flag(true));
-
-  canvasTexture(scene, TEXTURES.door, 32, 64, (ctx, w, h) => {
-    ctx.fillStyle = '#5b3a1e';
-    ctx.beginPath();
-    ctx.roundRect(1, 4, w - 2, h - 4, [14, 14, 0, 0]);
-    ctx.fill();
-    ctx.fillStyle = '#20263f';
-    ctx.beginPath();
-    ctx.roundRect(5, 8, w - 10, h - 8, [10, 10, 0, 0]);
-    ctx.fill();
-    ctx.fillStyle = '#ffd23f';
-    ctx.beginPath();
-    // A star over the doorway marks the exit.
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 === 0 ? 6 : 2.6;
-      const a = -Math.PI / 2 + (i * Math.PI) / 5;
-      const px = w / 2 + Math.cos(a) * r;
-      const py = 22 + Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillRect(w - 11, h - 26, 3, 3);
   });
 
   canvasTexture(scene, TEXTURES.puff, 8, 8, (ctx) => {
