@@ -1,3 +1,4 @@
+import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import type { CompiledMovement } from '../config/movement';
 import { msToTicks, TICK_DT } from '../config/net';
@@ -7,7 +8,8 @@ import type { NetPlayerState, NetWorldState } from '../protocol/state';
 import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/math';
 import { cellAt } from './collision';
 import type { DeathCause, GameEvent } from './events';
-import { createBody, resetBody, stepPlayerMovement, type MovementBody, type MovementContext } from './movement';
+import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
+import { createBody, resetBody, type MovementBody, type MovementContext } from './movement';
 
 export interface WorldPlayer {
   readonly id: string;
@@ -28,11 +30,19 @@ export interface WorldPlayer {
    * Absent players stay in the world but don't count towards the exit rule.
    */
   present: boolean;
+  /** Server-only hit bookkeeping (not replicated): the swing `swingHits` belongs to. */
+  swingSeq: number;
+  /** Bitmask of slots already hit by the current swing (one hit per target per swing). */
+  swingHits: number;
+  /** Ticks left during which this player can't be hit (stun + immunity). Server-only. */
+  hitImmuneTicks: number;
 }
 
 export interface GameWorldOptions {
   level: LevelData;
   movement: CompiledMovement;
+  /** Attack/hurt tuning (defaults to `resolveCombat()`). */
+  combat?: CompiledCombat;
   players?: Readonly<PlayerConfig>;
   entities?: Readonly<EntityConfig>;
   /** Fixed step in seconds (defaults to 1 / tickRate). */
@@ -68,6 +78,7 @@ export class GameWorld {
       level: options.level,
       movement: options.movement,
       hitbox: this.playerConfig.hitbox,
+      combat: options.combat ?? resolveCombat(),
       dt: options.dt ?? TICK_DT,
     };
     this.respawnDelayTicks = Math.max(1, msToTicks(this.playerConfig.respawnDelayMs));
@@ -112,6 +123,9 @@ export class GameWorld {
       atExit: false,
       tp: 0,
       present: true,
+      swingSeq: 0,
+      swingHits: 0,
+      hitImmuneTicks: 0,
     };
     this.players.set(id, player);
     return player;
@@ -126,16 +140,17 @@ export class GameWorld {
     if (player) player.present = present;
   }
 
-  /** Applies one input frame to one player: movement first, then interactions. */
+  /** Applies one input frame to one player: actions + movement first, then interactions. */
   stepPlayer(id: string, buttons: number): void {
     const player = this.players.get(id);
     if (!player) return;
-    stepPlayerMovement(player.body, buttons, this.ctx);
+    stepPlayerBody(player.body, buttons, this.ctx);
     if (player.body.alive) this.resolveInteractions(player);
   }
 
-  /** World-level rules that run once per tick regardless of input (respawns, exit rule). */
+  /** World-level rules that run once per tick regardless of input (hits, respawns, exit rule). */
   endTick(): void {
+    if (this.ctx.combat.playerHits) this.resolveAttacks();
     for (const player of this.players.values()) {
       if (player.body.alive) continue;
       player.respawnTicks -= 1;
@@ -216,6 +231,58 @@ export class GameWorld {
     player.atExit = this.level.exits.some((zone) => rectsOverlap(box, zone));
   }
 
+  /**
+   * Player-vs-player swings, in two passes: every hit is found against the state at the start
+   * of the pass, then applied. Simultaneous swings therefore trade (both players are hit)
+   * instead of the lower slot always winning, and the result doesn't depend on order. A target
+   * hit by several swings on the same tick takes the lowest slot's hit.
+   */
+  private resolveAttacks(): void {
+    const combat = this.ctx.combat;
+    const hitbox = this.ctx.hitbox;
+    const players = this.listPlayers();
+    for (const player of players) {
+      if (player.hitImmuneTicks > 0) player.hitImmuneTicks -= 1;
+      if (player.body.attackSeq !== player.swingSeq) {
+        player.swingSeq = player.body.attackSeq;
+        player.swingHits = 0;
+      }
+    }
+    const hits = new Map<WorldPlayer, WorldPlayer>(); // target -> attacker
+    for (const attacker of players) {
+      const a = attacker.body;
+      if (!isAttackActive(a, combat)) continue;
+      const reach = attackReachBox(a, hitbox, combat);
+      for (const target of players) {
+        const t = target.body;
+        if (target === attacker || !t.alive || t.hurt > 0 || target.hitImmuneTicks > 0) continue;
+        if (attacker.swingHits & (1 << target.slot)) continue;
+        if (!rectsOverlap(reach, { x: t.x, y: t.y, width: hitbox.width, height: hitbox.height })) continue;
+        if (!hits.has(target)) hits.set(target, attacker);
+      }
+    }
+    const immuneTicks = msToTicks((combat.stun + combat.immunity) * 1000);
+    for (const [target, attacker] of hits) {
+      const a = attacker.body;
+      const t = target.body;
+      attacker.swingHits |= 1 << target.slot;
+      target.hitImmuneTicks = immuneTicks;
+      t.hurt = combat.stun;
+      t.attack = 0; // a hit cancels the target's own swing
+      // Away from the attacker; when exactly overlapping, along the attacker's facing.
+      const away = t.x - a.x;
+      const dir = away > 0 ? 1 : away < 0 ? -1 : a.facing;
+      t.vx = dir * combat.knockbackX;
+      t.vy = -combat.knockbackY;
+      t.grounded = false;
+      t.jumping = false;
+      t.coyote = 0;
+      t.buffer = 0;
+      // Face the attacker: the Hurt frames draw the impact on the side the body faces.
+      t.facing = dir > 0 ? -1 : 1;
+    }
+  }
+
   private touchesHazardTile(box: Rect): boolean {
     const { level } = this;
     const ts = level.tileSize;
@@ -262,6 +329,10 @@ export class GameWorld {
     body.vx = 0;
     body.vy = 0;
     body.jumping = false;
+    body.attack = 0;
+    body.attackCooldown = 0;
+    body.hurt = 0;
+    player.hitImmuneTicks = 0;
     player.respawnTicks = this.respawnDelayTicks;
     player.deaths += 1;
     player.atExit = false;
@@ -304,6 +375,11 @@ function toNetPlayer(p: WorldPlayer, ack: number): NetPlayerState {
     atExit: p.atExit,
     checkpointId: p.checkpointId,
     tp: p.tp,
+    attackHeld: b.attackHeld,
+    attack: b.attack,
+    attackCooldown: b.attackCooldown,
+    attackSeq: b.attackSeq,
+    hurt: b.hurt,
     ack,
   };
 }

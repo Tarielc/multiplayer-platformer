@@ -2,7 +2,7 @@ import {
   NET_CONFIG,
   bodyFromNetState,
   lerp,
-  stepPlayerMovement,
+  stepPlayerBody,
   type MovementBody,
   type MovementContext,
   type NetConfig,
@@ -20,7 +20,8 @@ interface PendingInput {
  *
  * Every local fixed step applies the input immediately (`step`) and keeps it until the server
  * acknowledges it. When an authoritative state arrives (`reconcile`), un-acked inputs are
- * replayed on top of it with the exact same `stepPlayerMovement` the server runs, so with no
+ * replayed on top of it with the exact same `stepPlayerBody` the server runs (movement and
+ * attack timers), so with no
  * packet loss or stalls the replayed state equals the prediction. Any residual error is hidden
  * by a visual offset that decays exponentially (or snapped when large / on teleports).
  */
@@ -54,6 +55,11 @@ export class LocalPredictor {
     return this.pending.length;
   }
 
+  /** Server teleport counter of the current state (respawns). */
+  get teleports(): number {
+    return this.tp;
+  }
+
   reset(): void {
     this.body = null;
     this.pending = [];
@@ -72,7 +78,7 @@ export class LocalPredictor {
     if (!body) return;
     this.prevX = body.x;
     this.prevY = body.y;
-    stepPlayerMovement(body, buttons, this.ctx);
+    stepPlayerBody(body, buttons, this.ctx);
     this.pending.push({ seq, buttons });
     const overflow = this.pending.length - this.config.maxPendingInputs;
     if (overflow > 0) this.pending.splice(0, overflow);
@@ -85,7 +91,7 @@ export class LocalPredictor {
     if (drop > 0) this.pending.splice(0, drop);
 
     const replayed = bodyFromNetState(server);
-    for (const input of this.pending) stepPlayerMovement(replayed, input.buttons, this.ctx);
+    for (const input of this.pending) stepPlayerBody(replayed, input.buttons, this.ctx);
 
     const body = this.body;
     if (!body || server.tp !== this.tp || replayed.alive !== body.alive) {

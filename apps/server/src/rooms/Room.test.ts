@@ -1,4 +1,13 @@
-import { Button, CloseCode, NET_CONFIG, NEUTRAL_INPUT, applyWorldDelta, msToTicks, type NetWorldState } from '@platformer/shared';
+import {
+  Button,
+  CloseCode,
+  NET_CONFIG,
+  NEUTRAL_INPUT,
+  applyWorldDelta,
+  msToTicks,
+  type CharacterId,
+  type NetWorldState,
+} from '@platformer/shared';
 import { describe, expect, it } from 'vitest';
 import { silentLogger } from '../log';
 import { FakeConnection, TEST_LEVELS, TEST_MANIFEST } from '../test/fakes';
@@ -25,9 +34,9 @@ function createRoom(devCommands = true): Room {
   });
 }
 
-function join(room: Room, name: string, clientId = `client-${name}-secret`): TestClient {
+function join(room: Room, name: string, clientId = `client-${name}-secret`, characterId?: CharacterId): TestClient {
   const conn = new FakeConnection();
-  const result = room.join(conn, { name, clientId });
+  const result = room.join(conn, characterId ? { name, clientId, characterId } : { name, clientId });
   if (!result.ok) throw new Error(`join failed: ${result.code}`);
   return { conn, id: result.playerId, slot: result.slot };
 }
@@ -104,6 +113,65 @@ describe('Room: joining', () => {
     const room = createRoom();
     join(room, '  Ann​   Lee  ');
     expect(room.info().players[0]!.name).toBe('Ann Lee');
+  });
+});
+
+describe('Room: characters', () => {
+  const characterOf = (room: Room, id: string) => room.info().players.find((p) => p.id === id)?.characterId;
+
+  it('gives each slot its default character', () => {
+    const room = createRoom();
+    const clients = ['A', 'B', 'C', 'D'].map((name) => join(room, name));
+    expect(clients.map((c) => characterOf(room, c.id))).toEqual(['bunny-man', 'virtual-guy', 'mask-dude', 'ninja-frog']);
+  });
+
+  it('honours a preferred character on join, or gives the next free one', () => {
+    const room = createRoom();
+    const a = join(room, 'A', undefined, 'ninja-frog');
+    const b = join(room, 'B', undefined, 'ninja-frog');
+    const c = join(room, 'C');
+    expect(characterOf(room, a.id)).toBe('ninja-frog');
+    expect(characterOf(room, b.id)).toBe('bunny-man'); // wraps past the end of the roster
+    expect(characterOf(room, c.id)).toBe('mask-dude'); // slot default
+  });
+
+  it('lets players switch to a free character in the lobby', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    const b = join(room, 'B');
+    room.handle(a.id, { t: 'selectCharacter', characterId: 'mask-dude' });
+    expect(characterOf(room, a.id)).toBe('mask-dude');
+    expect(b.conn.last('room')?.room.players[0]?.characterId).toBe('mask-dude');
+
+    room.handle(b.id, { t: 'selectCharacter', characterId: 'mask-dude' });
+    expect(b.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED', message: 'Mask Dude is taken by P1.' });
+    expect(characterOf(room, b.id)).toBe('virtual-guy');
+  });
+
+  it('refuses character changes outside the lobby', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    startPlaying(room, [a]);
+    room.handle(a.id, { t: 'selectCharacter', characterId: 'ninja-frog' });
+    expect(a.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(characterOf(room, a.id)).toBe('bunny-man');
+  });
+
+  it('keeps the character across a reconnect, ignoring a new preference', () => {
+    const room = createRoom();
+    const a = join(room, 'A', 'client-a-secret', 'mask-dude');
+    room.disconnect(a.id, a.conn);
+    const back = join(room, 'A', 'client-a-secret', 'ninja-frog');
+    expect(back.id).toBe(a.id);
+    expect(characterOf(room, a.id)).toBe('mask-dude');
+  });
+
+  it('gives a drop-in player a free character', () => {
+    const room = createRoom();
+    const a = join(room, 'A', undefined, 'virtual-guy');
+    startPlaying(room, [a]);
+    const late = join(room, 'Late'); // slot 1 default is taken by A
+    expect(characterOf(room, late.id)).toBe('mask-dude');
   });
 });
 

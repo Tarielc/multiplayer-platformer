@@ -5,6 +5,7 @@ import {
   PLAYER_CONFIG,
   TICK_DT,
   bodyFromNetState,
+  resolveCombat,
   resolveMovement,
   type NetPlayerState,
   type NetWorldState,
@@ -30,7 +31,7 @@ const ROWS = [
 ];
 const level = asciiToLevel({ rows: ROWS });
 const movement = resolveMovement();
-const ctx = { level, movement, hitbox: PLAYER_CONFIG.hitbox, dt: TICK_DT };
+const ctx = { level, movement, hitbox: PLAYER_CONFIG.hitbox, combat: resolveCombat(), dt: TICK_DT };
 
 function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlayerState {
   return {
@@ -53,6 +54,11 @@ function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlay
     atExit: false,
     checkpointId: null,
     tp: 0,
+    attackHeld: false,
+    attack: 0,
+    attackCooldown: 0,
+    attackSeq: 0,
+    hurt: 0,
     ack: 0,
     ...overrides,
   };
@@ -95,7 +101,8 @@ describe('LocalPredictor', () => {
     };
 
     for (let tick = 1; tick <= 900; tick++) {
-      if (random() < 0.08) buttons = Math.floor(random() * 16); // hold each input for a while
+      // Hold each input for a while; includes Attack, so swing timers must predict exactly too.
+      if (random() < 0.08) buttons = Math.floor(random() * 32);
       predictor.step(tick, buttons);
       toServer.push({ at: tick + LATENCY, seq: tick, buttons });
       serverTick(tick);
@@ -107,8 +114,52 @@ describe('LocalPredictor', () => {
     }
 
     expect(maxCorrection).toBe(0);
+    expect(predictor.current!.attackSeq).toBeGreaterThan(0);
     expect(predictor.pendingCount).toBe(0);
     expect(predictor.current).toEqual(bodyFromNetState(serverState()));
+  });
+
+  it('converges exactly on the server after an unpredicted hit (stun + knockback)', () => {
+    const server = new GameWorld({ level, movement });
+    server.addPlayer('me', 0);
+    server.addPlayer('bot', 1); // shares the only spawn: standing inside "me", facing right
+    let ack = 0;
+    const serverState = () => server.getPlayer('me')!;
+    const net = () => server.toNetState(() => ack).players.find((p) => p.id === 'me')!;
+
+    const predictor = new LocalPredictor(ctx);
+    predictor.reconcile(net());
+    const LATENCY = 6;
+    const toServer: Array<{ at: number; seq: number; buttons: number }> = [];
+    const toClient: Array<{ at: number; state: NetPlayerState }> = [];
+    let wasHurt = false;
+    let maxCorrection = 0;
+
+    for (let tick = 1; tick <= 240; tick++) {
+      const buttons = tick > 40 && tick < 100 ? Button.RIGHT | (tick === 70 ? Button.JUMP : 0) : NEUTRAL_INPUT;
+      if (tick <= 200) {
+        predictor.step(tick, buttons);
+        toServer.push({ at: tick + LATENCY, seq: tick, buttons });
+      }
+      while (toServer.length > 0 && toServer[0]!.at <= tick) {
+        const frame = toServer.shift()!;
+        server.stepPlayer('me', frame.buttons);
+        ack = frame.seq;
+      }
+      server.stepPlayer('bot', tick === 10 ? Button.ATTACK : NEUTRAL_INPUT);
+      server.endTick();
+      wasHurt ||= serverState().body.hurt > 0;
+      if (tick % 3 === 0) toClient.push({ at: tick + LATENCY, state: net() });
+      while (toClient.length > 0 && toClient[0]!.at <= tick) {
+        predictor.reconcile(toClient.shift()!.state);
+        maxCorrection = Math.max(maxCorrection, predictor.lastCorrection);
+      }
+    }
+
+    expect(wasHurt).toBe(true);
+    expect(maxCorrection).toBeGreaterThan(0); // the hit itself can't be predicted…
+    expect(predictor.pendingCount).toBe(0);
+    expect(predictor.current).toEqual(bodyFromNetState(net())); // …but replay converges exactly
   });
 
   it('hides small corrections behind an offset that decays', () => {
@@ -169,6 +220,18 @@ describe('Interpolator', () => {
 
     interpolator.push(world(9, [netPlayer('a', { x: 520, tp: 1, alive: false })]));
     expect(interpolator.sample(7).get('a')).toMatchObject({ x: 520, alive: false });
+  });
+
+  it('counts combat timers down smoothly but takes new swings and hits from the newer state', () => {
+    const interpolator = new Interpolator();
+    interpolator.push(world(0, [netPlayer('a', { attack: 0.3, attackSeq: 1, hurt: 0.2 })]));
+    interpolator.push(world(3, [netPlayer('a', { attack: 0.25, attackSeq: 1, hurt: 0.15 })]));
+    expect(interpolator.sample(1.5).get('a')).toMatchObject({ attackSeq: 1 });
+    expect(interpolator.sample(1.5).get('a')!.attack).toBeCloseTo(0.275);
+    expect(interpolator.sample(1.5).get('a')!.hurt).toBeCloseTo(0.175);
+
+    interpolator.push(world(6, [netPlayer('a', { attack: 0.35, attackSeq: 2, hurt: 0.3 })]));
+    expect(interpolator.sample(4.5).get('a')).toMatchObject({ attack: 0.35, attackSeq: 2, hurt: 0.3 });
   });
 
   it('shows players who just joined at their newest position', () => {

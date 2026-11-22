@@ -1,7 +1,8 @@
-import { PLAYER_CONFIG, sanitizePlayerName } from '@platformer/shared';
+import { PLAYER_CONFIG, isCharacterId, sanitizePlayerName, type CharacterId } from '@platformer/shared';
 
 const CLIENT_ID_KEY = 'platformer.clientId';
 const NAME_KEY = 'platformer.name';
+const CHARACTER_KEY = 'platformer.character';
 const CHANNEL = 'platformer.clientId';
 const CLAIM_TIMEOUT_MS = 60;
 
@@ -60,4 +61,15 @@ export function savePlayerName(name: string): string {
   const clean = sanitizePlayerName(name);
   localStorage.setItem(NAME_KEY, clean);
   return clean;
+}
+
+/** The character this browser last picked, or null (then the server uses the slot default). */
+export function loadPreferredCharacter(): CharacterId | null {
+  if (typeof window === 'undefined') return null;
+  const value = localStorage.getItem(CHARACTER_KEY);
+  return isCharacterId(value) ? value : null;
+}
+
+export function savePreferredCharacter(id: CharacterId): void {
+  localStorage.setItem(CHARACTER_KEY, id);
 }

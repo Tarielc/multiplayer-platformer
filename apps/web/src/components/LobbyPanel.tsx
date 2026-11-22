@@ -1,9 +1,12 @@
 'use client';
 
-import { LEVELS, MAX_PLAYERS, PLAYER_SLOTS } from '@platformer/shared';
+import { LEVELS, MAX_PLAYERS, PLAYER_SLOTS, slotStyle, type CharacterId } from '@platformer/shared';
 import type { CSSProperties } from 'react';
 import type { GameSession } from '@/hooks/useGameSession';
+import { savePreferredCharacter } from '@/net/identity';
 import type { RoomView } from '@/net/RoomStore';
+import { CharacterPicker } from './CharacterPicker';
+import { CharacterPortrait } from './CharacterPortrait';
 import styles from './LobbyPanel.module.css';
 
 export function LobbyPanel({ session, view }: { session: GameSession; view: RoomView }) {
@@ -16,6 +19,13 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
   const readyCount = connected.filter((p) => p.ready).length;
   const selected = LEVELS.get(room.selectedLevelId);
   const finalScores = room.campaignComplete ? [...room.players].sort((a, b) => b.campaignScore - a.campaignScore) : [];
+  const takenBy = new Map<CharacterId, string>(
+    room.players.filter((p) => p.id !== view.selfId).map((p) => [p.characterId, slotStyle(p.slot).label]),
+  );
+  const pickCharacter = (id: CharacterId) => {
+    savePreferredCharacter(id);
+    client.selectCharacter(id);
+  };
 
   return (
     <section className={styles.lobby}>
@@ -45,7 +55,10 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
               data-ready={player?.ready ?? false}
               style={{ '--slot': style.css, '--slot-shade': style.shadeCss } as CSSProperties}
             >
-              <div className={styles.avatar}>{style.label}</div>
+              <div className={styles.avatar}>
+                {player ? <CharacterPortrait characterId={player.characterId} scale={2} animated /> : null}
+                <span className={styles.slotLabel}>{style.label}</span>
+              </div>
               {player ? (
                 <>
                   <div className={styles.name}>
@@ -65,6 +78,16 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
           );
         })}
       </div>
+
+      {me && (
+        <CharacterPicker
+          legend="Your character"
+          value={me.characterId}
+          onChange={pickCharacter}
+          takenBy={takenBy}
+          disabled={room.phase !== 'lobby'}
+        />
+      )}
 
       <div className={styles.controls}>
         <label className={styles.level}>

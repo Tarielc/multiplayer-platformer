@@ -5,6 +5,24 @@ import { BootScene } from './scenes/BootScene';
 import { LevelScene } from './scenes/LevelScene';
 import type { GameServices } from './services';
 
+let sharedAudioContext: AudioContext | null | undefined;
+
+/**
+ * One AudioContext for every game this page creates. Browsers limit how many contexts a page
+ * may open, and a context the player already unlocked (by a click or key press) stays unlocked
+ * for the next game. Phaser suspends, rather than closes, a context it was given.
+ */
+function audioContext(): AudioContext | undefined {
+  if (sharedAudioContext === undefined) {
+    try {
+      sharedAudioContext = typeof AudioContext === 'undefined' ? null : new AudioContext();
+    } catch {
+      sharedAudioContext = null;
+    }
+  }
+  return sharedAudioContext ?? undefined;
+}
+
 export interface GameHandle {
   game: Phaser.Game;
   /** Idempotent. Destroys the game (async: completes next frame) and removes `parent`. */
@@ -28,8 +46,8 @@ export function createGame(parent: HTMLElement, services: GameServices): GameHan
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     input: { keyboard: true, gamepad: true },
-    // No sounds ship with the template. To add audio, remove `noAudio` and load sounds in a scene.
-    audio: { noAudio: true },
+    // Sounds are synthesized at boot (game/audio); recorded overrides load in BootScene.
+    audio: { context: audioContext() },
     banner: false,
     scene: [new BootScene(services), new LevelScene(services)],
   });

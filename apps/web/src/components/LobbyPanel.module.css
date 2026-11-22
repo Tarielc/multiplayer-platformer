@@ -63,16 +63,26 @@
 }
 
 .avatar {
-  width: 48px;
-  height: 56px;
+  position: relative;
+  width: 76px;
+  height: 76px;
   display: grid;
   place-items: center;
-  border-radius: 12px 12px 8px 8px;
-  background: var(--slot);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--slot) 22%, var(--bg-sunken));
   border: 3px solid var(--slot-shade);
-  color: #10131f;
-  font-weight: 800;
   opacity: 0.35;
+}
+
+.slotLabel {
+  position: absolute;
+  bottom: -0.65rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--slot);
+  color: #10131f;
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
 .slot[data-filled='true'] .avatar {

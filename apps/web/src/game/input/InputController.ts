@@ -7,22 +7,26 @@ type Keys = Phaser.Input.Keyboard.Key[];
 /**
  * Turns keyboard + gamepad state into the shared `Button` bitmask, once per fixed step.
  *
- * Jump presses are latched until a simulation step consumes them, so a quick tap between two
- * steps (high refresh rates, low frame rates) is never lost.
+ * Jump and Attack presses are latched until a simulation step consumes them, so a quick tap
+ * between two steps (high refresh rates, low frame rates) is never lost.
  */
 export class InputController {
   private readonly left: Keys;
   private readonly right: Keys;
   private readonly jump: Keys;
   private readonly down: Keys;
+  private readonly attack: Keys;
   private readonly keyboard: Phaser.Input.Keyboard.KeyboardPlugin | null;
   private readonly gamepad: Phaser.Input.Gamepad.GamepadPlugin | null;
   private readonly gameEvents: Phaser.Events.EventEmitter;
-  private jumpLatched = false;
+  /** Buttons pressed since the last consumed step (Button.JUMP | Button.ATTACK). */
+  private latched = 0;
   private menuWasDown = false;
   private enabled = true;
   private readonly onPadDown = (_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
-    if (this.bindings.gamepad.jumpButtons.includes(button.index)) this.jumpLatched = true;
+    if (!this.enabled) return;
+    if (this.bindings.gamepad.jumpButtons.includes(button.index)) this.latched |= Button.JUMP;
+    if (this.bindings.gamepad.attackButtons.includes(button.index)) this.latched |= Button.ATTACK;
   };
   private readonly onBlur = () => this.keyboard?.resetKeys();
 
@@ -40,19 +44,25 @@ export class InputController {
     this.right = this.keyboard ? add(kb.right) : [];
     this.jump = this.keyboard ? add(kb.jump) : [];
     this.down = this.keyboard ? add(kb.down) : [];
+    this.attack = this.keyboard ? add(kb.attack) : [];
     for (const key of this.jump) key.on(Phaser.Input.Keyboard.Events.DOWN, this.latchJump);
+    for (const key of this.attack) key.on(Phaser.Input.Keyboard.Events.DOWN, this.latchAttack);
     this.gamepad?.on(Phaser.Input.Gamepad.Events.BUTTON_DOWN, this.onPadDown);
     this.gameEvents.on(Phaser.Core.Events.BLUR, this.onBlur);
   }
 
   private readonly latchJump = () => {
-    if (this.enabled) this.jumpLatched = true;
+    if (this.enabled) this.latched |= Button.JUMP;
+  };
+
+  private readonly latchAttack = () => {
+    if (this.enabled) this.latched |= Button.ATTACK;
   };
 
   /** While a menu is open keys are not captured (page shortcuts and buttons work normally). */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    this.jumpLatched = false;
+    this.latched = 0;
     if (!this.keyboard) return;
     if (enabled) this.keyboard.enableGlobalCapture();
     else {
@@ -61,24 +71,26 @@ export class InputController {
     }
   }
 
-  /** Current buttons (held + latched jump); 0 while disabled. Call once per fixed step. */
+  /** Current buttons (held + latched presses); 0 while disabled. Call once per fixed step. */
   sample(): number {
     if (!this.enabled) return 0;
-    let buttons = 0;
+    let buttons = this.latched;
     const held = (keys: Keys) => keys.some((key) => key.isDown);
     if (held(this.left)) buttons |= Button.LEFT;
     if (held(this.right)) buttons |= Button.RIGHT;
     if (held(this.down)) buttons |= Button.DOWN;
-    if (held(this.jump) || this.jumpLatched) buttons |= Button.JUMP;
+    if (held(this.jump)) buttons |= Button.JUMP;
+    if (held(this.attack)) buttons |= Button.ATTACK;
 
     const pad = this.firstPad();
     if (pad) {
-      const { stickDeadzone, downThreshold, jumpButtons } = this.bindings.gamepad;
+      const { stickDeadzone, downThreshold, jumpButtons, attackButtons } = this.bindings.gamepad;
       const stick = pad.leftStick;
       if (pad.left || stick.x < -stickDeadzone) buttons |= Button.LEFT;
       if (pad.right || stick.x > stickDeadzone) buttons |= Button.RIGHT;
       if (pad.down || stick.y > downThreshold) buttons |= Button.DOWN;
       if (jumpButtons.some((i) => pad.buttons[i]?.pressed)) buttons |= Button.JUMP;
+      if (attackButtons.some((i) => pad.buttons[i]?.pressed)) buttons |= Button.ATTACK;
     }
     return buttons;
   }
@@ -93,7 +105,7 @@ export class InputController {
 
   /** Call after a simulation step used the sampled buttons. */
   consumeLatch(): void {
-    this.jumpLatched = false;
+    this.latched = 0;
   }
 
   /**
@@ -103,9 +115,12 @@ export class InputController {
    */
   destroy(): void {
     for (const key of this.jump) key.off(Phaser.Input.Keyboard.Events.DOWN, this.latchJump);
+    for (const key of this.attack) key.off(Phaser.Input.Keyboard.Events.DOWN, this.latchAttack);
     const keyboard = this.keyboard;
     if (keyboard?.manager) {
-      for (const key of [...this.left, ...this.right, ...this.jump, ...this.down]) keyboard.removeKey(key, true);
+      for (const key of [...this.left, ...this.right, ...this.jump, ...this.down, ...this.attack]) {
+        keyboard.removeKey(key, true);
+      }
       keyboard.enableGlobalCapture();
     }
     this.gamepad?.off(Phaser.Input.Gamepad.Events.BUTTON_DOWN, this.onPadDown);

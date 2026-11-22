@@ -10,6 +10,7 @@ export * from './level/types';
 export * from './level/validate';
 
 // Deterministic simulation
+export * from './sim/actions';
 export * from './sim/collision';
 export * from './sim/events';
 export * from './sim/input';

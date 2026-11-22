@@ -1,3 +1,4 @@
+import { isCharacterId } from '../config/characters';
 import { PLAYER_CONFIG } from '../config/players';
 import { ALL_BUTTONS } from '../sim/input';
 import { DEV_COMMANDS, type ClientMessage, type DevCommand } from './messages';
@@ -45,15 +46,31 @@ const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
 export function parseClientMessage(value: unknown): ClientMessage | null {
   if (!isObj(value) || typeof value.t !== 'string') return null;
   switch (value.t) {
-    case 'join':
-      return isInt(value.protocol, 0, 1_000_000) &&
-        isStr(value.roomId, 1, 32) &&
-        isStr(value.name, 0, 64) &&
-        isStr(value.clientId, 8, 64)
-        ? { t: 'join', protocol: value.protocol, roomId: value.roomId, name: value.name, clientId: value.clientId }
-        : null;
+    case 'join': {
+      if (
+        !isInt(value.protocol, 0, 1_000_000) ||
+        !isStr(value.roomId, 1, 32) ||
+        !isStr(value.name, 0, 64) ||
+        !isStr(value.clientId, 8, 64)
+      ) {
+        return null;
+      }
+      const join: ClientMessage = {
+        t: 'join',
+        protocol: value.protocol,
+        roomId: value.roomId,
+        name: value.name,
+        clientId: value.clientId,
+      };
+      // Optional preference: an unknown id is ignored rather than rejecting the whole join
+      // (a newer client may know characters this server doesn't).
+      if (isCharacterId(value.characterId)) join.characterId = value.characterId;
+      return join;
+    }
     case 'ready':
       return isBool(value.ready) ? { t: 'ready', ready: value.ready } : null;
+    case 'selectCharacter':
+      return isCharacterId(value.characterId) ? { t: 'selectCharacter', characterId: value.characterId } : null;
     case 'selectLevel':
       return isStr(value.levelId, 1, 64) ? { t: 'selectLevel', levelId: value.levelId } : null;
     case 'input':

@@ -26,6 +26,12 @@ export interface NetPlayerState {
   checkpointId: number | null;
   /** Teleport counter: increments on respawn so clients snap instead of interpolating. */
   tp: number;
+  /** Combat state (see `MovementBody`): swing/stun timers in seconds, swing counter. */
+  attackHeld: boolean;
+  attack: number;
+  attackCooldown: number;
+  attackSeq: number;
+  hurt: number;
   /** Last input sequence number the server applied for this player. */
   ack: number;
 }
@@ -53,5 +59,10 @@ export function bodyFromNetState(state: NetPlayerState): MovementBody {
     buffer: state.buffer,
     drop: state.drop,
     alive: state.alive,
+    attackHeld: state.attackHeld,
+    attack: state.attack,
+    attackCooldown: state.attackCooldown,
+    attackSeq: state.attackSeq,
+    hurt: state.hurt,
   };
 }

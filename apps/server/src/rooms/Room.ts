@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import {
+  type CharacterId,
   CloseCode,
   GameWorld,
   MAX_PLAYERS,
@@ -7,9 +8,12 @@ import {
   NEUTRAL_INPUT,
   PROTOCOL_VERSION,
   SNAPSHOT_EVERY_TICKS,
+  characterInfo,
+  defaultCharacterForSlot,
   diffWorld,
   isDeltaEmpty,
   msToTicks,
+  pickFreeCharacter,
   sanitizePlayerName,
   ticksToMs,
   type ClientMessage,
@@ -50,6 +54,7 @@ interface RoomPlayer {
   ready: boolean;
   menuOpen: boolean;
   campaignScore: number;
+  characterId: CharacterId;
   connection: PlayerConnection | null;
   /** Ticks left before a disconnected player loses their slot. */
   graceTicks: number;
@@ -58,6 +63,8 @@ interface RoomPlayer {
 export interface JoinRequest {
   name: string;
   clientId: string;
+  /** Preferred character; the next free one is used if someone else has it. */
+  characterId?: CharacterId;
 }
 
 export type JoinResult =
@@ -170,6 +177,7 @@ export class Room {
         isHost: p.id === this.hostId,
         menuOpen: p.menuOpen,
         campaignScore: p.campaignScore,
+        characterId: p.characterId,
       })),
       selectedLevelId: this.selectedLevelId,
       level: this.level
@@ -218,15 +226,18 @@ export class Room {
       return { ok: false, code: 'ROOM_IN_PROGRESS', message: `Room ${this.id} is already playing.` };
     }
 
+    const slot = this.lowestFreeSlot();
+    const taken = [...this.players.values()].map((p) => p.characterId);
     const player: RoomPlayer = {
       id: this.uniquePlayerId(),
       clientId: request.clientId,
-      slot: this.lowestFreeSlot(),
+      slot,
       inputs: new InputQueue(this.net.input),
       name,
       ready: false,
       menuOpen: false,
       campaignScore: 0,
+      characterId: pickFreeCharacter(request.characterId ?? defaultCharacterForSlot(slot), taken),
       connection: null,
       graceTicks: 0,
     };
@@ -270,6 +281,9 @@ export class Room {
         break;
       case 'selectLevel':
         this.selectLevel(player, message.levelId);
+        break;
+      case 'selectCharacter':
+        this.selectCharacter(player, message.characterId);
         break;
       case 'menu':
         if (player.menuOpen !== message.open) {
@@ -481,6 +495,20 @@ export class Room {
     }
     if (this.selectedLevelId === levelId) return;
     this.selectedLevelId = levelId;
+    this.markRoomDirty();
+  }
+
+  private selectCharacter(player: RoomPlayer, characterId: CharacterId): void {
+    if (this.phase !== 'lobby') {
+      return this.reject(player, 'NOT_ALLOWED', 'Characters can only be changed in the lobby.');
+    }
+    if (player.characterId === characterId) return;
+    const owner = [...this.players.values()].find((p) => p !== player && p.characterId === characterId);
+    if (owner) {
+      const label = `P${owner.slot + 1}`;
+      return this.reject(player, 'NOT_ALLOWED', `${characterInfo(characterId).name} is taken by ${label}.`);
+    }
+    player.characterId = characterId;
     this.markRoomDirty();
   }
 

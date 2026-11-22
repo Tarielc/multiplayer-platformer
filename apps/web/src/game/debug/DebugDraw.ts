@@ -5,14 +5,18 @@ import { VIEW_CONFIG } from '../config';
 export interface DebugBox {
   x: number;
   y: number;
+  /** Defaults to the player hitbox size. */
+  width?: number;
+  height?: number;
   color: number;
-  /** Server "ghost" boxes are drawn thinner. */
+  /** Server "ghost" boxes and attack reach boxes are drawn thinner. */
   ghost?: boolean;
 }
 
 /**
- * F3 overlay: collision cells, zones and spawns (drawn once), plus player hitboxes and the
- * last authoritative server position of the local player (drawn each frame).
+ * F3 overlay: collision cells, zones and spawns (drawn once), plus player hitboxes, active
+ * attack reach boxes and the last authoritative server position of the local player (drawn
+ * each frame).
  */
 export class DebugDraw {
   private readonly staticLayer: Phaser.GameObjects.Graphics;
@@ -44,7 +48,7 @@ export class DebugDraw {
     g.clear();
     for (const box of boxes) {
       g.lineStyle(box.ghost ? 1 : 2, box.color, box.ghost ? 0.9 : 1);
-      g.strokeRect(box.x, box.y, this.hitbox.width, this.hitbox.height);
+      g.strokeRect(box.x, box.y, box.width ?? this.hitbox.width, box.height ?? this.hitbox.height);
     }
   }
 

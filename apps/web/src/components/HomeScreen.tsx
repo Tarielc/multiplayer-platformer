@@ -1,10 +1,18 @@
 'use client';
 
-import { LEVELS, MAX_PLAYERS, PLAYER_CONFIG, isRoomCode, normalizeRoomCode } from '@platformer/shared';
+import {
+  LEVELS,
+  MAX_PLAYERS,
+  PLAYER_CONFIG,
+  isRoomCode,
+  normalizeRoomCode,
+  type CharacterId,
+} from '@platformer/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { loadPlayerName, savePlayerName } from '@/net/identity';
+import { loadPlayerName, loadPreferredCharacter, savePlayerName, savePreferredCharacter } from '@/net/identity';
 import { gameServerHttpUrl } from '@/net/serverUrl';
+import { CharacterPicker } from './CharacterPicker';
 import styles from './HomeScreen.module.css';
 
 interface Health {
@@ -18,12 +26,22 @@ type ServerState = { kind: 'checking' } | { kind: 'online'; health: Health } | {
 export function HomeScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
+  // null until picked: the server then uses the slot default (P1 Bunny Man, P2 Virtual Guy, …).
+  const [character, setCharacter] = useState<CharacterId | null>(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [server, setServer] = useState<ServerState>({ kind: 'checking' });
 
-  useEffect(() => setName(loadPlayerName()), []);
+  useEffect(() => {
+    setName(loadPlayerName());
+    setCharacter(loadPreferredCharacter());
+  }, []);
+
+  const pickCharacter = (id: CharacterId) => {
+    setCharacter(id);
+    savePreferredCharacter(id);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +111,8 @@ export function HomeScreen() {
           />
         </label>
 
+        <CharacterPicker value={character} onChange={pickCharacter} />
+
         <div className={styles.actions}>
           <button className="primary" disabled={busy} onClick={() => void createRoom(true)}>
             Play solo
@@ -141,9 +161,12 @@ export function HomeScreen() {
             jump (hold for higher)
           </li>
           <li>
+            <kbd>J</kbd> / <kbd>X</kbd> attack (shoves other players)
+          </li>
+          <li>
             <kbd>↓</kbd> + jump drops through wooden platforms · <kbd>Esc</kbd> menu · <kbd>F3</kbd> debug overlay
           </li>
-          <li>Gamepad: stick / D-pad, A to jump, Start for the menu</li>
+          <li>Gamepad: stick / D-pad, A to jump, X to attack, Start for the menu</li>
         </ul>
       </section>
     </main>

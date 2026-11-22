@@ -36,6 +36,10 @@
   opacity: 0.6;
 }
 
+.portrait {
+  margin-left: 0.15rem;
+}
+
 .badge {
   display: grid;
   place-items: center;

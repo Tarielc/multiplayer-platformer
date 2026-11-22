@@ -1,13 +1,12 @@
-import { PLAYER_CONFIG, PLAYER_SLOTS } from '@platformer/shared';
 import type * as Phaser from 'phaser';
 
 /**
  * Procedural placeholder art, drawn on canvases and registered with `textures.addCanvas`,
  * so the template boots with zero external assets. Replace any key with a loaded image of
  * the same name (e.g. `this.load.image('coin', 'assets/sprites/coin.png')`) to reskin.
+ * Characters come from a sprite sheet instead (see `characters/characterArt.ts`).
  */
 export const TEXTURES = {
-  player: (slot: number) => `player-${slot}`,
   coin: 'coin',
   gem: 'gem',
   flagDown: 'flag-down',
@@ -35,42 +34,7 @@ function canvasTexture(scene: Phaser.Scene, key: string, width: number, height: 
   scene.textures.addCanvas(key, canvas);
 }
 
-const css = (hex: number, alpha = 1) =>
-  `rgba(${(hex >> 16) & 255}, ${(hex >> 8) & 255}, ${hex & 255}, ${alpha})`;
-
 export function createProceduralTextures(scene: Phaser.Scene): void {
-  const { width: hw, height: hh } = PLAYER_CONFIG.hitbox;
-
-  // Players: one texture per slot color, sized to the hitbox (+2 px margin), feet at the bottom.
-  for (const style of PLAYER_SLOTS) {
-    canvasTexture(scene, TEXTURES.player(style.slot), hw + 4, hh + 4, (ctx, w, h) => {
-      const x = 2;
-      const y = h - hh;
-      ctx.fillStyle = css(style.shade);
-      ctx.beginPath();
-      ctx.roundRect(x, y, hw, hh, 6);
-      ctx.fill();
-      ctx.fillStyle = css(style.color);
-      ctx.beginPath();
-      ctx.roundRect(x + 2, y + 2, hw - 4, hh - 5, 5);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.28)';
-      ctx.fillRect(x + 4, y + 4, 3, hh * 0.4);
-      // Eyes look right; the sprite is flipped for facing left.
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x + hw - 11, y + 8, 4, 6);
-      ctx.fillRect(x + hw - 6, y + 8, 3, 6);
-      ctx.fillStyle = '#151827';
-      ctx.fillRect(x + hw - 9, y + 10, 2, 3);
-      ctx.fillRect(x + hw - 5, y + 10, 2, 3);
-      // Feet
-      ctx.fillStyle = css(style.shade);
-      ctx.fillRect(x + 2, h - 3, 6, 3);
-      ctx.fillRect(x + hw - 8, h - 3, 6, 3);
-      void w;
-    });
-  }
-
   canvasTexture(scene, TEXTURES.coin, 16, 16, (ctx) => {
     ctx.fillStyle = '#a86f00';
     ctx.beginPath();

@@ -60,7 +60,7 @@ function roomInfo(overrides: Partial<RoomInfo> = {}, me: Partial<RoomPlayerInfo>
     phase: 'lobby',
     hostId: ME,
     maxPlayers: 4,
-    players: [{ id: ME, name: 'Ann', slot: 0, ready: false, connected: true, isHost: true, menuOpen: false, campaignScore: 0, ...me }],
+    players: [{ id: ME, name: 'Ann', slot: 0, ready: false, connected: true, isHost: true, menuOpen: false, campaignScore: 0, characterId: 'bunny-man', ...me }],
     selectedLevelId: 'level-1',
     level: null,
     paused: false,
@@ -144,6 +144,13 @@ describe('GameClient: lifecycle', () => {
     expect(client.status).toBe('open');
     expect(client.playerId).toBe(ME);
     expect(socket.sentOfType('ping')).toHaveLength(1);
+  });
+
+  it('sends a preferred character only when one is set', async () => {
+    const socket = await connected(createClient({ character: () => 'ninja-frog' }));
+    expect(socket.sent[0]).toMatchObject({ t: 'join', characterId: 'ninja-frog' });
+    const none = await connected(createClient({ character: () => null }));
+    expect(none.sent[0]).not.toHaveProperty('characterId');
   });
 
   it('reconnects with backoff after an unexpected close and restores the menu state', async () => {
@@ -231,7 +238,7 @@ describe('GameClient: auto-ready (solo play)', () => {
 
 describe('GameClient: world state', () => {
   const level = { id: 'level-1', name: 'Green Hills', checksum: 'abcd1234', run: 1 };
-  const player = { id: ME, x: 1, y: 2, vx: 0, vy: 0, facing: 1 as const, grounded: true, jumpHeld: false, jumping: false, coyote: 0, buffer: 0, drop: 0, alive: true, respawnIn: 0, score: 0, deaths: 0, atExit: false, checkpointId: null, tp: 0, ack: 0 };
+  const player = { id: ME, x: 1, y: 2, vx: 0, vy: 0, facing: 1 as const, grounded: true, jumpHeld: false, jumping: false, coyote: 0, buffer: 0, drop: 0, alive: true, respawnIn: 0, score: 0, deaths: 0, atExit: false, checkpointId: null, tp: 0, attackHeld: false, attack: 0, attackCooldown: 0, attackSeq: 0, hurt: 0, ack: 0 };
 
   it('emits keyframes and applied deltas, and asks for a resync on gaps', async () => {
     const client = createClient();

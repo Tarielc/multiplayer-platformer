@@ -30,6 +30,11 @@ function player(id: string, overrides: Partial<NetPlayerState> = {}): NetPlayerS
     atExit: false,
     checkpointId: null,
     tp: 0,
+    attackHeld: false,
+    attack: 0,
+    attackCooldown: 0,
+    attackSeq: 0,
+    hurt: 0,
     ack: 0,
     ...overrides,
   };
@@ -101,9 +106,12 @@ describe('world deltas', () => {
 describe('parseClientMessage', () => {
   it.each([
     { t: 'join', protocol: 1, roomId: 'ABCDE', name: 'Ann', clientId: '0123456789abcdef' },
+    { t: 'join', protocol: 1, roomId: 'ABCDE', name: 'Ann', clientId: '0123456789abcdef', characterId: 'ninja-frog' },
     { t: 'ready', ready: true },
+    { t: 'selectCharacter', characterId: 'mask-dude' },
     { t: 'selectLevel', levelId: 'level-2' },
     { t: 'input', seq: 42, buttons: Button.LEFT | Button.JUMP },
+    { t: 'input', seq: 43, buttons: Button.ATTACK | Button.RIGHT },
     { t: 'menu', open: false },
     { t: 'ping', id: 3, at: 1234.5 },
     { t: 'leave' },
@@ -117,15 +125,23 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage({ t: 'ready', ready: false, admin: true })).toEqual({ t: 'ready', ready: false });
   });
 
+  it('ignores an unknown join character instead of rejecting the join', () => {
+    const join = { t: 'join', protocol: 1, roomId: 'ABCDE', name: 'Ann', clientId: '0123456789abcdef' };
+    expect(parseClientMessage({ ...join, characterId: 'pink-man' })).toEqual(join);
+    expect(parseClientMessage({ ...join, characterId: 7 })).toEqual(join);
+  });
+
   it.each([
     ['non-objects', 'ready'],
     ['arrays', [{ t: 'leave' }]],
     ['unknown types', { t: 'teleport', x: 1 }],
-    ['unknown button bits', { t: 'input', seq: 1, buttons: 16 }],
+    ['unknown button bits', { t: 'input', seq: 1, buttons: 32 }],
     ['negative sequence numbers', { t: 'input', seq: -1, buttons: 0 }],
     ['fractional sequence numbers', { t: 'input', seq: 1.5, buttons: 0 }],
     ['wrong field types', { t: 'ready', ready: 'yes' }],
     ['unknown dev commands', { t: 'dev', cmd: 'godMode' }],
+    ['unknown characters', { t: 'selectCharacter', characterId: 'pink-man' }],
+    ['missing characters', { t: 'selectCharacter' }],
     ['short client ids', { t: 'join', protocol: 1, roomId: 'ABCDE', name: 'x', clientId: 'abc' }],
     ['non-finite ping times', { t: 'ping', id: 1, at: Number.POSITIVE_INFINITY }],
   ])('rejects %s', (_name, message) => {

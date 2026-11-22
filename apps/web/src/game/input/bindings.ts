@@ -8,6 +8,7 @@ export interface InputBindings {
     right: readonly string[];
     jump: readonly string[];
     down: readonly string[];
+    attack: readonly string[];
   };
   gamepad: {
     /** Stick deflection needed to count as left/right. */
@@ -15,6 +16,7 @@ export interface InputBindings {
     /** Stick deflection needed to count as down (drop-through). */
     downThreshold: number;
     jumpButtons: readonly number[];
+    attackButtons: readonly number[];
     menuButton: number;
   };
 }
@@ -25,11 +27,13 @@ export const DEFAULT_BINDINGS: Readonly<InputBindings> = {
     right: ['RIGHT', 'D'],
     jump: ['SPACE', 'UP', 'W', 'Z', 'K'],
     down: ['DOWN', 'S'],
+    attack: ['J', 'X'],
   },
   gamepad: {
     stickDeadzone: 0.35,
     downThreshold: 0.6,
     jumpButtons: [0, 1], // A / Cross, B / Circle
+    attackButtons: [2], // X / Square
     menuButton: 9, // Start / Options
   },
 };

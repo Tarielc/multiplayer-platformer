@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { resolveCombat } from '../config/combat';
 import { MOVEMENT_TUNING, compileMovement, resolveMovement, type MovementTuning } from '../config/movement';
 import { TICK_DT } from '../config/net';
 import { PLAYER_CONFIG } from '../config/players';
 import { asciiToLevel } from '../dev/asciiMap';
+import { mulberry32 } from '../util/math';
 import { Button, NEUTRAL_INPUT } from './input';
 import { cloneBody, createBody, stepPlayerMovement, type MovementBody, type MovementContext } from './movement';
 
 const HITBOX = PLAYER_CONFIG.hitbox;
 
 function makeCtx(rows: string[], tuning?: Partial<MovementTuning>): MovementContext {
-  return { level: asciiToLevel({ rows }), movement: resolveMovement(MOVEMENT_TUNING, tuning), hitbox: HITBOX, dt: TICK_DT };
+  return {
+    level: asciiToLevel({ rows }),
+    movement: resolveMovement(MOVEMENT_TUNING, tuning),
+    hitbox: HITBOX,
+    combat: resolveCombat(),
+    dt: TICK_DT,
+  };
 }
 
 function spawnBody(ctx: MovementContext, slot = 0): MovementBody {
@@ -31,18 +39,6 @@ function grounded(ctx: MovementContext, slot = 0): MovementBody {
 }
 
 const feet = (body: MovementBody) => body.y + HITBOX.height;
-
-/** Deterministic PRNG for reproducible random input streams. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // Floor top at y = 224 (row 7); spawn feet at (48, 224).
 const FLAT = [

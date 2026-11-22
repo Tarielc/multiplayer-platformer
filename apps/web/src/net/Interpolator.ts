@@ -11,6 +11,10 @@ export interface RemoteSample {
   alive: boolean;
   atExit: boolean;
   tp: number;
+  /** Swing / stun timers (s) and swing counter, for the animation state machine. */
+  attack: number;
+  attackSeq: number;
+  hurt: number;
 }
 
 /**
@@ -75,6 +79,10 @@ export class Interpolator {
     for (const pb of b.players) {
       const pa = before.get(pb.id);
       const snap = !pa || pa.tp !== pb.tp || pa.alive !== pb.alive;
+      // Timers count down smoothly between states, unless a new swing / hit started in between
+      // (then the newer state's fresh timer is the truth).
+      const newSwing = snap || pa.attackSeq !== pb.attackSeq;
+      const newHit = snap || pb.hurt > pa.hurt;
       out.set(pb.id, {
         id: pb.id,
         x: snap ? pb.x : lerp(pa.x, pb.x, t),
@@ -86,6 +94,9 @@ export class Interpolator {
         alive: pb.alive,
         atExit: pb.atExit,
         tp: pb.tp,
+        attack: newSwing ? pb.attack : lerp(pa.attack, pb.attack, t),
+        attackSeq: pb.attackSeq,
+        hurt: newHit ? pb.hurt : lerp(pa.hurt, pb.hurt, t),
       });
     }
     return out;

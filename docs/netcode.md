@@ -2,7 +2,7 @@
 
 The game server owns the game. Clients send inputs, and the server runs the simulation and broadcasts the results. Each client predicts **its own** player so the controls respond instantly, and draws **other** players slightly in the past, interpolated between server states.
 
-Client and server use the same rules: movement (`stepPlayerMovement`) and world logic (`GameWorld`) live in `packages/shared/src/sim`. All the numbers below come from `NET_CONFIG` in `packages/shared/src/config/net.ts`.
+Client and server use the same rules: movement and actions (`stepPlayerBody`, which wraps `stepPlayerMovement`) and world logic (`GameWorld`) live in `packages/shared/src/sim`. All the numbers below come from `NET_CONFIG` in `packages/shared/src/config/net.ts`.
 
 ```
  client (60 Hz fixed steps)                server (60 Hz tick, every room)
@@ -34,7 +34,7 @@ Every room timer counts ticks, not wall-clock time. Tests drive `room.tick()` by
 
 ## Inputs
 
-While playing, the client sends one `{ t: 'input', seq, buttons }` per fixed step. `buttons` is a bitmask: LEFT 1, RIGHT 2, JUMP 4, DOWN 8. `seq` increases by one per step. One input frame is exactly one simulation step of that player.
+While playing, the client sends one `{ t: 'input', seq, buttons }` per fixed step. `buttons` is a bitmask: LEFT 1, RIGHT 2, JUMP 4, DOWN 8, ATTACK 16. `seq` increases by one per step. One input frame is exactly one simulation step of that player.
 
 `InputQueue` (`apps/server/src/rooms/InputQueue.ts`) decides when frames are applied:
 
@@ -67,7 +67,7 @@ The world state is small: `{ tick, players[], collected[] }`. Each player carrie
 
 1. Samples the controls.
 2. Sends the input; `client.sendInput` returns its `seq`.
-3. Applies the input immediately with `LocalPredictor.step(seq, buttons)`, through the same `stepPlayerMovement` the server runs.
+3. Applies the input immediately with `LocalPredictor.step(seq, buttons)`, through the same `stepPlayerBody` the server runs.
 4. Keeps the input until the server acknowledges it. At most 180 inputs (3 s) are kept.
 
 When a server state for the local player arrives, `reconcile` does three things:
@@ -150,7 +150,8 @@ All messages are JSON objects with a `t` field. The types are in `packages/share
 
 | `t` | Fields | When |
 |---|---|---|
-| `join` | `protocol`, `roomId`, `name`, `clientId` | First message, within 10 s of connecting. |
+| `join` | `protocol`, `roomId`, `name`, `clientId`, optional `characterId` | First message, within 10 s of connecting. `characterId` is a preference: if it is taken, the player gets the next free character. On a rejoin it is ignored and the player keeps their character. |
+| `selectCharacter` | `characterId` | Lobby only. Refused with `NOT_ALLOWED` if another player has that character. |
 | `ready` | `ready` | Lobby (and the lobby countdown). |
 | `selectLevel` | `levelId` | Host only, in the lobby. |
 | `input` | `seq`, `buttons` | Every fixed step while playing. |
@@ -239,10 +240,15 @@ To go binary (MessagePack, or bit-packing with quantized positions):
 ## Extending
 
 - **New player state fields:**
-  1. Add the field to `NetPlayerState` (`protocol/state.ts`) and to `PLAYER_FIELDS` in `protocol/delta.ts`.
+  1. Add the field to `NetPlayerState` (`protocol/state.ts`) and to `PLAYER_FIELDS` in `protocol/delta.ts`. A compile-time check in `delta.ts` fails `typecheck` if a field is missing from `PLAYER_FIELDS`, because it would otherwise only sync in keyframes.
   2. Fill it in `toNetPlayer` (`sim/world.ts`).
   3. If prediction needs it, read it in `bodyFromNetState`.
   4. Bump `PROTOCOL_VERSION`.
+- **Actions, worked example (combat):**
+  - The swing itself is **predicted**: `stepPlayerBody` (`sim/actions.ts`) runs on both sides and owns the `attack`, `attackCooldown` and `hurt` timers plus `attackSeq`, a counter of swings started. Clients start the Attack animation from an increase in `attackSeq`, so a swing is never replayed after a rollback, and remote players get it from interpolated snapshots.
+  - **Hits are decided by the server**, in `GameWorld.resolveAttacks` at the end of each tick: every active reach box (`attackReachBox`) is tested against other players' hitboxes, first-found hits are collected, then applied together, so two simultaneous swings trade. A hit sets the target's stun, cancels their swing and applies knockback. Per-swing hit masks and post-stun immunity are server-only and never sent.
+  - The victim's client is not told about the hit separately. It sees the new `hurt` and velocity in the next snapshot and reconciles: replay from the stunned state, smoothed or snapped like any other correction.
+  - `COMBAT_TUNING.playerHits = false` keeps the swing and its animation but turns hits off.
 - **Moving platforms and other dynamic world objects:** put them in `GameWorld` and the world state. If players stand on them, prediction must know where they are at each tick. Make their motion a pure function of the tick, so the client can compute it without waiting for the server.
 - **Enemies and projectiles:** simulate them on the server and interpolate them on clients like remote players. Hits are decided by the server.
 - **More than one server process:** rooms live in memory, so a room code must always reach the same process. Use a lookup service or consistent hashing at the proxy, and keep `POST /rooms` on the instance that will host the room.

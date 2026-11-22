@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { resolveMovement } from '../config/movement';
 import { msToTicks } from '../config/net';
@@ -11,11 +12,12 @@ import { GameWorld } from './world';
 const HITBOX = PLAYER_CONFIG.hitbox;
 const RESPAWN_TICKS = msToTicks(PLAYER_CONFIG.respawnDelayMs);
 
-function makeWorld(rows: string[], entities: Partial<EntityConfig> = {}): GameWorld {
+function makeWorld(rows: string[], entities: Partial<EntityConfig> = {}, combat?: CompiledCombat): GameWorld {
   return new GameWorld({
     level: asciiToLevel({ rows }),
     movement: resolveMovement(),
     entities: { ...ENTITY_CONFIG, ...entities },
+    combat,
   });
 }
 
@@ -256,5 +258,154 @@ describe('GameWorld: network state', () => {
       ['second', 3],
     ]);
     expect(state.players[0]).toMatchObject({ alive: true, grounded: true, tp: 0, score: 0, checkpointId: null });
+  });
+});
+
+describe('GameWorld: combat', () => {
+  // Spawn feet at x = 48 (slot 0) and x = 80 (slot 1): 32 px apart, inside one swing's reach.
+  const NEAR = ['        ', '        ', ' 12     ', '########'];
+  // Slot 1 at x = 176: out of reach.
+  const FAR = ['        ', '        ', ' 1    2 ', '########'];
+  const COMBAT = resolveCombat();
+  const SWING_TICKS = msToTicks(COMBAT.attackDuration * 1000) + 2;
+
+  function setup(rows = NEAR, combat?: CompiledCombat) {
+    const world = makeWorld(rows, {}, combat);
+    const a = world.addPlayer('a', 0);
+    const b = world.addPlayer('b', 1);
+    ticks(world, 5);
+    return { world, a, b };
+  }
+
+  /** `a` presses attack once; returns the ticks (after the press) at which `b` got hit. */
+  function swing(world: GameWorld, buttons: Record<string, number> = { a: Button.ATTACK }): number[] {
+    const b = world.getPlayer('b')!.body;
+    const hits: number[] = [];
+    let prevHurt = b.hurt;
+    for (let i = 0; i < SWING_TICKS; i++) {
+      tick(world, i === 0 ? buttons : {});
+      if (b.hurt > prevHurt) hits.push(i);
+      prevHurt = b.hurt;
+    }
+    return hits;
+  }
+
+  it('hits a player in reach: stun, knockback away from the attacker, facing the hit', () => {
+    const { world, a, b } = setup();
+    const x = b.body.x;
+    const hits = swing(world);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]! * (1 / 60)).toBeGreaterThanOrEqual(COMBAT.activeFrom - 1 / 60);
+    expect(b.body.x).toBeGreaterThan(x + 10);
+    expect(b.body.facing).toBe(-1);
+    expect(a.body.hurt).toBe(0);
+  });
+
+  it('sets stun and launch velocity on the hit tick', () => {
+    const { world, b } = setup();
+    tick(world, { a: Button.ATTACK });
+    while (b.body.hurt === 0) tick(world);
+    expect(b.body.hurt).toBeCloseTo(COMBAT.stun);
+    expect(b.body.vx).toBe(COMBAT.knockbackX);
+    expect(b.body.vy).toBe(-COMBAT.knockbackY);
+    expect(b.body.grounded).toBe(false);
+  });
+
+  it('hits a player standing inside the attacker (players do not collide)', () => {
+    const { world, a, b } = setup();
+    place(world, 'b', a.body.x + HITBOX.width / 2 + 2, a.body.y + HITBOX.height);
+    expect(swing(world)).toHaveLength(1);
+    expect(b.body.vx).toBeGreaterThan(0);
+  });
+
+  it('misses when facing away, out of reach, or when the target is dead', () => {
+    const away = setup();
+    away.a.body.facing = -1;
+    expect(swing(away.world)).toEqual([]);
+
+    const far = setup(FAR);
+    expect(swing(far.world)).toEqual([]);
+
+    const dead = setup();
+    dead.world.killPlayer('b');
+    tick(dead.world);
+    expect(swing(dead.world)).toEqual([]);
+  });
+
+  it('keeps swings cosmetic when playerHits is off', () => {
+    const { world, a, b } = setup(NEAR, resolveCombat(undefined, { playerHits: false }));
+    expect(swing(world)).toEqual([]);
+    expect(a.body.attackSeq).toBe(1);
+    expect(b.body.vx).toBe(0);
+  });
+
+  it('hits each target at most once per swing (even with no stun or immunity)', () => {
+    const { world, b } = setup(NEAR, resolveCombat(undefined, { hurt: { stunMs: 0, immunityMs: 0 } }));
+    let launches = 0;
+    tick(world, { a: Button.ATTACK });
+    for (let i = 0; i < SWING_TICKS; i++) {
+      tick(world);
+      if (b.body.vy === -COMBAT.knockbackY) launches += 1;
+    }
+    expect(launches).toBe(1);
+  });
+
+  it('trades simultaneous swings: both players are hit and both swings are cancelled', () => {
+    const { world, a, b } = setup();
+    b.body.facing = -1;
+    tick(world, { a: Button.ATTACK, b: Button.ATTACK });
+    expect(b.body.attack).toBeGreaterThan(0);
+    while (b.body.hurt === 0) tick(world);
+    expect(a.body.hurt).toBeCloseTo(COMBAT.stun);
+    expect(a.body.attack).toBe(0);
+    expect(b.body.attack).toBe(0);
+    expect(a.body.vx).toBeLessThan(0);
+    expect(b.body.vx).toBeGreaterThan(0);
+  });
+
+  it('cancels the target swing when only the attacker connects', () => {
+    const { world, a, b } = setup();
+    tick(world, { a: Button.ATTACK, b: Button.ATTACK }); // b faces right, away from a
+    while (b.body.hurt === 0) tick(world);
+    expect(b.body.attack).toBe(0);
+    expect(a.body.hurt).toBe(0);
+  });
+
+  it('gives a hit player a short immunity after the stun (no stun-lock)', () => {
+    const { world, b } = setup();
+    const spawn = world.level.spawns[1]!;
+    const immuneTicks = msToTicks((COMBAT.stun + COMBAT.immunity) * 1000);
+    const hits: number[] = [];
+    let prevHurt = 0;
+    for (let i = 0; i < 150; i++) {
+      place(world, 'b', spawn.x, spawn.y); // hold the target in reach
+      tick(world, { a: i % 2 === 0 ? Button.ATTACK : 0 }); // mash attack
+      if (b.body.hurt > prevHurt) hits.push(i);
+      prevHurt = b.body.hurt;
+    }
+    expect(hits.length).toBeGreaterThan(2);
+    for (let i = 1; i < hits.length; i++) expect(hits[i]! - hits[i - 1]!).toBeGreaterThanOrEqual(immuneTicks);
+  });
+
+  it('clears swing and stun timers on death and keeps them clear after respawn', () => {
+    const { world, a } = setup();
+    tick(world, { a: Button.ATTACK });
+    a.body.hurt = 0.2;
+    world.killPlayer('a');
+    expect(a.body.attack).toBe(0);
+    expect(a.body.attackCooldown).toBe(0);
+    expect(a.body.hurt).toBe(0);
+    ticks(world, RESPAWN_TICKS + 1);
+    expect(a.body.alive).toBe(true);
+    expect(a.body.attack).toBe(0);
+    expect(a.body.attackSeq).toBe(1);
+  });
+
+  it('replicates combat state', () => {
+    const { world } = setup();
+    tick(world, { a: Button.ATTACK });
+    const net = world.toNetState(() => 0).players[0]!;
+    expect(net).toMatchObject({ attackSeq: 1, attackHeld: true, hurt: 0 });
+    expect(net.attack).toBeGreaterThan(0);
   });
 });

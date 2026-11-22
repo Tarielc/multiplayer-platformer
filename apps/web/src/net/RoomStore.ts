@@ -1,4 +1,4 @@
-import { slotStyle, type NetWorldState, type RoomInfo } from '@platformer/shared';
+import { slotStyle, type CharacterId, type NetWorldState, type RoomInfo } from '@platformer/shared';
 import type { ConnectionStatus, FatalError, GameClient } from './GameClient';
 
 export interface HudPlayer {
@@ -7,6 +7,7 @@ export interface HudPlayer {
   slot: number;
   label: string;
   color: string;
+  characterId: CharacterId;
   isSelf: boolean;
   isHost: boolean;
   connected: boolean;
@@ -136,6 +137,7 @@ export class RoomStore {
         slot: p.slot,
         label: style.label,
         color: style.css,
+        characterId: p.characterId,
         isSelf: p.id === this.view.selfId,
         isHost: p.isHost,
         connected: p.connected,

@@ -88,7 +88,11 @@ export class RoomManager {
       if (!created) return { ok: false, code: 'SERVER_FULL', message: 'The server is at capacity. Try again later.' };
       room = created;
     }
-    const result = room.join(connection, { name: message.name, clientId: message.clientId });
+    const result = room.join(connection, {
+      name: message.name,
+      clientId: message.clientId,
+      characterId: message.characterId,
+    });
     return result.ok ? { ...result, room } : result;
   }
 

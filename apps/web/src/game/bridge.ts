@@ -1,4 +1,5 @@
 import { TypedEmitter } from '@platformer/shared';
+import { DEFAULT_AUDIO_SETTINGS, type AudioSettings } from './audio/audioSettings';
 
 /** Network/perf numbers the scene reports for the debug HUD. */
 export interface NetStats {
@@ -32,12 +33,14 @@ export type BridgeEvents = {
   // React -> Phaser
   'ui:menu': boolean;
   'ui:debug': boolean;
+  'ui:audio': AudioSettings;
 };
 
 export class GameBridge extends TypedEmitter<BridgeEvents> {
   /** Latest UI state, so scenes that start later can read it instead of waiting for an event. */
   menuOpen = false;
   debug = false;
+  audio: AudioSettings = { ...DEFAULT_AUDIO_SETTINGS };
 
   setMenuOpen(open: boolean): void {
     if (this.menuOpen === open) return;
@@ -49,5 +52,11 @@ export class GameBridge extends TypedEmitter<BridgeEvents> {
     if (this.debug === enabled) return;
     this.debug = enabled;
     this.emit('ui:debug', enabled);
+  }
+
+  setAudio(settings: AudioSettings): void {
+    if (this.audio.muted === settings.muted && this.audio.volume === settings.volume) return;
+    this.audio = { ...settings };
+    this.emit('ui:audio', this.audio);
   }
 }

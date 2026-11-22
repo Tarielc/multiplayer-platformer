@@ -20,8 +20,21 @@ const PLAYER_FIELDS = [
   'atExit',
   'checkpointId',
   'tp',
+  'attackHeld',
+  'attack',
+  'attackCooldown',
+  'attackSeq',
+  'hurt',
   'ack',
 ] as const satisfies readonly (keyof NetPlayerState)[];
+
+/**
+ * Compile-time completeness check: a field added to `NetPlayerState` but not to
+ * `PLAYER_FIELDS` would only sync on keyframes. This line fails `typecheck` instead.
+ */
+type MissingPlayerField = Exclude<keyof NetPlayerState, (typeof PLAYER_FIELDS)[number] | 'id'>;
+const ALL_PLAYER_FIELDS_DIFFED: [MissingPlayerField] extends [never] ? true : MissingPlayerField = true;
+void ALL_PLAYER_FIELDS_DIFFED;
 
 export interface WorldDelta {
   /** New players (complete objects) or changed fields of existing ones. */

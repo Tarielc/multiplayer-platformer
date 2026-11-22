@@ -56,6 +56,26 @@
   }
 }
 
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.audio {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.audio input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
 .results {
   width: 100%;
   border-collapse: collapse;

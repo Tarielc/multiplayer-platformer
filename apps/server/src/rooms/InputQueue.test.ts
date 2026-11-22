@@ -31,7 +31,7 @@ describe('InputQueue', () => {
   it('strips unknown button bits', () => {
     const queue = new InputQueue(CONFIG);
     queue.push(1, 0xff);
-    expect(drainAll(queue)).toEqual([Button.LEFT | Button.RIGHT | Button.JUMP | Button.DOWN]);
+    expect(drainAll(queue)).toEqual([Button.LEFT | Button.RIGHT | Button.JUMP | Button.DOWN | Button.ATTACK]);
   });
 
   it('catches up after a burst of late frames, at most maxPerTick per tick', () => {

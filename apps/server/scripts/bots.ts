@@ -6,6 +6,7 @@
  * one machine and for rough load tests. Without --room a new room is created and printed.
  *
  * Options: --url ws://localhost:3001/ws  --room CODE  --count 3  --name Bot  --no-ready
+ *          --attack (tap Attack now and then, to see swings, shoves and Hurt on remote players)
  *          --seconds N (leave and exit after N seconds; default: run until Ctrl+C)
  */
 import { randomBytes } from 'node:crypto';
@@ -31,6 +32,7 @@ const { values } = parseArgs({
     count: { type: 'string', short: 'n', default: '3' },
     name: { type: 'string', default: 'Bot' },
     'no-ready': { type: 'boolean', default: false },
+    attack: { type: 'boolean', default: false },
     seconds: { type: 'string', short: 's' },
   },
 });
@@ -49,6 +51,7 @@ class Bot {
   private bestX = -Infinity;
   private stuck = 0;
   private jumpHold = 0;
+  private attackHold = 0;
   private sentReady = false;
   done = false;
 
@@ -146,6 +149,7 @@ class Bot {
     this.bestX = -Infinity;
     this.stuck = 0;
     this.jumpHold = 0;
+    this.attackHold = 0;
     this.dir = Button.RIGHT;
   }
 
@@ -173,6 +177,14 @@ class Bot {
       this.jumpHold -= 1;
     } else if (this.stuck > 12 || Math.random() < 0.015) {
       this.jumpHold = 8 + Math.floor(Math.random() * 16);
+    }
+    if (values.attack) {
+      if (this.attackHold > 0) {
+        buttons |= Button.ATTACK;
+        this.attackHold -= 1;
+      } else if (Math.random() < 0.02) {
+        this.attackHold = 3; // a short tap: the server starts swings on the press edge
+      }
     }
     this.seq += 1;
     this.send({ t: 'input', seq: this.seq, buttons });

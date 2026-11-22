@@ -1,3 +1,4 @@
+import type { CharacterId } from '../config/characters';
 import type { GameEvent } from '../sim/events';
 import type { NetPlayerPatch, NetWorldState } from './state';
 
@@ -13,6 +14,8 @@ export interface RoomPlayerInfo {
   menuOpen: boolean;
   /** Score banked from completed levels this campaign. */
   campaignScore: number;
+  /** Playable character (unique per room while there are enough characters). */
+  characterId: CharacterId;
 }
 
 export interface RoomLevelInfo {
@@ -59,8 +62,17 @@ export const DEV_COMMANDS: readonly DevCommand[] = ['skipLevel', 'respawn'];
 
 /** Messages sent by browsers / bots. Everything here is untrusted: see `parseClientMessage`. */
 export type ClientMessage =
-  | { t: 'join'; protocol: number; roomId: string; name: string; clientId: string }
+  | {
+      t: 'join';
+      protocol: number;
+      roomId: string;
+      name: string;
+      clientId: string;
+      /** Preferred character; the server picks the next free one if it is taken. */
+      characterId?: CharacterId;
+    }
   | { t: 'ready'; ready: boolean }
+  | { t: 'selectCharacter'; characterId: CharacterId }
   | { t: 'selectLevel'; levelId: string }
   | { t: 'input'; seq: number; buttons: number }
   | { t: 'menu'; open: boolean }

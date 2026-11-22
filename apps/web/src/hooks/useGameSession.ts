@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { registerDevProvider } from '@/devtools/devHook';
 import { GameClient } from '@/net/GameClient';
-import { getClientId, loadPlayerName } from '@/net/identity';
+import { getClientId, loadPlayerName, loadPreferredCharacter } from '@/net/identity';
 import { RoomStore, type RoomView } from '@/net/RoomStore';
 import { gameServerWsUrl } from '@/net/serverUrl';
 
@@ -23,6 +23,7 @@ export function useGameSession(roomId: string, autoReady: boolean): GameSession 
       autoReady,
       name: loadPlayerName,
       clientId: getClientId,
+      character: loadPreferredCharacter,
       url: gameServerWsUrl,
     });
     return { client, store: new RoomStore(client) };

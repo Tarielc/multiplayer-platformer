@@ -1,6 +1,7 @@
 'use client';
 
 import { LEVELS, PLAYER_SLOTS, type RoomInfo } from '@platformer/shared';
+import { CharacterPortrait } from './CharacterPortrait';
 import viewStyles from './GameView.module.css';
 import styles from './Overlays.module.css';
 import { useCountdown } from './useCountdown';
@@ -17,6 +18,7 @@ export function LevelCompleteOverlay({
   const left = Math.ceil(useCountdown(room.countdownMs, receivedAt) / 1000);
   const results = [...(room.results ?? [])].sort((a, b) => b.score - a.score);
   const totals = new Map(room.players.map((p) => [p.id, p.campaignScore]));
+  const characters = new Map(room.players.map((p) => [p.id, p.characterId]));
   const next = room.nextLevelId ? LEVELS.get(room.nextLevelId) : undefined;
 
   return (
@@ -34,17 +36,23 @@ export function LevelCompleteOverlay({
             </tr>
           </thead>
           <tbody>
-            {results.map((r) => (
-              <tr key={r.playerId} data-self={r.playerId === selfId}>
-                <td style={{ color: PLAYER_SLOTS[r.slot]?.css }}>
-                  {PLAYER_SLOTS[r.slot]?.label} {r.name}
-                </td>
-                <td>{r.score}</td>
-                <td>{r.collected}</td>
-                <td>{r.deaths}</td>
-                <td>{totals.get(r.playerId) ?? r.score}</td>
-              </tr>
-            ))}
+            {results.map((r) => {
+              const characterId = characters.get(r.playerId);
+              return (
+                <tr key={r.playerId} data-self={r.playerId === selfId}>
+                  <td style={{ color: PLAYER_SLOTS[r.slot]?.css }}>
+                    <span className={styles.who}>
+                      {characterId && <CharacterPortrait characterId={characterId} scale={1} />}
+                      {PLAYER_SLOTS[r.slot]?.label} {r.name}
+                    </span>
+                  </td>
+                  <td>{r.score}</td>
+                  <td>{r.collected}</td>
+                  <td>{r.deaths}</td>
+                  <td>{totals.get(r.playerId) ?? r.score}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <p className={styles.dim}>

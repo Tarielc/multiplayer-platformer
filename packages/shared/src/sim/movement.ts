@@ -1,3 +1,4 @@
+import type { CompiledCombat } from '../config/combat';
 import type { CompiledMovement } from '../config/movement';
 import { CellFlag, type LevelData } from '../level/types';
 import { approach } from '../util/math';
@@ -28,6 +29,16 @@ export interface MovementBody {
   /** Seconds left ignoring one-way platforms (drop-through). */
   drop: number;
   alive: boolean;
+  /** Attack button state on the previous step (edge detection). */
+  attackHeld: boolean;
+  /** Seconds left in the current swing (0 = not swinging). */
+  attack: number;
+  /** Seconds until another swing may start. */
+  attackCooldown: number;
+  /** Swings started so far; presentation detects a new swing when this increases. */
+  attackSeq: number;
+  /** Seconds of hit stun left (inputs ignored). Set by the server when hit. */
+  hurt: number;
 }
 
 export interface HitboxSize {
@@ -39,6 +50,7 @@ export interface MovementContext {
   level: LevelData;
   movement: CompiledMovement;
   hitbox: HitboxSize;
+  combat: CompiledCombat;
   /** Fixed step in seconds. */
   dt: number;
 }
@@ -60,10 +72,18 @@ export function createBody(feetX: number, feetY: number, hitbox: HitboxSize): Mo
     buffer: 0,
     drop: 0,
     alive: true,
+    attackHeld: false,
+    attack: 0,
+    attackCooldown: 0,
+    attackSeq: 0,
+    hurt: 0,
   };
 }
 
-/** Teleports a body to a new feet position and clears motion (respawn). Keeps `jumpHeld`. */
+/**
+ * Teleports a body to a new feet position and clears motion and action timers (respawn).
+ * Keeps the button edges (`jumpHeld`, `attackHeld`) and `attackSeq`.
+ */
 export function resetBody(body: MovementBody, feetX: number, feetY: number, hitbox: HitboxSize): void {
   body.x = feetX - hitbox.width / 2;
   body.y = feetY - hitbox.height;
@@ -75,6 +95,9 @@ export function resetBody(body: MovementBody, feetX: number, feetY: number, hitb
   body.buffer = 0;
   body.drop = 0;
   body.alive = true;
+  body.attack = 0;
+  body.attackCooldown = 0;
+  body.hurt = 0;
 }
 
 export function cloneBody(body: MovementBody): MovementBody {
@@ -82,8 +105,9 @@ export function cloneBody(body: MovementBody): MovementBody {
 }
 
 /**
- * Advances one player by one fixed step. Pure function of (body, buttons, context):
- * the server runs it authoritatively and clients run it for prediction/replay.
+ * Physics only: advances one player's movement by one fixed step. Pure function of
+ * (body, buttons, context). Game code calls `stepPlayerBody` (sim/actions.ts), which wraps this
+ * with attack and stun handling.
  */
 export function stepPlayerMovement(body: MovementBody, buttons: number, ctx: MovementContext): void {
   const jump = (buttons & Button.JUMP) !== 0;

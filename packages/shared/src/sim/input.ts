@@ -4,12 +4,13 @@ export const Button = {
   RIGHT: 1 << 1,
   JUMP: 1 << 2,
   DOWN: 1 << 3,
+  ATTACK: 1 << 4,
 } as const;
 
 export type ButtonName = keyof typeof Button;
 
 export const NEUTRAL_INPUT = 0;
-export const ALL_BUTTONS = Button.LEFT | Button.RIGHT | Button.JUMP | Button.DOWN;
+export const ALL_BUTTONS = Button.LEFT | Button.RIGHT | Button.JUMP | Button.DOWN | Button.ATTACK;
 
 export function hasButton(buttons: number, button: number): boolean {
   return (buttons & button) !== 0;
@@ -26,5 +27,6 @@ export function buttonsFrom(state: Partial<Record<ButtonName, boolean>>): number
   if (state.RIGHT) mask |= Button.RIGHT;
   if (state.JUMP) mask |= Button.JUMP;
   if (state.DOWN) mask |= Button.DOWN;
+  if (state.ATTACK) mask |= Button.ATTACK;
   return mask;
 }

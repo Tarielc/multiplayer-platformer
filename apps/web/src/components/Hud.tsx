@@ -4,6 +4,7 @@ import { LEVELS } from '@platformer/shared';
 import type { CSSProperties } from 'react';
 import type { NetStats } from '@/game/bridge';
 import type { HudPlayer, RoomView } from '@/net/RoomStore';
+import { CharacterPortrait } from './CharacterPortrait';
 import styles from './Hud.module.css';
 
 /** Minimal HUD: one chip per active player (slot color, name, score, status) + level info. */
@@ -55,6 +56,7 @@ function PlayerChip({ player }: { player: HudPlayer }) {
       data-dim={!player.connected || !player.alive}
       style={{ '--slot': player.color } as CSSProperties}
     >
+      <CharacterPortrait characterId={player.characterId} scale={1} className={styles.portrait} />
       <span className={styles.badge}>{player.label}</span>
       <span className={styles.name}>{player.name}</span>
       <span className={styles.score}>{player.score}</span>

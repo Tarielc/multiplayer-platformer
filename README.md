@@ -25,6 +25,7 @@ To fill a room without more browsers, open another terminal and run:
 
 ```bash
 npm run bots -- --room ABCDE --count 3     # headless players that run, jump and ready up
+npm run bots -- --room ABCDE --attack      # …and swing at each other now and then
 ```
 
 ### Controls
@@ -34,6 +35,7 @@ npm run bots -- --room ABCDE --count 3     # headless players that run, jump and
 | Move | ← → / A D | Left stick, D-pad |
 | Jump (hold for higher) | Space, ↑, W, Z, K | A / B |
 | Drop through planks | ↓ + Jump | Down + A |
+| Attack (shoves other players) | J, X | X / □ |
 | Pause menu | Esc | Start |
 | Debug overlay | F3 | – |
 
@@ -46,10 +48,10 @@ Pausing only stops the game when **every** connected player has the menu open. S
 | `npm run dev` | Game server (auto-restart) + Next.js dev server + asset sync watcher |
 | `npm run build` | Bundles the server (`apps/server/dist`) and runs `next build` |
 | `npm start` | Runs the production builds |
-| `npm test` | Vitest: simulation, level pipeline, protocol, rooms, client netcode (~160 tests, < 1 s) |
+| `npm test` | Vitest: simulation, combat, level pipeline, protocol, rooms, client netcode, state machines, synth (~240 tests, a few seconds) |
 | `npm run typecheck` | `tsc` for every package (including tests and scripts) |
 | `npm run levels:validate` | Parses and validates every level in the manifest |
-| `npm run bots -- --room CODE [--count 3] [--seconds 30]` | Headless test clients |
+| `npm run bots -- --room CODE [--count 3] [--seconds 30] [--attack]` | Headless test clients |
 | `npm run assets:sync` | Copies `packages/shared/data` to `apps/web/public/assets` (runs automatically on `dev`/`build`) |
 | `npm run samples:generate` | Regenerates the sample maps and the debug tileset (**overwrites** `level-1`/`level-2`) |
 
@@ -70,7 +72,7 @@ Pausing only stops the game when **every** connected player has the menu open. S
 ```
 
 - **The server owns the game.** Clients send one small input frame (a button bitmask) per tick. The server simulates every room, then broadcasts 20 snapshots per second, as full keyframes or field-level deltas.
-- **Clients predict their own player** by running the same `stepPlayerMovement` function as the server, and reconcile when authoritative state arrives. **Other players are interpolated** 100 ms in the past. Details are in [docs/netcode.md](docs/netcode.md).
+- **Clients predict their own player** by running the same `stepPlayerBody` function (movement plus attack and stun timers) as the server, and reconcile when authoritative state arrives. **Other players are interpolated** 100 ms in the past. Details are in [docs/netcode.md](docs/netcode.md).
 - **Room flow:** `lobby → countdown → playing → levelComplete → next level … → lobby (campaign complete)`. The first player is host and picks the level. A refresh or a dropped connection keeps your slot for 15 s.
 
 ```
@@ -108,6 +110,8 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 |---|---|
 | `movement.ts` | `jumpHeight` + `timeToApex` (gravity and jump velocity are derived; a held jump peaks at exactly `jumpHeight`), fall multiplier, run speed, ground/air acceleration and deceleration, turn boost, jump cut (variable jump), coyote time, jump buffer, drop-through time |
 | `players.ts` | max players, slot labels and colors, hitbox, respawn delay, name rules |
+| `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
+| `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
 | `net.ts` | tick and snapshot rates, interpolation delay, input queue limits, room timers, reconnect and rate limits |
 
@@ -121,9 +125,35 @@ Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42
 
 `npm run levels:validate` reports problems with a hint on how to fix each one. In development the server hot-reloads saved maps, and the asset watcher copies them to the client.
 
-### Art
+### Characters and animation
 
-Players, collectibles, flags and backgrounds are drawn procedurally in `apps/web/src/game/art/textures.ts`, one tinted texture per player slot. Swap in real sprite sheets by loading them in `BootScene`/`LevelScene` and pointing `PlayerView`/`EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
+Each player picks a character: on the home screen (saved in the browser, used for solo play and as the default when joining) or in the lobby. Picks are unique per room. A taken pick falls back to the next free character, and a player keeps their character across reconnects.
+
+The sprites come from one sheet, `packages/shared/data/sprites/all-characters.png`: 64×32 frames, 11 columns, and 7 rows per character in this order: Idle, Run, Attack, Jump, Fall, Hurt, Death. Characters are stacked in roster order. The body is centred in the frame with its feet on the bottom row, facing right.
+
+The player presentation is split into small parts, under `apps/web/src/game/`:
+
+| Part | File | Job |
+|---|---|---|
+| Signals | `player/playerSignals.ts` | Builds the state-machine input from the predicted body (you) or the interpolated sample (others). |
+| State machine | `player/PlayerStateMachine.ts` on `fsm/StateMachine.ts` | `idle`, `run`, `jump`, `fall`, `attack`, `hurt`, `dead`, with any-state interrupts. Emits cues such as `jump`, `land`, `attack`, `hurt`, `death`, `respawn`. Phaser-free and unit-tested. |
+| Animation controller | `player/PlayerAnimationController.ts` | Maps states to clips for the current character, chains intro → loop (Fall), and fires frame events (footsteps). |
+| Clip data | `characters/characterArt.ts` | Sheet layout, rows, frame counts, frame rates, per-character voice pitch. Attack and Hurt clip lengths come from `combat.ts`, so animation and simulation stay in sync. |
+| Sound controller | `audio/SoundController.ts` | Plays cues from the presentation event bus, with throttling, voice limits, distance falloff and stereo pan for other players. |
+
+To add a character: append rows to the sheet, add an id and name to `CHARACTER_IDS`/`CHARACTERS` in `characters.ts`, and give it a `block` (its position in the sheet) in `CHARACTER_ART`. Tests check that every clip fits inside the sheet.
+
+If the sheet fails to load, `BootScene` draws a placeholder sheet on the same grid and shows a warning, so the game still runs.
+
+### Audio
+
+Sound effects are synthesized when the game boots (`audio/sfxSynth.ts`, with recipes in `audio/soundCues.ts`), so no audio files are needed. Cues: `jump`, `land`, `step`, `attack`, `hit`, `hurt`, `death`, `respawn`, `coin`, `gem`, `checkpoint`, `levelComplete`. To use a recorded sound for a cue, put the file in `packages/shared/data/audio/` and set that cue's `file` (for example `audio/jump.ogg`). If the file fails to load, the synthesized version is used.
+
+The pause menu has a sound on/off toggle and a volume slider, saved per browser. Browsers keep audio locked until the first click or key press; nothing is queued while it is locked.
+
+### Other art
+
+Collectibles, flags and backgrounds are drawn procedurally in `apps/web/src/game/art/textures.ts`. Swap in real images by loading them in `BootScene` and pointing `EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
 
 ## React ↔ Phaser integration
 
@@ -131,7 +161,7 @@ Players, collectibles, flags and backgrounds are drawn procedurally in `apps/web
 - `createGame().destroy()` stops the running scenes first, so their cleanup runs while Phaser's plugins still exist, and then calls `game.destroy(true)`. Each game gets its own parent `div`, which is removed when Phaser finishes destroying.
 - `GameClient` constructs without side effects and opens its socket on a zero-delay timer that `disconnect()` cancels. Strict Mode therefore opens one socket, and a page refresh re-attaches to the same slot.
 - `GameBridge` is a typed event emitter between React and Phaser. React owns UI state (menu, debug) and Phaser reports readiness, warnings and network stats. Scenes subscribe with `listen(scene, emitter, event, handler)`, which unsubscribes automatically when the scene shuts down.
-- In development, `window.__PLATFORMER__.snapshot()` returns live counts (sockets, games, canvases), room phase, predicted position and network stats. `hold(buttons)` and `release()` drive input for automated checks.
+- In development, `window.__PLATFORMER__.snapshot()` returns live counts (sockets, games, canvases), room phase, predicted position, each player's animation state and character, audio status and network stats. `hold(buttons)` and `release()` drive input for automated checks.
 
 ## Configuration
 

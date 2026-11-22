@@ -1,6 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  DEFAULT_AUDIO_SETTINGS,
+  loadAudioSettings,
+  saveAudioSettings,
+  type AudioSettings,
+} from '@/game/audio/audioSettings';
 import { GameBridge, type NetStats } from '@/game/bridge';
 import { DEFAULT_ASSET_BASE, type GameServices } from '@/game/services';
 import type { GameSession } from '@/hooks/useGameSession';
@@ -23,6 +29,7 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
   const services = useMemo<GameServices>(() => ({ client, bridge, assetBase: DEFAULT_ASSET_BASE }), [client, bridge]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [debug, setDebug] = useState(false);
+  const [audio, setAudio] = useState<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
   const [stats, setStats] = useState<NetStats | null>(null);
 
   // A new level run closes the menu (derived-state reset during render).
@@ -37,6 +44,10 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
     bridge.setMenuOpen(menuOpen);
     client.setMenuOpen(menuOpen);
   }, [bridge, client, menuOpen]);
+
+  // localStorage is browser-only: load after hydration, like the player name.
+  useEffect(() => setAudio(loadAudioSettings()), []);
+  useEffect(() => bridge.setAudio(audio), [bridge, audio]);
 
   useEffect(() => {
     bridge.setDebug(debug);
@@ -83,8 +94,10 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
             room={room}
             solo={solo}
             debug={debug}
+            audio={audio}
             onResume={() => setMenuOpen(false)}
             onToggleDebug={() => setDebug((on) => !on)}
+            onAudio={(next) => setAudio(saveAudioSettings(next))}
             onDev={(cmd) => {
               client.dev(cmd);
               setMenuOpen(false);

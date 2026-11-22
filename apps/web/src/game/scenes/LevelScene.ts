@@ -6,11 +6,17 @@ import {
   PLAYER_CONFIG,
   TICK_DT,
   TICK_MS,
+  TypedEmitter,
+  attackReachBox,
+  defaultCharacterForSlot,
+  isAttackActive,
   levelChecksum,
   parseTiledLevel,
   propertiesToRecord,
+  resolveCombat,
   resolveMovement,
   slotStyle,
+  type CompiledCombat,
   type GameEvent,
   type LevelData,
   type LevelManifestEntry,
@@ -28,9 +34,12 @@ import type { WorldUpdate } from '@/net/GameClient';
 import { Interpolator } from '@/net/Interpolator';
 import { LocalPredictor } from '@/net/LocalPredictor';
 import { fallbackTilesetCanvas } from '../art/tilesetFallback';
+import { SoundController } from '../audio/SoundController';
 import { VIEW_CONFIG } from '../config';
 import { DebugDraw, type DebugBox } from '../debug/DebugDraw';
 import { InputController } from '../input/InputController';
+import { signalsFromBody, signalsFromSample } from '../player/playerSignals';
+import type { PlayerCueEvent, PresentationEvents, WorldCueEvent } from '../presentation';
 import type { GameServices } from '../services';
 import { listen, onSceneEnd } from '../util/listen';
 import { Backdrop } from '../views/Backdrop';
@@ -53,6 +62,9 @@ const tilesetKey = (def: TiledTileset) => `tileset:${def.name ?? 'tileset'}:${de
  *    build tile layers, entities, camera, input, and subscribe to the net client.
  *  - update: fixed 60 Hz accumulator -> sample input -> send -> predict; render the local player
  *    from the predictor and remote players from the interpolation buffer.
+ *  - presentation: player views turn replicated state into animation states and cues
+ *    (PlayerStateMachine); cues and server events go on a presentation bus that drives sound
+ *    (SoundController) and effects. Nothing on that bus affects gameplay.
  *
  * Phaser re-uses the scene instance on restart (new level run), so all per-run state is reset
  * in init().
@@ -71,6 +83,9 @@ export class LevelScene extends Phaser.Scene {
   private backdrop: Backdrop | null = null;
   private debugDraw: DebugDraw | null = null;
   private controls: InputController | null = null;
+  private combat: CompiledCombat = resolveCombat();
+  private presentation = new TypedEmitter<PresentationEvents>();
+  private sfx: SoundController | null = null;
   private accumulator = 0;
   private lastFrame = 0;
   private statsElapsed = 0;
@@ -96,6 +111,8 @@ export class LevelScene extends Phaser.Scene {
     this.backdrop = null;
     this.debugDraw = null;
     this.controls = null;
+    this.presentation = new TypedEmitter<PresentationEvents>();
+    this.sfx = null;
     this.accumulator = 0;
     this.statsElapsed = 0;
     this.frameCount = 0;
@@ -155,9 +172,14 @@ export class LevelScene extends Phaser.Scene {
       level,
       movement: resolveMovement(MOVEMENT_TUNING, this.entry.tuning),
       hitbox: HITBOX,
+      combat: this.combat,
       dt: TICK_DT,
     };
     this.predictor = new LocalPredictor(ctx);
+    const sound = new SoundController(this, bridge.audio);
+    this.sfx = sound;
+    this.presentation.on('player', this.onPlayerCue);
+    this.presentation.on('world', this.onWorldCue);
 
     this.setupCamera(level);
     this.backdrop = new Backdrop(this);
@@ -173,14 +195,20 @@ export class LevelScene extends Phaser.Scene {
     listen(this, client.events, 'welcome', () => this.predictor?.clearPending());
     listen(this, bridge, 'ui:menu', (open) => this.controls?.setEnabled(!open));
     listen(this, bridge, 'ui:debug', (on) => this.debugDraw?.setVisible(on));
+    listen(this, bridge, 'ui:audio', (settings) => sound.applySettings(settings));
 
     const unregister = registerDevProvider('scene', () => this.devSnapshot());
+    const unregisterAudio = registerDevProvider('audio', () => sound.stats());
     onSceneEnd(this, () => {
       unregister();
+      unregisterAudio();
       this.controls?.destroy();
       this.controls = null;
       for (const view of this.views.values()) view.destroy();
       this.views.clear();
+      this.presentation.removeAllListeners();
+      sound.destroy();
+      this.sfx = null;
     });
 
     const latest = client.latestWorld;
@@ -231,13 +259,16 @@ export class LevelScene extends Phaser.Scene {
     const position = predictor.renderPosition(alpha);
     const body = predictor.current;
     if (local && position && body) {
-      local.render(position.x + HITBOX.width / 2, position.y + HITBOX.height, body.facing, body.grounded, body.vy, body.alive);
+      const signals = signalsFromBody(body, predictor.teleports);
+      local.render(position.x + HITBOX.width / 2, position.y + HITBOX.height, body.facing, signals, frameMs);
       if (!this.cameraSnapped) {
         this.cameras.main.centerOn(local.container.x, local.container.y);
         this.cameraSnapped = true;
       }
       if (debug) {
-        boxes.push({ x: position.x, y: position.y, color: slotStyle(client.slot ?? 0).color });
+        const color = slotStyle(client.slot ?? 0).color;
+        boxes.push({ x: position.x, y: position.y, color });
+        this.pushReachBox(boxes, { ...body, x: position.x, y: position.y }, color);
         const ghost = predictor.lastServer;
         if (ghost) boxes.push({ x: ghost.x, y: ghost.y, color: 0xffffff, ghost: true });
       }
@@ -250,8 +281,11 @@ export class LevelScene extends Phaser.Scene {
       if (id === selfId) continue;
       const s = samples.get(id);
       if (!s) continue;
-      view.render(s.x + HITBOX.width / 2, s.y + HITBOX.height, s.facing, s.grounded, s.vy, s.alive);
-      if (debug) boxes.push({ x: s.x, y: s.y, color: this.slotColor(id) });
+      view.render(s.x + HITBOX.width / 2, s.y + HITBOX.height, s.facing, signalsFromSample(s), frameMs);
+      if (debug) {
+        boxes.push({ x: s.x, y: s.y, color: this.slotColor(id) });
+        this.pushReachBox(boxes, s, this.slotColor(id));
+      }
     }
 
     entityViews.update(frameMs);
@@ -279,6 +313,7 @@ export class LevelScene extends Phaser.Scene {
       if (!player) continue;
       view.setName(player.name);
       view.setConnected(player.connected);
+      view.setCharacter(player.characterId);
     }
   };
 
@@ -312,7 +347,16 @@ export class LevelScene extends Phaser.Scene {
     const { client } = this.services;
     const info = client.room?.players.find((p) => p.id === id);
     const isSelf = id === client.playerId;
-    const view = new PlayerView(this, { slot: info?.slot ?? 0, name: info?.name ?? '…', isSelf, hitbox: HITBOX });
+    const slot = info?.slot ?? 0;
+    const view = new PlayerView(this, {
+      id,
+      slot,
+      name: info?.name ?? '…',
+      isSelf,
+      hitbox: HITBOX,
+      characterId: info?.characterId ?? defaultCharacterForSlot(slot),
+      onCue: (event) => this.presentation.emit('player', event),
+    });
     view.setConnected(info?.connected ?? true);
     this.views.set(id, view);
     if (isSelf) {
@@ -324,16 +368,25 @@ export class LevelScene extends Phaser.Scene {
 
   private playEvent(event: GameEvent, state: NetWorldState): void {
     const entities = this.entityViews!;
+    const selfId = this.services.client.playerId;
     switch (event.type) {
       case 'collect': {
         const position = entities.itemPosition(event.entityId);
         entities.collect(event.entityId);
-        if (position) floatText(this, position.x, position.y - 8, `+${event.value}`, this.slotCss(event.playerId));
+        if (position) {
+          floatText(this, position.x, position.y - 8, `+${event.value}`, this.slotCss(event.playerId));
+          this.presentation.emit('world', {
+            cue: event.kind === 'gem' ? 'gem' : 'coin',
+            x: position.x,
+            y: position.y,
+            isSelf: event.playerId === selfId,
+          });
+        }
         break;
       }
       case 'death':
-        puff(this, event.x, event.y, this.slotColor(event.playerId), 12);
-        if (event.playerId === this.services.client.playerId) this.cameras.main.shake(140, 0.004);
+        // The Death clip plays on the player view (death cue); only the camera reacts here.
+        if (event.playerId === selfId) this.cameras.main.shake(140, 0.004);
         break;
       case 'respawn': {
         const player = state.players.find((p) => p.id === event.playerId);
@@ -342,12 +395,49 @@ export class LevelScene extends Phaser.Scene {
       }
       case 'checkpoint': {
         const position = entities.flagPosition(event.checkpointId);
-        if (position) floatText(this, position.x, position.y, 'Checkpoint!', '#7ee081');
+        if (position) {
+          floatText(this, position.x, position.y, 'Checkpoint!', '#7ee081');
+          this.presentation.emit('world', { cue: 'checkpoint', x: position.x, y: position.y, isSelf: event.playerId === selfId });
+        }
         break;
       }
-      case 'levelComplete':
-        break; // React shows the results overlay
+      case 'levelComplete': {
+        // React shows the results overlay.
+        const camera = this.cameras.main;
+        this.presentation.emit('world', { cue: 'levelComplete', x: camera.midPoint.x, y: camera.midPoint.y, isSelf: true });
+        break;
+      }
     }
+  }
+
+  // --- presentation --------------------------------------------------------------------------
+
+  private readonly onPlayerCue = (event: PlayerCueEvent) => {
+    const { cue, x, y, isSelf, characterId } = event;
+    const sound = this.sfx;
+    const at = { x, y, isSelf, characterId };
+    if (cue === 'hurt') {
+      // The hit lands when the victim's view enters Hurt, in sync with what is on screen.
+      puff(this, x, y - HITBOX.height / 2, 0xffffff, 6);
+      sound?.play('hit', at);
+      if (isSelf) this.cameras.main.shake(100, 0.003);
+    }
+    sound?.play(cue, at);
+  };
+
+  private readonly onWorldCue = (event: WorldCueEvent) => {
+    this.sfx?.play(event.cue, { x: event.x, y: event.y, isSelf: event.isSelf });
+  };
+
+  /** F3: the area a swing hits, while it can hit. */
+  private pushReachBox(
+    boxes: DebugBox[],
+    body: { x: number; y: number; facing: 1 | -1; alive: boolean; attack: number },
+    color: number,
+  ): void {
+    if (!isAttackActive(body, this.combat)) return;
+    const reach = attackReachBox(body, HITBOX, this.combat);
+    boxes.push({ ...reach, color, ghost: true });
   }
 
   // --- level construction --------------------------------------------------------------------
@@ -457,6 +547,8 @@ export class LevelScene extends Phaser.Scene {
 
   private devSnapshot(): Record<string, unknown> {
     const body = this.predictor?.current;
+    const selfId = this.services.client.playerId;
+    const selfView = selfId ? this.views.get(selfId) : undefined;
     const round = (n: number) => Math.round(n * 100) / 100;
     return {
       levelId: this.entry?.id ?? null,
@@ -470,8 +562,14 @@ export class LevelScene extends Phaser.Scene {
             grounded: body.grounded,
             alive: body.alive,
             facing: body.facing,
+            attack: round(body.attack),
+            attackSeq: body.attackSeq,
+            hurt: round(body.hurt),
+            state: selfView?.state ?? null,
+            character: selfView?.characterId ?? null,
           }
         : null,
+      players: [...this.views].map(([id, view]) => ({ id, self: id === selfId, state: view.state, character: view.characterId })),
       pendingInputs: this.predictor?.pendingCount ?? 0,
       correctionPx: round(this.predictor?.lastCorrection ?? 0),
       views: this.views.size,

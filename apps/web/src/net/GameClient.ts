@@ -4,6 +4,7 @@ import {
   PROTOCOL_VERSION,
   TypedEmitter,
   jsonCodec,
+  type CharacterId,
   type ClientMessage,
   type DevCommand,
   type ErrorCode,
@@ -60,6 +61,8 @@ export interface GameClientOptions {
   /** Read lazily on connect (localStorage is browser-only). */
   name: () => string;
   clientId: () => Promise<string> | string;
+  /** Preferred character, read on every (re)connect; `null` lets the server use the slot default. */
+  character?: () => CharacterId | null;
   url: () => string;
   /**
    * Ready up automatically right after joining a room that is in its lobby (solo play).
@@ -206,6 +209,11 @@ export class GameClient {
     this.send({ t: 'selectLevel', levelId });
   }
 
+  /** Lobby only; the server answers with a room update, or a notice if someone else has it. */
+  selectCharacter(characterId: CharacterId): void {
+    this.send({ t: 'selectCharacter', characterId });
+  }
+
   /** The pause rule is server-side: the room pauses when every connected player has it open. */
   setMenuOpen(open: boolean): void {
     this.menuOpen = open;
@@ -246,12 +254,14 @@ export class GameClient {
     this.socket = socket;
     openSockets += 1;
     socket.onopen = () => {
+      const characterId = this.options.character?.() ?? null;
       this.send({
         t: 'join',
         protocol: PROTOCOL_VERSION,
         roomId: this.options.roomId,
         name: this.options.name(),
         clientId,
+        ...(characterId ? { characterId } : {}),
       });
     };
     socket.onmessage = (event) => {

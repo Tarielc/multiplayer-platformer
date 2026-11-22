@@ -1,0 +1,25 @@
+.portrait {
+  display: inline-block;
+  flex: none;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+.portrait[data-animated='true'] {
+  animation: idle var(--duration) steps(var(--frames)) infinite;
+}
+
+@keyframes idle {
+  from {
+    background-position-x: var(--x0);
+  }
+  to {
+    background-position-x: calc(var(--x0) - var(--strip));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portrait[data-animated='true'] {
+    animation: none;
+  }
+}
