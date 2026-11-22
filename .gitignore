@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# builds
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# generated: copied from packages/shared/data by scripts/sync-assets.mjs
+apps/web/public/assets/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# misc
+coverage/
+.DS_Store
+npm-debug.log*

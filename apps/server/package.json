@@ -1,0 +1,24 @@
+{
+  "name": "@platformer/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Authoritative real-time game server: rooms, lobby state, fixed-timestep simulation, snapshot/delta broadcasts over WebSockets.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "node build.mjs",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "levels:validate": "tsx scripts/validate-levels.ts",
+    "bots": "tsx scripts/bots.ts"
+  },
+  "dependencies": {
+    "@platformer/shared": "*",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2"
+  }
+}

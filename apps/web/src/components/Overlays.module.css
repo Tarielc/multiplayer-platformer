@@ -1,0 +1,81 @@
+.panel {
+  min-width: min(360px, 90%);
+  max-width: 90%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 12px 48px rgb(0 0 0 / 45%);
+}
+
+.panel h2 {
+  margin: 0 0 0.5rem;
+}
+
+.dim {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.buttons {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  text-shadow: 0 4px 0 rgb(0 0 0 / 45%);
+}
+
+.levelName {
+  font-size: clamp(1rem, 3vw, 1.8rem);
+  font-weight: 700;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  background: rgb(10 12 23 / 60%);
+}
+
+.number {
+  font-size: clamp(3rem, 12vw, 7rem);
+  font-weight: 900;
+  color: var(--warn);
+  animation: pop 400ms ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.results {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+
+.results th,
+.results td {
+  text-align: right;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.results th:first-child,
+.results td:first-child {
+  text-align: left;
+  font-weight: 700;
+}
+
+.results tr[data-self='true'] td {
+  background: rgb(255 255 255 / 4%);
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM and no Node types: this package must stay environment-agnostic
+    // because it runs unchanged in the browser (prediction) and on the server (authority).
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

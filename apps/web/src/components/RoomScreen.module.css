@@ -1,0 +1,98 @@
+.screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.room {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-dim);
+}
+
+.room strong {
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.small {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.conn {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.conn[data-status='open'] {
+  color: var(--ok);
+}
+
+.conn[data-status='reconnecting'],
+.conn[data-status='connecting'] {
+  color: var(--warn);
+}
+
+.conn[data-status='closed'] {
+  color: var(--danger);
+}
+
+.body {
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.screen[data-ingame='true'] .body {
+  padding: 0.75rem;
+  place-items: stretch;
+}
+
+.panel {
+  width: min(520px, 94vw);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}

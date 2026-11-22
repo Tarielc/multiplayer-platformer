@@ -1,0 +1,149 @@
+.lobby {
+  width: min(760px, 96vw);
+  display: grid;
+  gap: 1rem;
+}
+
+.banner {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 25%, var(--bg-raised)), var(--bg-raised));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.banner h2 {
+  margin: 0 0 0.5rem;
+}
+
+.banner ol {
+  margin: 0;
+  padding-left: 1.3rem;
+  font-weight: 600;
+}
+
+.banner p {
+  margin: 0.5rem 0 0;
+  color: var(--text-dim);
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .slots {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.slot {
+  min-height: 150px;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 1rem 0.75rem;
+  border-radius: var(--radius);
+  border: 2px dashed var(--border);
+  background: var(--bg-sunken);
+  text-align: center;
+}
+
+.slot[data-filled='true'] {
+  border-style: solid;
+  border-color: var(--slot-shade);
+  background: color-mix(in srgb, var(--slot) 10%, var(--bg-raised));
+}
+
+.slot[data-ready='true'] {
+  border-color: var(--slot);
+  box-shadow: 0 0 0 1px var(--slot);
+}
+
+.avatar {
+  width: 48px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px 12px 8px 8px;
+  background: var(--slot);
+  border: 3px solid var(--slot-shade);
+  color: #10131f;
+  font-weight: 800;
+  opacity: 0.35;
+}
+
+.slot[data-filled='true'] .avatar {
+  opacity: 1;
+}
+
+.name {
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.you {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.level {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.level select {
+  min-width: 220px;
+  color: var(--text);
+}
+
+.controls button {
+  min-width: 160px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.05rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}

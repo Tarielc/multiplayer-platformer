@@ -1,0 +1,122 @@
+import type { GameEvent } from '../sim/events';
+import type { NetPlayerPatch, NetWorldState } from './state';
+
+export type RoomPhase = 'lobby' | 'countdown' | 'playing' | 'levelComplete';
+
+export interface RoomPlayerInfo {
+  id: string;
+  name: string;
+  slot: number;
+  ready: boolean;
+  connected: boolean;
+  isHost: boolean;
+  menuOpen: boolean;
+  /** Score banked from completed levels this campaign. */
+  campaignScore: number;
+}
+
+export interface RoomLevelInfo {
+  id: string;
+  name: string;
+  /** `levelChecksum()` of the server's parse; clients compare against their own. */
+  checksum: string;
+  /** Increments for every new world (level start / restart). */
+  run: number;
+}
+
+export interface LevelResult {
+  playerId: string;
+  name: string;
+  slot: number;
+  score: number;
+  collected: number;
+  deaths: number;
+}
+
+export interface RoomInfo {
+  roomId: string;
+  phase: RoomPhase;
+  hostId: string | null;
+  maxPlayers: number;
+  players: RoomPlayerInfo[];
+  /** Level the host picked in the lobby. */
+  selectedLevelId: string;
+  /** Level currently loaded (countdown / playing / levelComplete). */
+  level: RoomLevelInfo | null;
+  /** True while every connected player has the pause menu open. */
+  paused: boolean;
+  /** Remaining time of the current countdown or results screen when this was sent. */
+  countdownMs: number;
+  results: LevelResult[] | null;
+  nextLevelId: string | null;
+  /** Set when returning to the lobby after the final level. */
+  campaignComplete: boolean;
+  devCommands: boolean;
+}
+
+export type DevCommand = 'skipLevel' | 'respawn';
+export const DEV_COMMANDS: readonly DevCommand[] = ['skipLevel', 'respawn'];
+
+/** Messages sent by browsers / bots. Everything here is untrusted: see `parseClientMessage`. */
+export type ClientMessage =
+  | { t: 'join'; protocol: number; roomId: string; name: string; clientId: string }
+  | { t: 'ready'; ready: boolean }
+  | { t: 'selectLevel'; levelId: string }
+  | { t: 'input'; seq: number; buttons: number }
+  | { t: 'menu'; open: boolean }
+  | { t: 'ping'; id: number; at: number }
+  | { t: 'leave' }
+  | { t: 'resync' }
+  | { t: 'dev'; cmd: DevCommand };
+
+export type ErrorCode =
+  | 'ROOM_NOT_FOUND'
+  | 'ROOM_FULL'
+  | 'ROOM_IN_PROGRESS'
+  | 'PROTOCOL_MISMATCH'
+  | 'BAD_REQUEST'
+  | 'NOT_ALLOWED'
+  | 'REPLACED'
+  | 'SERVER_FULL'
+  | 'SERVER_SHUTDOWN';
+
+export type ServerMessage =
+  | {
+      t: 'welcome';
+      protocol: number;
+      roomId: string;
+      playerId: string;
+      slot: number;
+      /** True when the server re-attached an existing player (refresh / reconnect). */
+      rejoined: boolean;
+      tickRate: number;
+      snapshotRate: number;
+    }
+  | { t: 'room'; room: RoomInfo }
+  | { t: 'snapshot'; run: number; tick: number; state: NetWorldState; events: GameEvent[] }
+  | {
+      t: 'delta';
+      run: number;
+      tick: number;
+      baseTick: number;
+      upserts: NetPlayerPatch[];
+      removed: string[];
+      collected: number[];
+      events: GameEvent[];
+    }
+  | { t: 'pong'; id: number; at: number; serverTick: number }
+  | { t: 'error'; code: ErrorCode; message: string };
+
+export type ClientMessageOf<T extends ClientMessage['t']> = Extract<ClientMessage, { t: T }>;
+export type ServerMessageOf<T extends ServerMessage['t']> = Extract<ServerMessage, { t: T }>;
+
+/** WebSocket close codes used by the server (4000-4999 are application-defined). */
+export const CloseCode = {
+  NORMAL: 1000,
+  GOING_AWAY: 1001,
+  REPLACED: 4001,
+  REJECTED: 4002,
+  PROTOCOL: 4003,
+  ABUSE: 4004,
+  SHUTDOWN: 4005,
+} as const;

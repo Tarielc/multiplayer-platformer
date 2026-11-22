@@ -1,0 +1,33 @@
+{
+  "name": "platformer-template",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Data-driven 1-4 player 2D platformer starter: Next.js (App Router) + Phaser 4 client, authoritative Node.js WebSocket game server, shared TypeScript domain/data package.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web,assets -c magenta,cyan,gray \"npm run dev -w @platformer/server\" \"npm run dev -w @platformer/web\" \"node scripts/sync-assets.mjs --watch\"",
+    "build": "npm run build -w @platformer/server && npm run build -w @platformer/web",
+    "start": "concurrently -k -n server,web -c magenta,cyan \"npm run start -w @platformer/server\" \"npm run start -w @platformer/web\"",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p scripts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "levels:validate": "npm run levels:validate -w @platformer/server",
+    "assets:sync": "node scripts/sync-assets.mjs",
+    "samples:generate": "tsx scripts/generate-samples.ts",
+    "bots": "npm run bots -w @platformer/server --"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "concurrently": "^10.0.7",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}

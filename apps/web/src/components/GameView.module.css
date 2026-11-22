@@ -1,0 +1,56 @@
+.view {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+/* 16:9 stage that fits the viewport below the top bar; Phaser's Scale.FIT fills it. */
+.stage {
+  position: relative;
+  width: min(100%, calc((100vh - 84px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  background: #05060d;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  user-select: none;
+}
+
+.canvasHost,
+.mount {
+  position: absolute;
+  inset: 0;
+}
+
+.mount canvas {
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(5 6 13 / 55%);
+  backdrop-filter: blur(2px);
+}
+
+.pausedBadge,
+.connection {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  background: rgb(5 6 13 / 75%);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.connection {
+  color: var(--warn);
+}
