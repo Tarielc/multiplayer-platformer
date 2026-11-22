@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "levels:validate": "npm run levels:validate -w @platformer/server",
+    "levels:solve": "tsx scripts/solve-levels.ts",
     "assets:sync": "node scripts/sync-assets.mjs",
     "samples:generate": "tsx scripts/generate-samples.ts",
     "bots": "npm run bots -w @platformer/server --"

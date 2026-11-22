@@ -19,6 +19,11 @@ export const SOUND_CUES = [
   'gem',
   'checkpoint',
   'levelComplete',
+  'bounce',
+  'boxHit',
+  'boxBreak',
+  'thud',
+  'shake',
 ] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
 
@@ -209,6 +214,62 @@ export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
     detuneJitter: 0,
     spatial: false,
     maxVoices: 1,
+  }),
+  // --- traps ---------------------------------------------------------------------------------
+  /** Trampoline spring. */
+  bounce: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.25, freq: 180, freqEnd: 900, attack: 0.002, sustain: 0.05, decay: 0.16, vibrato: { depth: 0.25, rate: 30 }, lowpass: 4000, gain: 0.45 },
+        { wave: 'triangle', freq: 90, freqEnd: 60, attack: 0.001, sustain: 0.02, decay: 0.08, gain: 0.4 },
+      ],
+    },
+    volume: 0.5,
+    detuneJitter: 50,
+  }),
+  /** A box takes a hit (not the last). */
+  boxHit: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 2400, freqEnd: 700, attack: 0.001, sustain: 0.015, decay: 0.08, lowpass: 1800, gain: 0.7 },
+        { wave: 'triangle', freq: 220, freqEnd: 140, attack: 0.001, sustain: 0.02, decay: 0.07, gain: 0.5 },
+      ],
+    },
+    volume: 0.5,
+    detuneJitter: 80,
+  }),
+  /** A box bursts into pieces. */
+  boxBreak: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 3200, freqEnd: 300, attack: 0.001, sustain: 0.04, decay: 0.22, lowpass: 2200, gain: 0.85 },
+        { wave: 'square', freq: 160, freqEnd: 50, attack: 0.001, sustain: 0.03, decay: 0.15, lowpass: 900, gain: 0.35 },
+        { wave: 'noise', freq: 5000, attack: 0.001, sustain: 0.01, decay: 0.05, lowpass: 5000, gain: 0.3, delay: 0.06 },
+      ],
+    },
+    volume: 0.55,
+    detuneJitter: 60,
+  }),
+  /** A rock-head slams into a wall (fades with distance, so far ones stay quiet). */
+  thud: cue({
+    recipe: {
+      layers: [
+        { wave: 'sine', freq: 110, freqEnd: 38, attack: 0.001, sustain: 0.04, decay: 0.26, gain: 0.9 },
+        { wave: 'noise', freq: 900, freqEnd: 120, attack: 0.001, sustain: 0.02, decay: 0.16, lowpass: 700, gain: 0.6 },
+      ],
+    },
+    volume: 0.6,
+    detuneJitter: 40,
+    minIntervalMs: 60,
+  }),
+  /** A falling platform starts shaking. */
+  shake: cue({
+    recipe: {
+      layers: [{ wave: 'noise', freq: 1600, attack: 0.005, sustain: 0.2, decay: 0.1, vibrato: { depth: 0.5, rate: 24 }, lowpass: 1400, gain: 0.35 }],
+    },
+    volume: 0.35,
+    detuneJitter: 60,
+    maxVoices: 2,
   }),
 };
 

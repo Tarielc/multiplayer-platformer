@@ -11,6 +11,8 @@ export interface ViewConfig {
   parallax: { texture: string; scrollFactor: number; alpha: number; y: number }[];
   label: { fontFamily: string; fontSize: number; offsetY: number };
   squash: { landX: number; landY: number; jumpX: number; jumpY: number; durationMs: number };
+  /** Blinking while invulnerable after a trap hit: on/off period and the dimmed alpha. */
+  invulnerable: { blinkPeriodMs: number; blinkAlpha: number };
   /** Player animation state machine thresholds (px/s). */
   animation: { runEnterSpeed: number; runExitSpeed: number };
   collectible: { bobPx: number; bobMs: number };
@@ -42,6 +44,7 @@ export const VIEW_CONFIG: Readonly<ViewConfig> = {
   ],
   label: { fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 10, offsetY: 8 },
   squash: { landX: 1.12, landY: 0.88, jumpX: 0.9, jumpY: 1.1, durationMs: 110 },
+  invulnerable: { blinkPeriodMs: 70, blinkAlpha: 0.25 },
   animation: { runEnterSpeed: 20, runExitSpeed: 10 },
   collectible: { bobPx: 3, bobMs: 900 },
   lavaScrollPxPerSec: 12,

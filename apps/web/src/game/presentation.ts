@@ -14,8 +14,8 @@ export interface PlayerCueEvent {
   y: number;
 }
 
-/** World-level moments from server game events. */
-export type WorldCueName = 'coin' | 'gem' | 'checkpoint' | 'levelComplete';
+/** World-level moments from server game events and trap views. */
+export type WorldCueName = 'coin' | 'gem' | 'checkpoint' | 'levelComplete' | 'bounce' | 'boxHit' | 'boxBreak' | 'thud' | 'shake';
 
 export interface WorldCueEvent {
   cue: WorldCueName;

@@ -1,4 +1,4 @@
-import { slotStyle, type CharacterId, type NetWorldState, type RoomInfo } from '@platformer/shared';
+import { PLAYER_CONFIG, slotStyle, type CharacterId, type NetWorldState, type RoomInfo } from '@platformer/shared';
 import type { ConnectionStatus, FatalError, GameClient } from './GameClient';
 
 export interface HudPlayer {
@@ -16,6 +16,9 @@ export interface HudPlayer {
   deaths: number;
   alive: boolean;
   atExit: boolean;
+  /** Hearts left (traps cost one) out of `maxHp`. */
+  hp: number;
+  maxHp: number;
 }
 
 export interface Notice {
@@ -146,6 +149,8 @@ export class RoomStore {
         deaths: s?.deaths ?? 0,
         alive: s?.alive ?? true,
         atExit: s?.atExit ?? false,
+        hp: s?.hp ?? PLAYER_CONFIG.maxHp,
+        maxHp: PLAYER_CONFIG.maxHp,
       };
     });
     const key = JSON.stringify(hud);

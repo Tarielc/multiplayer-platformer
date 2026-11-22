@@ -367,6 +367,6 @@ describe('stepPlayerMovement: determinism', () => {
     body.alive = false;
     const before = cloneBody(body);
     stepPlayerMovement(body, Button.RIGHT | Button.JUMP, ctx);
-    expect(body).toEqual({ ...before, jumpHeld: true });
+    expect(body).toEqual({ ...before, jumpHeld: true, stepTick: before.stepTick + 1 });
   });
 });

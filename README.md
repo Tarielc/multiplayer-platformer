@@ -7,7 +7,7 @@ A data-driven starter for online 2D platformers with **1–4 players per room**:
 - **Node.js game server** (`http` + `ws`) that runs every room at a fixed 60 Hz tick and holds the authoritative state. It streams snapshots and deltas over WebSockets.
 - **Shared TypeScript package** used by both client and server: types, wire protocol, tuning configs, level manifest, Tiled JSON parser and a deterministic movement simulation.
 
-Levels are Tiled JSON maps. Adding one takes a map file and one manifest entry. The template boots without any external art: sample levels and a debug tileset are included, and missing images fall back to generated placeholder textures.
+Levels are Tiled JSON maps. Adding one takes a map file and one manifest entry. Three sample levels are included, built from a 16 px terrain tileset by an auto-tiling generator, with traps and interactive entities (spikes, saws, trampolines, falling platforms, fans, rock-heads, spike-heads, breakable boxes). Players have 3 hearts. Missing images fall back to generated placeholder textures, so the game still boots without them.
 
 ## Quick start
 
@@ -35,7 +35,7 @@ npm run bots -- --room ABCDE --attack      # …and swing at each other now and 
 | Move | ← → / A D | Left stick, D-pad |
 | Jump (hold for higher) | Space, ↑, W, Z, K | A / B |
 | Drop through planks | ↓ + Jump | Down + A |
-| Attack (shoves other players) | J, X | X / □ |
+| Attack (shoves other players, breaks boxes) | J, X | X / □ |
 | Pause menu | Esc | Start |
 | Debug overlay | F3 | – |
 
@@ -48,12 +48,13 @@ Pausing only stops the game when **every** connected player has the menu open. S
 | `npm run dev` | Game server (auto-restart) + Next.js dev server + asset sync watcher |
 | `npm run build` | Bundles the server (`apps/server/dist`) and runs `next build` |
 | `npm start` | Runs the production builds |
-| `npm test` | Vitest: simulation, combat, level pipeline, protocol, rooms, client netcode, state machines, synth (~240 tests, a few seconds) |
+| `npm test` | Vitest: simulation, combat, traps, level pipeline, protocol, rooms, client netcode, state machines, synth (~290 tests, a few seconds) |
 | `npm run typecheck` | `tsc` for every package (including tests and scripts) |
 | `npm run levels:validate` | Parses and validates every level in the manifest |
+| `npm run levels:solve [-- --level level-2] [-- --verbose]` | Proves every level can be finished by one player without losing a heart (search over the real simulation, traps included) |
 | `npm run bots -- --room CODE [--count 3] [--seconds 30] [--attack]` | Headless test clients |
 | `npm run assets:sync` | Copies `packages/shared/data` to `apps/web/public/assets` (runs automatically on `dev`/`build`) |
-| `npm run samples:generate` | Regenerates the sample maps and the debug tileset (**overwrites** `level-1`/`level-2`) |
+| `npm run samples:generate` | Regenerates the sample maps from `scripts/generate-samples.ts` (**overwrites** `level-1`…`level-3`), the debug tileset, and a placeholder fan sheet if `fan.png` is missing |
 
 ## How it fits together
 
@@ -93,7 +94,7 @@ packages/
     src/config/      movement, player, entity and network tuning
     src/levels/      level manifest
     src/level/       Tiled JSON parser, validation, checksum
-    src/sim/         deterministic movement and GameWorld rules
+    src/sim/         deterministic movement, traps and GameWorld rules
     src/protocol/    messages, validation, delta encoding, codec
 docs/                level authoring, netcode
 ```
@@ -109,10 +110,11 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | File | Contents |
 |---|---|
 | `movement.ts` | `jumpHeight` + `timeToApex` (gravity and jump velocity are derived; a held jump peaks at exactly `jumpHeight`), fall multiplier, run speed, ground/air acceleration and deceleration, turn boost, jump cut (variable jump), coyote time, jump buffer, drop-through time |
-| `players.ts` | max players, slot labels and colors, hitbox, respawn delay, name rules |
+| `players.ts` | max players, slot labels and colors, hitbox, hearts (`maxHp`), respawn delay, name rules |
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
+| `traps.ts` | trap damage, knockback and invulnerability; per-trap sizes, speeds and timings (see [Traps and health](#traps-and-health)) |
 | `net.ts` | tick and snapshot rates, interpolation delay, input queue limits, room timers, reconnect and rate limits |
 
 Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42 }`). The Phaser view settings (camera, parallax, effects) are in `apps/web/src/game/config.ts`.
@@ -124,6 +126,23 @@ Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42
 3. Add it to `packages/shared/src/levels/manifest.ts`.
 
 `npm run levels:validate` reports problems with a hint on how to fix each one. In development the server hot-reloads saved maps, and the asset watcher copies them to the client.
+
+### Traps and health
+
+Players have **3 hearts** (`PLAYER_CONFIG.maxHp`), shown in the HUD. Spikes, saws and spike-heads cost one heart, with a stun, a knockback away from the trap and about a second of invulnerability (the player blinks). At 0 hearts the player dies and respawns with full hearts. Lava, pits and being crushed by a rock-head kill outright.
+
+| Trap | Behaviour | Sheet (`packages/shared/data/sprites/traps/`) |
+|---|---|---|
+| Spikes | Static strip; touching the blades costs a heart. Can point up, down, left or right. | `spikes.png` 16×16 |
+| Saw | Spins and slides back and forth along a track (or stays put); costs a heart. | `saw.png` 38×38 × 8 |
+| Trampoline | Landing on it launches you high; the spring animation plays. | `trampoline.png` 28×28 × 9 (frame 0 idle) |
+| Falling platform | One-way platform that shakes, then falls shortly after you land on it, and comes back. | `falling-platform.png` 32×10 × 4 |
+| Fan | Blows players up while it is on (frame 0 = off). | `fan.png` 24×8 × N (placeholder art; drop your own over it) |
+| Rock-head | Solid block that slides between two walls on one axis and slams into them. You can ride it; get pinned against a wall and you are crushed. | `rock-head.png` 42×42, rows: blink, side impact, top/bottom impact |
+| Spike-head | Solid block with spikes on every side; touching it costs a heart. | `spike-head.png` 54×52, same rows |
+| Box | Solid; breaks after 1/2/3 hits (box1/2/3) from an attack or a stomp (which bounces you), then bursts into debris. | `box1..3.png` 28×24, rows: idle, hit, debris |
+
+Traps are Tiled objects; [docs/level-authoring.md](docs/level-authoring.md#traps) lists their classes and properties. Every trap moves as a pure function of the server tick, so the client predicts them exactly (you collide with what you see); only box hits and falling-platform triggers are replicated. Tuning is in `packages/shared/src/config/traps.ts`; the client views are in `apps/web/src/game/traps/`.
 
 ### Characters and animation
 
@@ -147,11 +166,13 @@ If the sheet fails to load, `BootScene` draws a placeholder sheet on the same gr
 
 ### Audio
 
-Sound effects are synthesized when the game boots (`audio/sfxSynth.ts`, with recipes in `audio/soundCues.ts`), so no audio files are needed. Cues: `jump`, `land`, `step`, `attack`, `hit`, `hurt`, `death`, `respawn`, `coin`, `gem`, `checkpoint`, `levelComplete`. To use a recorded sound for a cue, put the file in `packages/shared/data/audio/` and set that cue's `file` (for example `audio/jump.ogg`). If the file fails to load, the synthesized version is used.
+Sound effects are synthesized when the game boots (`audio/sfxSynth.ts`, with recipes in `audio/soundCues.ts`), so no audio files are needed. Cues: `jump`, `land`, `step`, `attack`, `hit`, `hurt`, `death`, `respawn`, `coin`, `gem`, `checkpoint`, `levelComplete`, and for traps `bounce`, `boxHit`, `boxBreak`, `thud` (rock-head impacts, quieter with distance) and `shake` (falling platforms). To use a recorded sound for a cue, put the file in `packages/shared/data/audio/` and set that cue's `file` (for example `audio/jump.ogg`). If the file fails to load, the synthesized version is used.
 
 The pause menu has a sound on/off toggle and a volume slider, saved per browser. Browsers keep audio locked until the first click or key press; nothing is queued while it is locked.
 
 ### Other art
+
+The levels use `packages/shared/data/tilesets/terrain-tileset.png` (16×16 tiles): wall, ground and brick sets with inner corners, block sets, and one-way platforms. Everything is solid except the platforms. See [Terrain tileset](docs/level-authoring.md#terrain-tileset) for the layout and the auto-tiling legend.
 
 Collectibles, flags and backgrounds are drawn procedurally in `apps/web/src/game/art/textures.ts`. Swap in real images by loading them in `BootScene` and pointing `EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
 

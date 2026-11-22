@@ -4,6 +4,7 @@ import {
   NEUTRAL_INPUT,
   PLAYER_CONFIG,
   TICK_DT,
+  TrapField,
   bodyFromNetState,
   resolveCombat,
   resolveMovement,
@@ -59,14 +60,89 @@ function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlay
     attackCooldown: 0,
     attackSeq: 0,
     hurt: 0,
+    stepTick: 0,
+    hp: 3,
+    invulnUntil: 0,
     ack: 0,
     ...overrides,
   };
 }
 
-const world = (tick: number, players: NetPlayerState[], collected: number[] = []): NetWorldState => ({ tick, players, collected });
+const world = (tick: number, players: NetPlayerState[], collected: number[] = []): NetWorldState => ({ tick, players, collected, traps: [] });
 
 describe('LocalPredictor', () => {
+  it('predicts moving traps exactly: riding, pushes, launches, wind, falling platforms', () => {
+    // A rock-head sweeping the floor, a falling platform, a trampoline and a fan; nothing that
+    // hurts (damage is decided by the server, like hits).
+    const trap = (type: string, x: number, y: number, props: Record<string, number> = {}) => ({
+      name: type,
+      type,
+      x,
+      y,
+      width: 0,
+      height: 0,
+      point: true,
+      properties: Object.entries(props).map(([name, value]) => ({ name, type: 'float' as const, value })),
+    });
+    const trapLevel = asciiToLevel({
+      rows: ['                              ', '                              ', '                              ', '                              ', ' 1                            ', '##############################'],
+      objects: [
+        trap('rockHead', 800, 160, { waitMs: 1500 }),
+        trap('fallingPlatform', 200, 120),
+        trap('trampoline', 360, 160),
+        trap('fan', 520, 160, { onMs: 900, offMs: 700 }),
+      ],
+    });
+    const server = new GameWorld({ level: trapLevel, movement });
+    server.addPlayer('me', 0);
+    let ack = 0;
+    const net = () => server.toNetState(() => ack);
+    const predictor = new LocalPredictor({ ...ctx, level: trapLevel, traps: TrapField.forLevel(trapLevel) });
+    predictor.reconcile(net().players[0]!, net().traps);
+
+    const LATENCY = 6;
+    const toServer: Array<{ at: number; seq: number; buttons: number }> = [];
+    const toClient: Array<{ at: number; state: NetWorldState }> = [];
+    let seed = 7;
+    const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    let buttons = NEUTRAL_INPUT;
+    let maxCorrection = 0;
+    let rode = 0;
+    const serverTick = (tick: number) => {
+      while (toServer.length > 0 && toServer[0]!.at <= tick) {
+        const frame = toServer.shift()!;
+        server.stepPlayer('me', frame.buttons);
+        ack = frame.seq;
+      }
+      server.endTick();
+      if (tick % 3 === 0) toClient.push({ at: tick + LATENCY, state: net() });
+    };
+    const clientReceive = (tick: number) => {
+      while (toClient.length > 0 && toClient[0]!.at <= tick) {
+        const state = toClient.shift()!.state;
+        predictor.reconcile(state.players[0]!, state.traps);
+        // The first acked state syncs the prediction clock; corrections count from then on.
+        if (state.players[0]!.ack > 0) maxCorrection = Math.max(maxCorrection, predictor.lastCorrection);
+      }
+    };
+    for (let tick = 1; tick <= 1800; tick++) {
+      // Right / left / jump in bursts (no attack: boxes would need the server).
+      if (random() < 0.06) buttons = [0, Button.RIGHT, Button.LEFT, Button.RIGHT | Button.JUMP, Button.LEFT | Button.JUMP, Button.JUMP][Math.floor(random() * 6)]!;
+      const contacts = predictor.step(tick, buttons);
+      if (contacts && contacts.ground >= 0) rode++;
+      toServer.push({ at: tick + LATENCY, seq: tick, buttons });
+      serverTick(tick);
+      clientReceive(tick);
+    }
+    for (let tick = 1801; tick <= 1830; tick++) {
+      serverTick(tick);
+      clientReceive(tick);
+    }
+    expect(rode).toBeGreaterThan(0);
+    expect(maxCorrection).toBeLessThan(1e-6);
+    expect(predictor.current).toEqual(bodyFromNetState(net().players[0]!));
+  });
+
   it('agrees exactly with the server when inputs arrive in order (zero correction)', () => {
     const server = new GameWorld({ level, movement });
     server.addPlayer('me', 0);

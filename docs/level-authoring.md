@@ -15,7 +15,7 @@ Levels are [Tiled](https://www.mapeditor.org/) JSON maps. The server and the bro
 | Orientation | Orthogonal | Collision is a square grid. |
 | Infinite | Off | The collision grid needs a fixed size. |
 | Tile Layer Format | CSV | Base64 and compressed layers are rejected. |
-| Tile size | Square (32×32 recommended) | The movement tuning is in pixels and assumes 32 px tiles. |
+| Tile size | Square (the samples use 16×16) | Movement tuning is in pixels, so the tile size changes how many tiles a jump covers, not how the game feels. See [Design metrics](#design-metrics). |
 | Tilesets | Embedded in the map | Phaser cannot load external `.tsx`/`.tsj` tilesets. Use *Map → Embed Tilesets*, or tick *Embed in map* when creating one. |
 | File | JSON with a `.json` extension | Tiled's default JSON extension is `.tmj`, but the manifest expects `.json`. |
 
@@ -61,7 +61,7 @@ Put objects on any object layer (hidden layers count too). The engine reads each
 | `collectible` | Point, rect or tile object | `kind` (`coin`, `gem`), `value` (int, optional) | Picked up once per level, by the first player to touch it. Its score is `value` if set, else the kind's value (coin 10, gem 50). It sits at the object's center. |
 | `hazard` | Rect, or point | `style` (`lava`, optional) | Kills on any overlap with the player's hitbox. `style = "lava"` draws animated lava; anything else draws a generic danger pattern. |
 
-Objects with any other class are kept in `LevelData.extraObjects`, with position, size and properties. The validator warns that they are ignored. That is the hook for your own entities: moving platforms, enemies, signs and so on.
+Trap classes (`spikes`, `saw`, `trampoline`, …) are listed under [Traps](#traps). Objects with any other class are kept in `LevelData.extraObjects`, with position, size and properties. The validator warns that they are ignored. That is the hook for your own entities: enemies, signs and so on.
 
 To add a new collectible kind, add it to `ENTITY_CONFIG.collectibles` in `packages/shared/src/config/entities.ts`. Then add a texture whose key is the kind's name; the procedural `coin` and `gem` textures are in `apps/web/src/game/art/textures.ts`. A kind without a texture is drawn as a coin.
 
@@ -70,6 +70,30 @@ Map custom properties are available as `LevelData.properties`. A level's movemen
 ```ts
 { id: 'moon', name: 'Moon Base', map: 'maps/moon.json', next: null, tuning: { timeToApex: 0.6, maxRunSpeed: 180 } }
 ```
+
+## Traps
+
+Traps are objects too, on any object layer. Class names ignore case, spaces, `-` and `_` (`falling platform`, `rock-head` and `rockHead` all work). Each trap has a fixed body size from `packages/shared/src/config/traps.ts`, so the object only says **where** it is:
+
+- a **point** marks the bottom-centre of the body (put it on the floor);
+- a **rect** marks its top-left (its size is ignored), except for spikes, saws and fans, where the rect means something (below).
+
+Times are in milliseconds, distances in pixels. Every property is optional.
+
+| Class | Body | Shape | Properties | Behaviour |
+|---|---|---|---|---|
+| `spikes` | the strip | Rect covering whole 16 px tiles (or a point: one tile on the floor) | `dir` (`up` default, `down`, `left`, `right`: where the blades point) | Touching the blades (the 6 px band along the base, where they are drawn) costs a heart. Put solid ground behind the base. |
+| `trampoline` | 24×11 (the spring's top) | Point on the floor | `launch` (px/s, default 800 ≈ 14 tiles up) | Landing on top launches you; walking into it from the side does nothing (it is one-way). |
+| `saw` | circle, radius 16 | Rect = track, along its long axis through the middle; a point = a saw spinning in place (the point is its centre) | `speed` (px/s, default 90), `radius`, `phaseMs` | Ping-pongs along the track, easing at the ends. Costs a heart. It passes through terrain. |
+| `fallingPlatform` | 32×10 | Point or rect | `delayMs` (default 500) | One-way. Shakes when someone lands on it, falls after `delayMs` (riders go with it), and is back 2.5 s after it disappears. |
+| `fan` | 24×8 (8×24 sideways) | Point on the floor, or rect | `dir` (`up` default), `range` (px, default 112), `onMs` (2000), `offMs` (1500, `0` = always on), `phaseMs` | Blows players along `dir` in a 32 px wide stream `range` long while on. Going up, it lifts you to about the top of the stream. |
+| `rockHead` | 32×32 | Point or rect | `axis` (`x` default, `y`), `dir` (first move: `right`/`down` default, or `left`/`up`), `waitMs` (900), `phaseMs` | Solid. Scans the tiles for the walls it hits on its axis, then waits, accelerates, slams into a wall, waits, and goes back. You can ride it. Pinned between it and a wall: crushed (instant death). Needs walls on its axis: map edges count horizontally, but a vertical one needs a real floor and ceiling. |
+| `spikeHead` | 42×42 | Point or rect | – | Solid and static; touching any side costs a heart. |
+| `box` | 20×20 | Point on the floor, or rect | `variant` (1–3: hits to break, and the art) | Solid. An attack or a stomp hits it (a stomp bounces you; one hit per swing, 200 ms apart). On the last hit it bursts. Broken boxes stay broken for the rest of the run. |
+
+Damage, knockback, invulnerability, speeds and the falling and fan timings are in `TRAP_TUNING` (`config/traps.ts`). An object that can't work fails the level with a message naming it: a rock-head with no wall on its axis or placed inside one, an unknown `dir`, `axis` or `variant`, a saw with `speed` 0, a non-number property.
+
+Traps move as a function of the level clock, so a level is the same every time it runs. Use `phaseMs` to offset saws, fans and rock-heads that would otherwise move in step.
 
 ## Validation
 
@@ -84,7 +108,8 @@ Map custom properties are available as `LevelData.properties`. A level's movemen
 - external tileset;
 - wrong layer size;
 - no spawn point;
-- a spawn outside the map.
+- a spawn outside the map;
+- a trap that can't work (see [Traps](#traps)).
 
 **Warnings** (the level loads):
 
@@ -101,11 +126,31 @@ While `npm run dev` is running:
 - **Saving a map** reloads it on the server, which watches `DATA_DIR`. The next level start uses the new version; a level already in progress keeps its copy. The asset watcher copies the file to the web app. The client loads maps with the server's checksum in the URL, so browsers never use a stale cached copy.
 - **To restart a level after a map change**, use *Skip level* in the pause menu, or ready up again from the lobby.
 - **Editing `manifest.ts`** or any shared TypeScript restarts the game server. Rooms live in memory, so clients reconnect automatically and the room is recreated under the same code.
-- **The checksum check:** the server includes a checksum of its parsed level in the room info. The client parses its own copy and shows a warning if they differ, which usually means stale assets (`npm run assets:sync`). The checksum covers everything that affects gameplay (grid, spawns, zones, collectibles) and ignores decor.
+- **The checksum check:** the server includes a checksum of its parsed level in the room info. The client parses its own copy and shows a warning if they differ, which usually means stale assets (`npm run assets:sync`). The checksum covers everything that affects gameplay (grid, spawns, zones, collectibles, traps) and ignores decor.
+
+## Terrain tileset
+
+The sample levels use `terrain-tileset.png`: 16×16 tiles on a 22×11 grid, with empty tiles between the sets. Its Tiled definition (collision properties included) comes from `terrainTilesetDefinition()` in `packages/shared/src/dev/terrainTileset.ts`. Every tile is `collides` except the one-way platforms, which are `oneWay`.
+
+| Kind | Sets | Layout |
+|---|---|---|
+| Walls (hollow frames) | stone, wood, jade (cols 0–4) | 3×3 corners, edges and dark center, plus a 2×2 of inner corners to the right |
+| Ground | grass, autumn, candy (cols 6–10) | 3×3 with the grass/top edge, plus 2×2 inner "overhang" corners |
+| Brick | brick (cols 17–21, rows 4–6) | 3×3 plus 2×2 inner corners |
+| Blocks | bronze, steel, copper (cols 12–15), gold (cols 17–20, rows 8–10) | 3×1 beam, 1×3 pillar, 1×1 block, 2×2 block |
+| One-way platforms | gold, wood, metal (cols 17–19, rows 0–2) | left end, middle, right end; the plank is the top 5 px of the tile |
+
+The rows are 0–2, 4–6 and 8–10 for the three sets of each column group. The tile `type` (Tiled's class) is the set name, for example `grass` or `steelBlock`.
+
+**Auto-tiling.** In Tiled, paint these tiles by hand or with your own terrain set. The sample generator picks them automatically from neighbors:
+
+- **Walls, ground, brick:** an exposed side picks the matching edge or corner of the 3×3. A fully enclosed cell next to an empty diagonal picks the inner corner pointing at it. Different materials count as different regions, and cells beyond the map edge count as the same material, so regions run cleanly off the map. Keep regions at least 2 tiles thick: 1-tile strips have no proper tile, and the generator rejects them.
+- **Blocks:** 1×1 is the small block, a 1-tall run is a beam (end caps and a repeated middle), a 1-wide run is a pillar, and larger even-sized rectangles repeat the 2×2 block. Blocks of the same material must not touch, or they merge into one shape.
+- **Platforms:** end caps and a repeated middle, at least 2 tiles long.
 
 ## Debug tileset
 
-`debug-tiles.png` (8×2 tiles of 32 px) is generated from `packages/shared/src/art/debugTileset.ts`. In Tiled, a tile's gid is `firstgid + id`, and the sample maps use `firstgid = 1`.
+`debug-tiles.png` (8×2 tiles of 32 px) is generated from `packages/shared/src/art/debugTileset.ts`. It is the default for `asciiToTiledMap` (unit tests and quick sketches). In Tiled, a tile's gid is `firstgid + id`, and maps made with it use `firstgid = 1`.
 
 | id | tile | properties | id | tile | properties |
 |---|---|---|---|---|---|
@@ -122,23 +167,22 @@ Ice and water look different but have no special physics. Adding behavior means 
 
 ## Design metrics
 
-These come from `packages/shared/src/config` at the default tuning. Change the config and they change everywhere.
+These come from `packages/shared/src/config` at the default tuning. Change the config and they change everywhere. Tile counts are given for 16 px tiles (the terrain tileset), with 32 px tiles in parentheses.
 
 | Metric | Value |
 |---|---|
-| Tile | 32 px |
-| Player hitbox | 20×28 px. Fits through 1-tile gaps and tunnels. |
-| Full jump height | 112 px = **3.5 tiles** (a held jump peaks at exactly this height after 0.4 s). Ledges up to 3 tiles high are comfortable. |
+| Player hitbox | 20×28 px. Needs 2×2 tiles of clearance (1×1 at 32 px). |
+| Full jump height | 112 px = **7 tiles** (3.5) (a held jump peaks at exactly this height after 0.4 s). Ledges up to 96 px (6 tiles) high are comfortable. |
 | Short hop | Releasing jump while rising multiplies the remaining upward speed by 0.45, once. |
-| Run speed | 220 px/s (≈ 6.9 tiles/s), reached in 0.1 s from standstill |
-| Running jump distance | ≈ 5 tiles of horizontal travel, back to the same height. Gaps up to 4 tiles are comfortable; 5 is an expert jump. |
+| Run speed | 220 px/s (≈ 13.8 tiles/s, or 6.9), reached in 0.1 s from standstill |
+| Running jump distance | ≈ 160 px = 10 tiles (5) of horizontal travel, back to the same height. Gaps up to 128 px (8 tiles) are comfortable; 160 px is an expert jump. |
 | Coyote time | 100 ms after walking off a ledge |
 | Jump buffer | 120 ms before landing |
 | Drop-through | One-way tiles are ignored for 220 ms after Down + Jump |
-| Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom |
+| Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom (`hazardTileHitbox`, tuned for 32 px spike tiles; the terrain tileset has no hazard tiles, so the samples use lava zones) |
 | Kill plane | 96 px below the bottom of the map |
 | Respawn delay | 0.9 s |
-| View | 960×540 px (30×17 tiles). Maps smaller than the view are centered. |
+| View | 960×540 px = 60×34 tiles (30×17). Maps smaller than the view are centered. |
 
 ## Prototyping with ASCII
 
@@ -169,4 +213,56 @@ const map = asciiToTiledMap({
 
 You can extend or override the legend with `legend: { … }`. `asciiToLevel()` returns parsed `LevelData` directly, which is handy in tests.
 
-`npm run samples:generate` rebuilds `level-1.json`, `level-2.json` and `debug-tiles.png` from `scripts/generate-samples.ts`. It **overwrites** those maps, so after editing a sample in Tiled, either stop using the generator or copy the map to a new file first.
+For the terrain tileset, pass its legend, tileset and tile size. Every material is auto-tiled (see [Terrain tileset](#terrain-tileset)):
+
+```ts
+import { TERRAIN_ASCII_LEGEND, asciiToTiledMap, terrainTilesetDefinition } from '@platformer/shared/dev';
+
+const map = asciiToTiledMap({
+  rows: [
+    '                        ',
+    '                        ',
+    '             ~~~~       ',
+    '  o o                   ',
+    ' 1 2 3 4   mm        E  ',
+    '###########mm####LL#####',
+    '########################',
+  ],
+  baseLegend: TERRAIN_ASCII_LEGEND,
+  tileset: terrainTilesetDefinition(1),
+  tileSize: 16,
+});
+```
+
+| Char | Set | Char | Set |
+|---|---|---|---|
+| `#` `%` `&` | grass, autumn, candy ground | `x` `m` `k` `Y` | bronze, steel, copper, gold blocks |
+| `S` `W` `J` | stone, wood, jade walls | `-` `=` `~` | wood, metal, gold one-way platforms |
+| `B` | brick | `^` | spikes pointing up (a horizontal run becomes one strip) |
+
+Objects use the same characters as the default legend. Checkpoints and exits are 2×4 tiles (32×64 px) and lava (`L`) zones are 2 tiles tall, rising from the bottom of the cell, so their pixel sizes match the 32 px legend.
+
+Other traps can be passed to `asciiToTiledMap` as `objects: [{ name, type: 'saw', x, y, width, height, properties }]` (in pixels).
+
+`npm run samples:generate` rebuilds `level-1.json` … `level-3.json` (and `debug-tiles.png`) from `scripts/generate-samples.ts`. There, layouts are written with a small `Sketch` API (`ground`, `solid`, `block`, `platform`, `text`) that throws on shapes the tileset can't draw. Traps are placed in tile coordinates and checked against the layout (no overlaps, a floor under boxes, trampolines and fans, solid ground behind spikes):
+
+```ts
+s.spikes(30, 23, 3);                      // 3 tiles of spikes on the floor, from column 30
+s.saw(36, 18, 41, 18, { speed: 60 });     // a saw between the centres of two tiles
+s.trampoline(53, 23).fan(82, 23, { range: 9 });   // on the floor under cells (x, y) and (x+1, y); range in tiles
+s.fallingPlatform(50, 23).box(128, 17, 3);
+s.rockHead(141, 16, 'x').spikeHead(91, 15);       // 2×2 cells / centred in 3×3 cells
+```
+
+It **overwrites** those maps, so after editing a sample in Tiled, either stop using the generator or copy the map to a new file first.
+
+### Is it finishable?
+
+`npm run levels:solve` checks that one player can reach the exit of every level without losing a heart. It searches over moves (runs, jumps of different heights and steering, waits, attacks) in the real simulation, traps and timing included, and prints the route with `--verbose`:
+
+```
+level-3 "Sunset Ruins" (14 traps)
+  ✓ finished in 15 moves, 14.4 s of play, 0 hearts lost (316 nodes, 1607 states, 4.4s)
+```
+
+When it fails it reports how close it got and what ended the branches (`trap hit`, `death (hazard)`, `death (crush)`…). Optional areas (bonus coins up a trampoline, a box-blocked nook) are not checked. Use `--level <id>` for one level.

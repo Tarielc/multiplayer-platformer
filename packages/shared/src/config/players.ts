@@ -29,6 +29,8 @@ export interface PlayerConfig {
   hitbox: { width: number; height: number };
   /** Delay between death and respawn. */
   respawnDelayMs: number;
+  /** Hearts. Traps cost one each (see `traps.ts`); at 0 the player dies and respawns full. */
+  maxHp: number;
   nameMaxLength: number;
   defaultName: string;
 }
@@ -36,6 +38,7 @@ export interface PlayerConfig {
 export const PLAYER_CONFIG: Readonly<PlayerConfig> = {
   hitbox: { width: 20, height: 28 },
   respawnDelayMs: 900,
+  maxHp: 3,
   nameMaxLength: 16,
   defaultName: 'Player',
 };

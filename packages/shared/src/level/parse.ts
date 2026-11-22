@@ -1,4 +1,7 @@
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
+import { TRAP_CONFIG, type CompiledTraps } from '../config/traps';
+import { parseTraps, trapKindOf, type TrapObject } from '../sim/traps/parseTraps';
+import { LevelFormatError } from './errors';
 import {
   flattenLayers,
   objectKind,
@@ -18,17 +21,14 @@ import {
   type LevelZone,
 } from './types';
 
-export class LevelFormatError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'LevelFormatError';
-  }
-}
+export { LevelFormatError } from './errors';
 
 export interface ParseLevelOptions {
   id: string;
   name?: string;
   entities?: Readonly<EntityConfig>;
+  /** Trap defaults (sizes, timings); defaults to `TRAP_CONFIG`. */
+  traps?: Readonly<CompiledTraps>;
   /** Used when the map has no `backgroundcolor`. */
   backgroundColor?: string;
 }
@@ -124,6 +124,7 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
   const hazards: LevelZone[] = [];
   const collectibles: LevelCollectible[] = [];
   const extraObjects: LevelObject[] = [];
+  const trapObjects: TrapObject[] = [];
   const pendingSpawns: Array<{ slot: number | null; x: number; y: number }> = [];
 
   for (const { layer } of flattenLayers(map.layers)) {
@@ -179,6 +180,12 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
           }
           default: {
             const { x, y } = objectTopLeft(obj);
+            const trapKind = trapKindOf(kind);
+            if (trapKind) {
+              const point = obj.point === true || (obj.width === 0 && obj.height === 0);
+              trapObjects.push({ id: obj.id, kind: trapKind, name: obj.name, x, y, width: obj.width, height: obj.height, point, properties: props });
+              break;
+            }
             extraObjects.push({ id: obj.id, kind, name: obj.name, x, y, width: obj.width, height: obj.height, properties: props });
           }
         }
@@ -207,7 +214,7 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
   checkpoints.sort((a, b) => a.x - b.x);
 
   const mapProps = propertiesToRecord(map.properties);
-  return {
+  const level: LevelData = {
     id: options.id,
     name: options.name ?? options.id,
     tileSize,
@@ -221,8 +228,12 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
     exits,
     hazards,
     collectibles,
+    traps: [],
     extraObjects,
     backgroundColor: map.backgroundcolor ?? (typeof mapProps.backgroundColor === 'string' ? mapProps.backgroundColor : null) ?? options.backgroundColor ?? null,
     properties: mapProps,
   };
+  // Traps need the finished collision grid (rock-heads find the walls they slam into).
+  level.traps = parseTraps(trapObjects, level, options.traps ?? TRAP_CONFIG);
+  return level;
 }

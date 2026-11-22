@@ -6,6 +6,7 @@ import {
   PLAYER_CONFIG,
   TICK_DT,
   TICK_MS,
+  TrapField,
   TypedEmitter,
   attackReachBox,
   defaultCharacterForSlot,
@@ -46,6 +47,7 @@ import { Backdrop } from '../views/Backdrop';
 import { EntityViews } from '../views/EntityViews';
 import { floatText, puff } from '../views/effects';
 import { PlayerView } from '../views/PlayerView';
+import { TrapViews } from '../traps/TrapViews';
 import { SCENE_KEYS } from './keys';
 
 const INTERPOLATION_DELAY_TICKS = NET_CONFIG.interpolationDelayMs / TICK_MS;
@@ -80,6 +82,8 @@ export class LevelScene extends Phaser.Scene {
   private interpolator = new Interpolator();
   private views = new Map<string, PlayerView>();
   private entityViews: EntityViews | null = null;
+  private traps: TrapField | null = null;
+  private trapViews: TrapViews | null = null;
   private backdrop: Backdrop | null = null;
   private debugDraw: DebugDraw | null = null;
   private controls: InputController | null = null;
@@ -108,6 +112,8 @@ export class LevelScene extends Phaser.Scene {
     this.interpolator = new Interpolator();
     this.views = new Map();
     this.entityViews = null;
+    this.traps = null;
+    this.trapViews = null;
     this.backdrop = null;
     this.debugDraw = null;
     this.controls = null;
@@ -168,12 +174,16 @@ export class LevelScene extends Phaser.Scene {
     }
     this.levelData = level;
 
+    // Same trap runtime as the server's world; the predictor keeps it in sync with snapshots.
+    const traps = TrapField.forLevel(level);
+    this.traps = traps;
     const ctx: MovementContext = {
       level,
       movement: resolveMovement(MOVEMENT_TUNING, this.entry.tuning),
       hitbox: HITBOX,
       combat: this.combat,
       dt: TICK_DT,
+      traps: level.traps.length > 0 ? traps : null,
     };
     this.predictor = new LocalPredictor(ctx);
     const sound = new SoundController(this, bridge.audio);
@@ -185,6 +195,7 @@ export class LevelScene extends Phaser.Scene {
     this.backdrop = new Backdrop(this);
     this.buildTilemap(json as TiledMap);
     this.entityViews = new EntityViews(this, level);
+    this.trapViews = new TrapViews(this, traps, (event) => this.presentation.emit('world', event));
     this.debugDraw = new DebugDraw(this, level, HITBOX);
     this.debugDraw.setVisible(bridge.debug);
     this.controls = new InputController(this, () => bridge.emit('input:menu'));
@@ -206,6 +217,8 @@ export class LevelScene extends Phaser.Scene {
       this.controls = null;
       for (const view of this.views.values()) view.destroy();
       this.views.clear();
+      this.trapViews?.destroy();
+      this.trapViews = null;
       this.presentation.removeAllListeners();
       sound.destroy();
       this.sfx = null;
@@ -218,8 +231,8 @@ export class LevelScene extends Phaser.Scene {
   }
 
   override update(): void {
-    const { predictor, controls, entityViews } = this;
-    if (!predictor || !controls || !entityViews) return;
+    const { predictor, controls, entityViews, trapViews } = this;
+    if (!predictor || !controls || !entityViews || !trapViews) return;
     const { client, bridge } = this.services;
     const now = performance.now();
     const frameMs = Math.min(now - this.lastFrame, VIEW_CONFIG.maxFrameMs);
@@ -239,7 +252,9 @@ export class LevelScene extends Phaser.Scene {
         }
         const buttons = bridge.menuOpen ? NEUTRAL_INPUT : controls.sample() | devVirtualButtons();
         const seq = client.sendInput(buttons);
-        predictor.step(seq, buttons);
+        const contacts = predictor.step(seq, buttons);
+        // Trampolines spring the moment you land on them (the server event is for everyone else).
+        if (contacts && contacts.bounced >= 0) trapViews.bounce(contacts.bounced, true);
         controls.consumeLatch();
         this.accumulator -= TICK_MS;
         steps += 1;
@@ -260,6 +275,8 @@ export class LevelScene extends Phaser.Scene {
     const body = predictor.current;
     if (local && position && body) {
       const signals = signalsFromBody(body, predictor.teleports);
+      const server = predictor.lastServer;
+      local.setInvulnerable(server !== null && server.invulnUntil > server.stepTick);
       local.render(position.x + HITBOX.width / 2, position.y + HITBOX.height, body.facing, signals, frameMs);
       if (!this.cameraSnapped) {
         this.cameras.main.centerOn(local.container.x, local.container.y);
@@ -281,6 +298,7 @@ export class LevelScene extends Phaser.Scene {
       if (id === selfId) continue;
       const s = samples.get(id);
       if (!s) continue;
+      view.setInvulnerable(s.invulnUntil > renderTick);
       view.render(s.x + HITBOX.width / 2, s.y + HITBOX.height, s.facing, signalsFromSample(s), frameMs);
       if (debug) {
         boxes.push({ x: s.x, y: s.y, color: this.slotColor(id) });
@@ -288,6 +306,9 @@ export class LevelScene extends Phaser.Scene {
       }
     }
 
+    // Traps are drawn at the local player's predicted tick: where they are when you meet them.
+    trapViews.update(predictor.renderTick(alpha) ?? renderTick, frameMs);
+    if (debug) trapViews.debugBoxes(boxes);
     entityViews.update(frameMs);
     this.backdrop?.update(this.cameras.main);
     this.debugDraw?.draw(boxes);
@@ -335,7 +356,8 @@ export class LevelScene extends Phaser.Scene {
 
     const selfId = this.services.client.playerId;
     const me = selfId ? state.players.find((p) => p.id === selfId) : undefined;
-    if (me) predictor.reconcile(me);
+    if (me) predictor.reconcile(me, state.traps);
+    else this.traps?.applyNet(state.traps);
 
     for (const event of events) this.playEvent(event, state);
     entityViews.sync(state);
@@ -401,6 +423,16 @@ export class LevelScene extends Phaser.Scene {
         }
         break;
       }
+      case 'trapHit':
+        // The damage itself shows on the player view (Hurt, blink); spike-heads also squash.
+        this.trapViews?.trapHit(event.trapId, event.side);
+        break;
+      case 'bounce':
+        if (event.playerId !== selfId) this.trapViews?.bounce(event.trapId, false);
+        break;
+      case 'boxHit':
+        this.trapViews?.boxHit(event.boxId, event.broken, event.playerId === selfId);
+        break;
       case 'levelComplete': {
         // React shows the results overlay.
         const camera = this.cameras.main;
@@ -565,11 +597,15 @@ export class LevelScene extends Phaser.Scene {
             attack: round(body.attack),
             attackSeq: body.attackSeq,
             hurt: round(body.hurt),
+            stepTick: body.stepTick,
+            hp: this.predictor?.lastServer?.hp ?? null,
+            invulnUntil: this.predictor?.lastServer?.invulnUntil ?? null,
             state: selfView?.state ?? null,
             character: selfView?.characterId ?? null,
           }
         : null,
       players: [...this.views].map(([id, view]) => ({ id, self: id === selfId, state: view.state, character: view.characterId })),
+      traps: this.traps ? { count: this.traps.traps.length, state: this.traps.toNet() } : null,
       pendingInputs: this.predictor?.pendingCount ?? 0,
       correctionPx: round(this.predictor?.lastCorrection ?? 0),
       views: this.views.size,

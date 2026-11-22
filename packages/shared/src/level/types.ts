@@ -1,3 +1,4 @@
+import type { TrapDef } from '../sim/traps/types';
 import type { Rect } from '../util/math';
 import type { PropertyValue } from './tiled';
 
@@ -60,6 +61,8 @@ export interface LevelData {
   exits: LevelZone[];
   hazards: LevelZone[];
   collectibles: LevelCollectible[];
+  /** Traps and interactive entities (sorted by id). See `sim/traps`. */
+  traps: TrapDef[];
   extraObjects: LevelObject[];
   backgroundColor: string | null;
   properties: Record<string, PropertyValue>;

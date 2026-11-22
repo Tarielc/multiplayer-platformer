@@ -42,11 +42,18 @@ export interface AsciiLegendEntry {
 
 export interface AsciiMapSpec {
   rows: readonly string[];
+  /** Legend the `legend` entries are merged over (default: `DEFAULT_ASCII_LEGEND`, debug tiles). */
+  baseLegend?: Record<string, AsciiLegendEntry>;
   legend?: Record<string, AsciiLegendEntry>;
   tileSize?: number;
   backgroundColor?: string;
   properties?: Record<string, AsciiPropertyValue>;
   tileset?: TiledTileset;
+  /**
+   * Extra objects (in pixels) appended to the entities layer after the legend's, for things a
+   * character can't express (saw tracks, rock-heads, boxes…). Ids are assigned automatically.
+   */
+  objects?: ReadonlyArray<Omit<TiledObject, 'id'>>;
 }
 
 /** Solid ground: grass on exposed tops, dirt underneath. */
@@ -101,7 +108,7 @@ export function asciiToTiledMap(spec: AsciiMapSpec): TiledMap {
   const width = Math.max(...spec.rows.map((r) => r.length));
   const height = spec.rows.length;
   const rows = spec.rows.map((r) => r.padEnd(width, ' '));
-  const legend = { ...DEFAULT_ASCII_LEGEND, ...spec.legend };
+  const legend = { ...(spec.baseLegend ?? DEFAULT_ASCII_LEGEND), ...spec.legend };
   const tileset = spec.tileset ?? debugTilesetDefinition(1);
   const data = {
     terrain: new Array<number>(width * height).fill(0),
@@ -144,6 +151,8 @@ export function asciiToTiledMap(spec: AsciiMapSpec): TiledMap {
       }
     }
   }
+
+  for (const obj of spec.objects ?? []) objects.push({ rotation: 0, visible: true, ...obj, id: nextObjectId++ });
 
   const layers: TiledMap['layers'] = [tileLayer(1, 'terrain', width, height, data.terrain)];
   if (data.decor.some(Boolean)) layers.unshift(tileLayer(2, 'decor', width, height, data.decor));

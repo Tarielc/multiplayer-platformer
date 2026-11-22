@@ -5,12 +5,14 @@ import { ensureCharacterSheet, registerCharacterAnimations } from '../characters
 import { CHARACTER_SHEET } from '../characters/characterArt';
 import { VIEW_CONFIG } from '../config';
 import type { GameServices } from '../services';
+import { ensureTrapSheets, queueTrapSheets, registerTrapAnimations } from '../traps/trapAnimations';
+import { TRAP_SHEETS } from '../traps/trapArt';
 import { listen } from '../util/listen';
 import { SCENE_KEYS } from './keys';
 
 /**
- * Loads game-wide assets once per game (character sprite sheet, optional recorded sounds),
- * generates placeholder textures and synthesized sounds, registers character animations, then
+ * Loads game-wide assets once per game (character and trap sprite sheets, optional recorded
+ * sounds), generates placeholder textures and synthesized sounds, registers animations, then
  * waits for the room to have a level and starts it.
  */
 export class BootScene extends Phaser.Scene {
@@ -32,6 +34,7 @@ export class BootScene extends Phaser.Scene {
     if (!this.textures.exists(key)) {
       this.load.spritesheet(key, `${this.services.assetBase}/${path}`, { frameWidth, frameHeight });
     }
+    queueTrapSheets(this, this.services.assetBase);
     queueSoundOverrides(this, this.services.assetBase);
   }
 
@@ -44,6 +47,14 @@ export class BootScene extends Phaser.Scene {
       });
     }
     registerCharacterAnimations(this);
+    const missingTraps = ensureTrapSheets(this, this.failed);
+    if (missingTraps.length > 0) {
+      const files = missingTraps.map((name) => TRAP_SHEETS[name].path).join(', ');
+      this.services.bridge.emit('level:warning', {
+        message: `Trap sprites (${files}) could not be loaded; using placeholders. Run "npm run assets:sync".`,
+      });
+    }
+    registerTrapAnimations(this);
     prepareSoundCues(this);
 
     this.add

@@ -32,6 +32,8 @@ export class PlayerView {
   private readonly marker: Phaser.GameObjects.Image | null = null;
   private squash: Phaser.Tweens.Tween | null = null;
   private grounded = true;
+  private invulnerable = false;
+  private blinkMs = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -82,6 +84,11 @@ export class PlayerView {
     this.anim.setCharacter(id);
   }
 
+  /** Blinks the sprite while traps can't hurt the player (after taking a hit). */
+  setInvulnerable(on: boolean): void {
+    this.invulnerable = on;
+  }
+
   /** `feetX/feetY` = bottom-centre of the hitbox in world pixels. */
   render(feetX: number, feetY: number, facing: 1 | -1, signals: PlayerSignals, dtMs: number): void {
     // Dead players stay where they died, so the Death clip plays on the spot.
@@ -92,6 +99,9 @@ export class PlayerView {
     this.anim.update();
     this.label.setVisible(signals.alive);
     this.marker?.setVisible(signals.alive);
+    const { blinkPeriodMs, blinkAlpha } = VIEW_CONFIG.invulnerable;
+    this.blinkMs = this.invulnerable && signals.alive ? this.blinkMs + dtMs : 0;
+    this.anim.sprite.setAlpha(this.blinkMs > 0 && Math.floor(this.blinkMs / blinkPeriodMs) % 2 === 0 ? blinkAlpha : 1);
 
     const { squash } = VIEW_CONFIG;
     for (const cue of cues) {

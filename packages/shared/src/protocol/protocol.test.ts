@@ -35,24 +35,39 @@ function player(id: string, overrides: Partial<NetPlayerState> = {}): NetPlayerS
     attackCooldown: 0,
     attackSeq: 0,
     hurt: 0,
+    stepTick: 0,
+    hp: 3,
+    invulnUntil: 0,
     ack: 0,
     ...overrides,
   };
 }
 
 describe('world deltas', () => {
-  const prev: NetWorldState = { tick: 10, players: [player('a'), player('b'), player('c')], collected: [3] };
+  const prev: NetWorldState = { tick: 10, players: [player('a'), player('b'), player('c')], collected: [3], traps: [] };
   const next: NetWorldState = {
     tick: 13,
-    players: [player('a', { x: 14, vx: 220, ack: 3 }), player('c'), player('d', { x: 99 })],
+    players: [player('a', { x: 14, vx: 220, ack: 3, hp: 2, invulnUntil: 70 }), player('c'), player('d', { x: 99 })],
     collected: [3, 7],
+    traps: [{ id: 4, hits: 1 }],
   };
 
   it('contains only what changed', () => {
     const delta = diffWorld(prev, next);
-    expect(delta.upserts).toEqual([{ id: 'a', x: 14, vx: 220, ack: 3 }, player('d', { x: 99 })]);
+    expect(delta.upserts).toEqual([{ id: 'a', x: 14, vx: 220, ack: 3, hp: 2, invulnUntil: 70 }, player('d', { x: 99 })]);
     expect(delta.removed).toEqual(['b']);
     expect(delta.collected).toEqual([7]);
+    expect(delta.traps).toEqual([{ id: 4, hits: 1 }]);
+  });
+
+  it('sends the trap state only when it changed', () => {
+    const same = { ...next, tick: 14 };
+    expect(diffWorld(next, same).traps).toBeUndefined();
+    expect(isDeltaEmpty(diffWorld(next, same))).toBe(true);
+    const triggered = { ...same, traps: [{ id: 4, hits: 1 }, { id: 9, trigger: 12 }] };
+    const delta = diffWorld(next, triggered);
+    expect(isDeltaEmpty(delta)).toBe(false);
+    expect(applyWorldDelta(next, 14, delta).traps).toEqual(triggered.traps);
   });
 
   it('round-trips: applying the diff to the base rebuilds the new state', () => {

@@ -19,5 +19,20 @@ export function levelChecksum(level: LevelData): string {
   zones(level.hazards, 'hz');
   h.str('col');
   for (const c of level.collectibles) h.int(c.id).str(c.kind).num(c.x).num(c.y).num(c.value).num(c.radius);
+  h.str('trap');
+  for (const trap of level.traps) hashValue(h, trap);
   return h.digest();
+}
+
+/** Hashes plain data (numbers, strings, nested objects) in a key order that never changes. */
+function hashValue(h: Fnv1a, value: unknown): void {
+  if (typeof value === 'number') h.num(value);
+  else if (typeof value === 'string') h.str(value);
+  else if (typeof value === 'boolean') h.int(value ? 1 : 0);
+  else if (value && typeof value === 'object') {
+    for (const key of Object.keys(value).sort()) {
+      h.str(key);
+      hashValue(h, (value as Record<string, unknown>)[key]);
+    }
+  }
 }

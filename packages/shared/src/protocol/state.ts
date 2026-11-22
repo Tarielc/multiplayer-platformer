@@ -1,4 +1,5 @@
 import type { MovementBody } from '../sim/movement';
+import type { NetTrapState } from '../sim/traps/types';
 
 /**
  * Network view of one player. Carries the *full* movement state (timers included) so the
@@ -32,6 +33,12 @@ export interface NetPlayerState {
   attackCooldown: number;
   attackSeq: number;
   hurt: number;
+  /** Tick of the last step (trap positions follow from ticks; prediction continues from here). */
+  stepTick: number;
+  /** Hearts left. */
+  hp: number;
+  /** Traps can't hurt the player before this server tick (they blink until then). */
+  invulnUntil: number;
   /** Last input sequence number the server applied for this player. */
   ack: number;
 }
@@ -41,6 +48,8 @@ export interface NetWorldState {
   players: NetPlayerState[];
   /** Ids of collectibles picked up so far this run (sorted). */
   collected: number[];
+  /** Traps whose state changed (box hits, falling platforms), sorted by id. */
+  traps: NetTrapState[];
 }
 
 export type NetPlayerPatch = Partial<NetPlayerState> & { id: string };
@@ -64,5 +73,6 @@ export function bodyFromNetState(state: NetPlayerState): MovementBody {
     attackCooldown: state.attackCooldown,
     attackSeq: state.attackSeq,
     hurt: state.hurt,
+    stepTick: state.stepTick,
   };
 }

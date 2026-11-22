@@ -7,7 +7,7 @@ import type { HudPlayer, RoomView } from '@/net/RoomStore';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './Hud.module.css';
 
-/** Minimal HUD: one chip per active player (slot color, name, score, status) + level info. */
+/** Minimal HUD: one chip per active player (slot color, name, hearts, score, status) + level info. */
 export function Hud({ view, stats }: { view: RoomView; stats: NetStats | null }) {
   const room = view.room!;
   const levelIndex = room.level ? LEVELS.entries.findIndex((e) => e.id === room.level!.id) : -1;
@@ -59,8 +59,22 @@ function PlayerChip({ player }: { player: HudPlayer }) {
       <CharacterPortrait characterId={player.characterId} scale={1} className={styles.portrait} />
       <span className={styles.badge}>{player.label}</span>
       <span className={styles.name}>{player.name}</span>
+      <Hearts hp={player.hp} max={player.maxHp} />
       <span className={styles.score}>{player.score}</span>
       {status && <span className={styles.status}>{status}</span>}
     </div>
+  );
+}
+
+/** Pixel hearts: filled for each heart left. A heart pops as it empties. */
+function Hearts({ hp, max }: { hp: number; max: number }) {
+  return (
+    <span className={styles.hearts} role="img" aria-label={`${hp} of ${max} hearts`}>
+      {Array.from({ length: max }, (_, i) => (
+        <svg key={i} className={styles.heart} data-full={i < hp} viewBox="0 0 7 6" shapeRendering="crispEdges" aria-hidden>
+          <path d="M1 0h2v1h1v-1h2v1h1v2h-1v1h-1v1h-1v1h-1v-1h-1v-1h-1v-1h-1v-2h1z" />
+        </svg>
+      ))}
+    </span>
   );
 }

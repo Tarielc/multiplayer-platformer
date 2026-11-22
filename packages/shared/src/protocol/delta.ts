@@ -1,3 +1,4 @@
+import type { NetTrapState } from '../sim/traps/types';
 import type { NetPlayerPatch, NetPlayerState, NetWorldState } from './state';
 
 /** Fields compared for player deltas (everything except `id`). */
@@ -25,6 +26,9 @@ const PLAYER_FIELDS = [
   'attackCooldown',
   'attackSeq',
   'hurt',
+  'stepTick',
+  'hp',
+  'invulnUntil',
   'ack',
 ] as const satisfies readonly (keyof NetPlayerState)[];
 
@@ -42,6 +46,8 @@ export interface WorldDelta {
   removed: string[];
   /** Collectible ids picked up since the base state. */
   collected: number[];
+  /** The complete trap state, only when it changed since the base state. */
+  traps?: NetTrapState[];
 }
 
 /**
@@ -69,15 +75,27 @@ export function diffWorld(prev: NetWorldState, next: NetWorldState): WorldDelta 
     if (changed) upserts.push(patch as NetPlayerPatch);
   }
   const seen = new Set(prev.collected);
-  return {
+  const delta: WorldDelta = {
     upserts,
     removed: [...previous.keys()],
     collected: next.collected.filter((id) => !seen.has(id)),
   };
+  if (!sameTraps(prev.traps, next.traps)) delta.traps = next.traps;
+  return delta;
+}
+
+function sameTraps(a: readonly NetTrapState[], b: readonly NetTrapState[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x.id !== y.id || x.hits !== y.hits || x.trigger !== y.trigger) return false;
+  }
+  return true;
 }
 
 export function isDeltaEmpty(delta: WorldDelta): boolean {
-  return delta.upserts.length === 0 && delta.removed.length === 0 && delta.collected.length === 0;
+  return delta.upserts.length === 0 && delta.removed.length === 0 && delta.collected.length === 0 && !delta.traps;
 }
 
 /** Rebuilds the full state at `tick` from a base state and a delta. Returns a new object. */
@@ -91,5 +109,5 @@ export function applyWorldDelta(base: NetWorldState, tick: number, delta: WorldD
   const collected = delta.collected.length
     ? [...base.collected, ...delta.collected].sort((a, b) => a - b)
     : base.collected;
-  return { tick, players: [...players.values()], collected };
+  return { tick, players: [...players.values()], collected, traps: delta.traps ?? base.traps };
 }

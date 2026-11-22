@@ -15,6 +15,7 @@ export * from './sim/collision';
 export * from './sim/events';
 export * from './sim/input';
 export * from './sim/movement';
+export * from './sim/traps';
 export * from './sim/world';
 
 // Wire protocol

@@ -60,6 +60,36 @@
   white-space: nowrap;
 }
 
+.hearts {
+  display: inline-flex;
+  gap: 0.12em;
+}
+
+.heart {
+  width: 0.95em;
+  height: 0.82em;
+  fill: #ff4d6a;
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 60%));
+}
+
+.heart[data-full='false'] {
+  fill: rgb(255 255 255 / 18%);
+  animation: heart-lost 380ms ease-out;
+}
+
+@keyframes heart-lost {
+  0% {
+    fill: #ff4d6a;
+    transform: scale(1.6);
+  }
+  60% {
+    transform: scale(0.8);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .score {
   font-family: var(--mono);
   font-weight: 700;

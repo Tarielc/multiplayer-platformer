@@ -67,9 +67,15 @@ export const LEVELS = defineLevels([
     id: 'level-2',
     name: 'Sky Steps',
     map: 'maps/level-2.json',
-    next: null,
+    next: 'level-3',
     // Example of a per-level override: slightly floatier jumps up the tower.
     tuning: { timeToApex: 0.42 },
+  },
+  {
+    id: 'level-3',
+    name: 'Sunset Ruins',
+    map: 'maps/level-3.json',
+    next: null,
   },
 ]);
 

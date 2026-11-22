@@ -47,19 +47,20 @@ Players are not lockstepped. A laggy player's frames are applied whenever they a
 
 ## Snapshots and deltas
 
-The world state is small: `{ tick, players[], collected[] }`. Each player carries the full movement state (position, velocity, timers, flags) plus `alive`, `respawnIn`, `score`, `deaths`, `atExit`, `checkpointId`, `tp` and `ack`. Every field the simulation needs travels with it, so a client can resume the simulation from any state.
+The world state is small: `{ tick, players[], collected[], traps[] }`. Each player carries the full movement state (position, velocity, timers, flags, and `stepTick`, the tick of its last step) plus `alive`, `respawnIn`, `score`, `deaths`, `atExit`, `checkpointId`, `tp`, `ack`, and `hp`/`invulnUntil` (hearts, and the tick until which traps can't hurt it). `traps` lists only traps that differ from their initial state (see [Traps](#traps)). Every field the simulation needs travels with it, so a client can resume the simulation from any state.
 
 - **Keyframe:** `snapshot` carries the full state. It is sent at the start of each level, then every 60th broadcast (every 3 s). A player who joins or rejoins mid-level receives the last broadcast state, so they share the same delta base as everyone else. A client can also request one with `resync`.
 - **Delta:** `delta` holds only what changed since the previous broadcast (`baseTick`):
   - `upserts`: changed fields per player, or the whole object for a new player;
   - `removed`: ids of players who left;
-  - `collected`: newly collected item ids.
+  - `collected`: newly collected item ids;
+  - `traps`: the whole trap state, only when it changed (it is a few entries at most).
 
   When the world is frozen (countdown, results, pause) and nothing changed, the broadcast is skipped.
 - **Why deltas are safe:** WebSockets deliver every message, in order. All clients of a room hold the same base, so one encoded delta serves everyone.
 - **Gap detection:** the client's `WorldStateStore` applies a delta only if its `baseTick` equals the tick of the state it already holds. Otherwise it sends `resync` and waits for the keyframe.
 - **Run counter:** `run` increments with every new `GameWorld` (level start or restart) and is part of the room's level info. Snapshots and deltas from an older run are dropped, so a slow packet can never leak the previous level into the next one.
-- **Events:** `collect`, `death`, `respawn`, `checkpoint` and `levelComplete` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
+- **Events:** `collect`, `death`, `respawn`, `checkpoint`, `levelComplete`, `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
 
 ## Prediction and reconciliation (own player)
 
@@ -92,7 +93,20 @@ How they are handled:
 
 The local player is drawn between the last two predicted steps using the accumulator's remainder, so movement stays smooth at any frame rate.
 
-**Not predicted:** pickups, checkpoints and deaths happen on the server. They show up one round trip (plus up to 50 ms until the next broadcast) after the player touches them. Players don't collide with each other, so another player can never cause a misprediction. If you add player-to-player interactions (pushing, stomping), you'll need to predict them or accept corrections.
+**Not predicted:** pickups, checkpoints, deaths, trap damage and box hits happen on the server. They show up one round trip (plus up to 50 ms until the next broadcast) after the player touches them. Players don't collide with each other, so another player can never cause a misprediction. If you add player-to-player interactions (pushing, stomping), you'll need to predict them or accept corrections.
+
+## Traps
+
+Traps have to line up exactly between the server and the predicting client, or you would land on a platform the server thinks has moved. So:
+
+- **Motion is a pure function of the tick.** Saws, rock-heads, fans and falling platforms are positioned by functions in `packages/shared/src/sim/traps/motion.ts` from the trap's definition and a tick. Nothing about their position is sent.
+- **Only what players change is replicated:** hits taken by each box and the tick each falling platform was stood on (`NetTrapState[]`, in snapshots and in deltas when it changes). A finished falling cycle is forgotten, so the list stays tiny.
+- **Each body knows its tick.** A step at tick *t* carries a rider by the platform's movement since the body's previous step (`stepTick`), so the 0–3 inputs the server applies in one tick carry the rider once, and a skipped tick is caught up. The server steps players at `world.tick`; the client predicts each new input at `stepTick + 1` and replays from the server's `stepTick`, which lands each replayed input on the tick the server used.
+- **The predictor owns the client's `TrapField`.** Every reconcile copies the server's trap state into it before replaying. Landing on a falling platform starts it locally at once; the server's state then confirms it.
+- **Traps are drawn at the local player's predicted tick** (`LocalPredictor.renderTick`), interpolated between steps. What you see is what you collide with. The price: other players, drawn 100 ms in the past, can look slightly out of step with a moving platform they ride.
+- **Effects without events:** rock-head impacts are scheduled, so the client derives the squash animation and thud from the same functions (`rockHeadImpacts`).
+
+Damage flow: the server checks hazards after each player step. A hit costs `damage.amount` hearts, stuns the player (Hurt), knocks them away from the trap and sets `invulnUntil`; at 0 hearts the player dies (`death` with cause `trap`) and respawns with full hearts. `trapHit {playerId, trapId, hp, side}` drives the spike-head squash; the Hurt animation and the blink come from the replicated state. Lava, pits and crushes (`death` with cause `crush`) kill outright. Trampoline launches and box stomps are part of movement, so they are predicted; the client plays your spring animation from the predicted step and other players' from the `bounce` event.
 
 ## Interpolation (other players)
 

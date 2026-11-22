@@ -1,10 +1,19 @@
 import type { CompiledCombat } from '../config/combat';
 import type { Rect } from '../util/math';
 import { Button, NEUTRAL_INPUT } from './input';
-import { stepPlayerMovement, type HitboxSize, type MovementBody, type MovementContext } from './movement';
+import {
+  noContacts,
+  stepPlayerMovement,
+  type HitboxSize,
+  type MovementBody,
+  type MovementContext,
+  type StepContacts,
+} from './movement';
 
 /**
- * One full player step: action timers (swing, cooldown, stun) + movement physics.
+ * One full player step at `tick`: action timers (swing, cooldown, stun) + movement physics.
+ * The server passes its current tick; clients predict with the default (the tick after the
+ * body's last step). Returns what the step touched (see `StepContacts`).
  *
  * This is the single per-tick entry point for a player. The server runs it authoritatively and
  * clients run the exact same function for prediction and replay, so a swing the local player
@@ -13,12 +22,18 @@ import { stepPlayerMovement, type HitboxSize, type MovementBody, type MovementCo
  * Hits are *not* resolved here: they need every player and are decided by the server
  * (`GameWorld.resolveAttacks`), then replicated as the target's `hurt` timer + knockback.
  */
-export function stepPlayerBody(body: MovementBody, buttons: number, ctx: MovementContext): void {
+export function stepPlayerBody(
+  body: MovementBody,
+  buttons: number,
+  ctx: MovementContext,
+  tick = body.stepTick + 1,
+): StepContacts {
+  const contacts = noContacts();
   const attackDown = (buttons & Button.ATTACK) !== 0;
   if (!body.alive) {
     body.attackHeld = attackDown;
-    stepPlayerMovement(body, buttons, ctx); // records the jump edge only
-    return;
+    stepPlayerMovement(body, buttons, ctx, tick, contacts); // records the jump edge only
+    return contacts;
   }
   const c = ctx.combat;
   const dt = ctx.dt;
@@ -39,15 +54,16 @@ export function stepPlayerBody(body: MovementBody, buttons: number, ctx: Movemen
   if (body.hurt > 0) {
     // Stunned: no control, knockback carries the body. Keep tracking the real jump button so a
     // jump held through the stun is not treated as a fresh press when control returns.
-    stepPlayerMovement(body, NEUTRAL_INPUT, ctx);
+    stepPlayerMovement(body, NEUTRAL_INPUT, ctx, tick, contacts);
     body.jumpHeld = (buttons & Button.JUMP) !== 0;
-    return;
+    return contacts;
   }
 
   const facing = body.facing;
-  stepPlayerMovement(body, buttons, ctx);
+  stepPlayerMovement(body, buttons, ctx, tick, contacts);
   // Turning still works on the step a swing starts (Left + Attack together swings left).
   if (body.attack > 0 && c.lockFacing && !started) body.facing = facing;
+  return contacts;
 }
 
 /** Whether the body's current swing is inside its hit window. */

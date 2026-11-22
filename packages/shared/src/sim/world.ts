@@ -3,13 +3,16 @@ import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import type { CompiledMovement } from '../config/movement';
 import { msToTicks, TICK_DT } from '../config/net';
 import { PLAYER_CONFIG, type PlayerConfig } from '../config/players';
+import { TRAP_CONFIG, type CompiledTraps } from '../config/traps';
 import { CellFlag, type LevelData, type LevelZone } from '../level/types';
 import type { NetPlayerState, NetWorldState } from '../protocol/state';
 import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/math';
 import { cellAt } from './collision';
 import type { DeathCause, GameEvent } from './events';
 import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
-import { createBody, resetBody, type MovementBody, type MovementContext } from './movement';
+import { cloneBody, createBody, resetBody, type MovementBody, type MovementContext, type StepContacts } from './movement';
+import { TrapField } from './traps/TrapField';
+import type { Dir4, TrapHazard } from './traps/types';
 
 export interface WorldPlayer {
   readonly id: string;
@@ -36,6 +39,13 @@ export interface WorldPlayer {
   swingHits: number;
   /** Ticks left during which this player can't be hit (stun + immunity). Server-only. */
   hitImmuneTicks: number;
+  /** Hearts left (`PlayerConfig.maxHp` when alive and unhurt, 0 while dead). */
+  hp: number;
+  /** Traps can't hurt this player before this tick (replicated, so clients can blink them). */
+  invulnUntil: number;
+  /** Server-only: boxes already hit by the current swing (`boxSwingSeq`), one hit per swing. */
+  boxSwingSeq: number;
+  swingBoxes: Set<number>;
 }
 
 export interface GameWorldOptions {
@@ -45,6 +55,8 @@ export interface GameWorldOptions {
   combat?: CompiledCombat;
   players?: Readonly<PlayerConfig>;
   entities?: Readonly<EntityConfig>;
+  /** Trap physics and damage (defaults to `TRAP_CONFIG`; trap placement comes from the level). */
+  traps?: Readonly<CompiledTraps>;
   /** Fixed step in seconds (defaults to 1 / tickRate). */
   dt?: number;
 }
@@ -69,23 +81,50 @@ export class GameWorld {
   private readonly collected = new Set<number>();
   private teamCheckpoint: LevelZone | null = null;
   private events: GameEvent[] = [];
+  private traps: TrapField;
 
-  constructor(options: GameWorldOptions) {
+  constructor(private readonly options: GameWorldOptions) {
     this.level = options.level;
     this.playerConfig = options.players ?? PLAYER_CONFIG;
     this.entityConfig = options.entities ?? ENTITY_CONFIG;
+    this.traps = TrapField.forLevel(options.level, options.traps ?? TRAP_CONFIG);
     this.ctx = {
       level: options.level,
       movement: options.movement,
       hitbox: this.playerConfig.hitbox,
       combat: options.combat ?? resolveCombat(),
       dt: options.dt ?? TICK_DT,
+      traps: this.traps.traps.length > 0 ? this.traps : null,
     };
     this.respawnDelayTicks = Math.max(1, msToTicks(this.playerConfig.respawnDelayMs));
   }
 
   get movementContext(): Readonly<MovementContext> {
     return this.ctx;
+  }
+
+  /** Live trap state (box hits, falling platforms). Read-only use outside the world. */
+  get trapField(): TrapField {
+    return this.traps;
+  }
+
+  /**
+   * Independent deep copy (players, collectibles, traps, pending events). Used by the level
+   * solver to branch, and by tests.
+   */
+  clone(): GameWorld {
+    const copy = new GameWorld(this.options);
+    copy.tick = this.tick;
+    copy.completed = this.completed;
+    copy.teamCheckpoint = this.teamCheckpoint;
+    copy.events = [...this.events];
+    for (const id of this.collected) copy.collected.add(id);
+    for (const [id, p] of this.players) {
+      copy.players.set(id, { ...p, body: cloneBody(p.body), respawnPoint: { ...p.respawnPoint }, swingBoxes: new Set(p.swingBoxes) });
+    }
+    copy.traps = this.traps.clone();
+    copy.ctx.traps = copy.ctx.traps ? copy.traps : null;
+    return copy;
   }
 
   get playerCount(): number {
@@ -113,7 +152,7 @@ export class GameWorld {
     const player: WorldPlayer = {
       id,
       slot,
-      body: createBody(respawnPoint.x, respawnPoint.y, this.ctx.hitbox),
+      body: createBody(respawnPoint.x, respawnPoint.y, this.ctx.hitbox, this.tick - 1),
       score: 0,
       deaths: 0,
       collected: 0,
@@ -126,6 +165,10 @@ export class GameWorld {
       swingSeq: 0,
       swingHits: 0,
       hitImmuneTicks: 0,
+      hp: this.playerConfig.maxHp,
+      invulnUntil: 0,
+      boxSwingSeq: 0,
+      swingBoxes: new Set(),
     };
     this.players.set(id, player);
     return player;
@@ -144,13 +187,15 @@ export class GameWorld {
   stepPlayer(id: string, buttons: number): void {
     const player = this.players.get(id);
     if (!player) return;
-    stepPlayerBody(player.body, buttons, this.ctx);
-    if (player.body.alive) this.resolveInteractions(player);
+    const contacts = stepPlayerBody(player.body, buttons, this.ctx, this.tick);
+    if (player.body.alive) this.resolveInteractions(player, contacts);
   }
 
   /** World-level rules that run once per tick regardless of input (hits, respawns, exit rule). */
   endTick(): void {
     if (this.ctx.combat.playerHits) this.resolveAttacks();
+    this.resolveBoxAttacks();
+    this.traps.expire(this.tick);
     for (const player of this.players.values()) {
       if (player.body.alive) continue;
       player.respawnTicks -= 1;
@@ -188,6 +233,7 @@ export class GameWorld {
       tick: this.tick,
       players: this.listPlayers().map((p) => toNetPlayer(p, ackFor(p.id))),
       collected: [...this.collected].sort((a, b) => a - b),
+      traps: this.traps.toNet(),
     };
   }
 
@@ -206,7 +252,7 @@ export class GameWorld {
     return { x: zone.x + zone.width / 2 + (slot - 1.5) * 6, y: zone.y + zone.height };
   }
 
-  private resolveInteractions(player: WorldPlayer): void {
+  private resolveInteractions(player: WorldPlayer, contacts: StepContacts): void {
     const body = player.body;
     const box: Rect = { x: body.x, y: body.y, width: this.ctx.hitbox.width, height: this.ctx.hitbox.height };
 
@@ -214,9 +260,20 @@ export class GameWorld {
       this.kill(player, 'fall');
       return;
     }
+    if (contacts.crushed) {
+      this.kill(player, 'crush');
+      return;
+    }
     if (this.touchesHazardTile(box) || this.level.hazards.some((zone) => rectsOverlap(box, zone))) {
       this.kill(player, 'hazard');
       return;
+    }
+    if (this.ctx.traps) {
+      if (contacts.stomped >= 0) this.hitBox(player, contacts.stomped);
+      if (contacts.ground >= 0) this.traps.trigger(contacts.ground, this.tick);
+      if (contacts.bounced >= 0) this.events.push({ type: 'bounce', playerId: player.id, trapId: contacts.bounced });
+      this.resolveTrapHazards(player, box);
+      if (!body.alive) return;
     }
     for (const item of this.level.collectibles) {
       if (this.collected.has(item.id) || !circleOverlapsRect(item.x, item.y, item.radius, box)) continue;
@@ -283,6 +340,74 @@ export class GameWorld {
     }
   }
 
+  /** First trap hurting the player this tick costs a heart (none while invulnerable or stunned). */
+  private resolveTrapHazards(player: WorldPlayer, box: Rect): void {
+    if (this.tick < player.invulnUntil || player.body.hurt > 0) return;
+    for (const hazard of this.traps.hazards(this.tick)) {
+      const hit = hazard.rect
+        ? rectsOverlap(box, hazard.rect)
+        : circleOverlapsRect(hazard.circle!.x, hazard.circle!.y, hazard.circle!.r, box);
+      if (!hit) continue;
+      this.damage(player, hazard, box);
+      return;
+    }
+  }
+
+  /**
+   * Trap damage: lose a heart, then either die (no hearts left) or get the shove treatment
+   * (stun + knockback away from the trap) and a moment of invulnerability.
+   */
+  private damage(player: WorldPlayer, hazard: TrapHazard, box: Rect): void {
+    const body = player.body;
+    const cfg = this.traps.config.damage;
+    const side = contactSide(box, hazard);
+    player.hp = Math.max(0, player.hp - cfg.amount);
+    this.events.push({ type: 'trapHit', playerId: player.id, trapId: hazard.id, hp: player.hp, side });
+    if (player.hp <= 0) {
+      this.kill(player, 'trap');
+      return;
+    }
+    const away = box.x + box.width / 2 - hazard.sourceX;
+    const dir = Math.abs(away) > 0.5 ? Math.sign(away) : -body.facing;
+    body.hurt = this.ctx.combat.stun;
+    body.attack = 0;
+    body.vx = (side === 'up' || side === 'down' ? 0.5 : 1) * dir * cfg.knockbackX;
+    body.vy = side === 'down' ? cfg.knockbackY * 0.25 : side === 'up' ? -cfg.knockbackY : -cfg.knockbackY * 0.6;
+    body.grounded = false;
+    body.jumping = false;
+    body.coyote = 0;
+    body.buffer = 0;
+    body.facing = dir > 0 ? -1 : 1; // face the trap: the Hurt frames show the impact in front
+    player.invulnUntil = this.tick + cfg.invulnerabilityTicks;
+  }
+
+  private hitBox(player: WorldPlayer, boxId: number): void {
+    const result = this.traps.hitBox(boxId, this.tick);
+    if (result) this.events.push({ type: 'boxHit', playerId: player.id, boxId, hits: result.hits, broken: result.broken });
+  }
+
+  /** Swings break boxes too (whether or not they can hit players), once per box per swing. */
+  private resolveBoxAttacks(): void {
+    if (!this.ctx.traps) return;
+    const combat = this.ctx.combat;
+    let boxes: ReturnType<TrapField['colliders']> | null = null;
+    for (const player of this.players.values()) {
+      const body = player.body;
+      if (body.attackSeq !== player.boxSwingSeq) {
+        player.boxSwingSeq = body.attackSeq;
+        player.swingBoxes.clear();
+      }
+      if (!isAttackActive(body, combat)) continue;
+      const reach = attackReachBox(body, this.ctx.hitbox, combat);
+      boxes ??= this.traps.colliders(this.tick).filter((c) => c.kind === 'box');
+      for (const box of boxes) {
+        if (player.swingBoxes.has(box.id) || !rectsOverlap(reach, box)) continue;
+        player.swingBoxes.add(box.id);
+        this.hitBox(player, box.id);
+      }
+    }
+  }
+
   private touchesHazardTile(box: Rect): boolean {
     const { level } = this;
     const ts = level.tileSize;
@@ -333,6 +458,8 @@ export class GameWorld {
     body.attackCooldown = 0;
     body.hurt = 0;
     player.hitImmuneTicks = 0;
+    player.hp = 0;
+    player.invulnUntil = 0;
     player.respawnTicks = this.respawnDelayTicks;
     player.deaths += 1;
     player.atExit = false;
@@ -348,6 +475,7 @@ export class GameWorld {
   private respawn(player: WorldPlayer): void {
     resetBody(player.body, player.respawnPoint.x, player.respawnPoint.y, this.ctx.hitbox);
     player.respawnTicks = 0;
+    player.hp = this.playerConfig.maxHp;
     player.tp += 1;
     this.events.push({ type: 'respawn', playerId: player.id });
   }
@@ -380,6 +508,24 @@ function toNetPlayer(p: WorldPlayer, ack: number): NetPlayerState {
     attackCooldown: b.attackCooldown,
     attackSeq: b.attackSeq,
     hurt: b.hurt,
+    stepTick: b.stepTick,
+    hp: p.hp,
+    invulnUntil: p.invulnUntil,
     ack,
   };
+}
+
+/** Which side of the hazard the player touched (for knockback and the spike-head squash). */
+function contactSide(box: Rect, hazard: TrapHazard): Dir4 {
+  const r = hazard.rect;
+  if (hazard.kind === 'spikeHead' && r) {
+    const slack = 3;
+    if (box.y + box.height <= r.y + slack) return 'up';
+    if (box.y >= r.y + r.height - slack) return 'down';
+    return box.x + box.width / 2 < hazard.sourceX ? 'left' : 'right';
+  }
+  const dx = box.x + box.width / 2 - hazard.sourceX;
+  const dy = box.y + box.height / 2 - hazard.sourceY;
+  if (Math.abs(dy) >= Math.abs(dx) * 0.5) return dy < 0 ? 'up' : 'down';
+  return dx < 0 ? 'left' : 'right';
 }

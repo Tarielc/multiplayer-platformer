@@ -7,6 +7,8 @@ import {
   type MovementContext,
   type NetConfig,
   type NetPlayerState,
+  type NetTrapState,
+  type StepContacts,
   type Vec2,
 } from '@platformer/shared';
 
@@ -24,6 +26,11 @@ interface PendingInput {
  * attack timers), so with no
  * packet loss or stalls the replayed state equals the prediction. Any residual error is hidden
  * by a visual offset that decays exponentially (or snapped when large / on teleports).
+ *
+ * Traps: the context's `TrapField` takes the server's trap state on every reconcile. Each input
+ * is stepped at the tick after the body's last step (the server's `stepTick` + 1 for the first
+ * replayed input), so moving platforms are where the server will have them. Falling platforms
+ * this player lands on are triggered locally right away; the server state confirms it.
  */
 export class LocalPredictor {
   private body: MovementBody | null = null;
@@ -60,6 +67,14 @@ export class LocalPredictor {
     return this.tp;
   }
 
+  /**
+   * The simulation tick the local player is drawn at, `alpha` (0..1) of the way from the previous
+   * step to the latest. Traps render at this tick so they line up with what you collide with.
+   */
+  renderTick(alpha: number): number | null {
+    return this.body ? this.body.stepTick - 1 + alpha : null;
+  }
+
   reset(): void {
     this.body = null;
     this.pending = [];
@@ -73,25 +88,28 @@ export class LocalPredictor {
     this.pending = [];
   }
 
-  step(seq: number, buttons: number): void {
+  /** Predicts one input. Returns what the step touched (for instant trampoline feedback). */
+  step(seq: number, buttons: number): StepContacts | null {
     const body = this.body;
-    if (!body) return;
+    if (!body) return null;
     this.prevX = body.x;
     this.prevY = body.y;
-    stepPlayerBody(body, buttons, this.ctx);
+    const contacts = this.stepWithTraps(body, buttons);
     this.pending.push({ seq, buttons });
     const overflow = this.pending.length - this.config.maxPendingInputs;
     if (overflow > 0) this.pending.splice(0, overflow);
+    return contacts;
   }
 
-  reconcile(server: NetPlayerState): void {
+  reconcile(server: NetPlayerState, traps?: readonly NetTrapState[]): void {
     this.lastServer = server;
+    if (traps) this.ctx.traps?.applyNet(traps);
     let drop = 0;
     while (drop < this.pending.length && this.pending[drop]!.seq <= server.ack) drop++;
     if (drop > 0) this.pending.splice(0, drop);
 
     const replayed = bodyFromNetState(server);
-    for (const input of this.pending) stepPlayerBody(replayed, input.buttons, this.ctx);
+    for (const input of this.pending) this.stepWithTraps(replayed, input.buttons);
 
     const body = this.body;
     if (!body || server.tp !== this.tp || replayed.alive !== body.alive) {
@@ -118,6 +136,13 @@ export class LocalPredictor {
       this.offsetY += dy;
     }
     this.body = replayed;
+  }
+
+  private stepWithTraps(body: MovementBody, buttons: number): StepContacts {
+    const contacts = stepPlayerBody(body, buttons, this.ctx);
+    // Standing on a falling platform starts it, exactly as the server will on this tick.
+    if (contacts.ground >= 0) this.ctx.traps?.trigger(contacts.ground, body.stepTick);
+    return contacts;
   }
 
   /** Decays the visual correction offset; call once per rendered frame. */
