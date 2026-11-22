@@ -50,6 +50,8 @@ interface TrapView {
 export class TrapViews {
   private readonly views = new Map<number, TrapView>();
   private readonly debris: Debris[] = [];
+  /** Boxes the ability prop views are drawing right now (their trap view stays hidden). */
+  private readonly props = new Set<number>();
   private lastTick = 0;
 
   constructor(
@@ -87,6 +89,20 @@ export class TrapViews {
     if (!(view instanceof BoxView)) return;
     if (broken) this.debris.push(...view.burst(isSelf));
     else view.hit(isSelf);
+  }
+
+  /** Ids of the boxes drawn as ability props this frame. */
+  setProps(ids: ReadonlySet<number>): void {
+    this.props.clear();
+    for (const id of ids) this.props.add(id);
+  }
+
+  /** A box that was out of the level (carried or spat by an ability) shattered at (x, y). */
+  burstAt(boxId: number, variant: 1 | 2 | 3, x: number, y: number, isSelf: boolean): void {
+    const view = this.views.get(boxId);
+    this.debris.push(...boxDebris(this.scene, sheetForTrap('box', variant), x, y));
+    if (view instanceof BoxView) view.markBroken();
+    this.cue({ cue: 'boxBreak', x, y, isSelf });
   }
 
   /** F3 overlay: collision boxes, hurt areas and wind streams at the current render tick. */
@@ -127,7 +143,7 @@ export class TrapViews {
       case 'spikeHead':
         return new HeadView(scene, trap, 'spikeHead', cue);
       case 'box':
-        return new BoxView(scene, trap, field, cue);
+        return new BoxView(scene, trap, field, cue, (id) => this.props.has(id));
     }
   }
 }
@@ -404,6 +420,7 @@ class BoxView implements TrapView {
     private readonly trap: BoxTrap,
     private readonly field: TrapField,
     private readonly cue: Cue,
+    private readonly isProp: (id: number) => boolean,
   ) {
     this.sheet = sheetForTrap('box', trap.variant);
     this.sprite = bodySprite(scene, this.sheet, trap.x, trap.y);
@@ -421,23 +438,14 @@ class BoxView implements TrapView {
     if (this.broken) return [];
     this.broken = true;
     this.sprite.setVisible(false).stop();
-    this.cue({ cue: 'boxBreak', ...this.center(), isSelf });
-    const sheet = TRAP_SHEETS[this.sheet];
-    const pieces: Debris[] = [];
-    const { pieces: count, speed } = BOX_DEBRIS;
-    for (let i = 0; i < count; i++) {
-      // Left pieces fly left, right pieces right; all start with a hop.
-      const dirX = i % 2 === 0 ? -1 : 1;
-      const lift = i < 2 ? 1 : 0.55;
-      const vx = dirX * speed * (0.55 + 0.45 * Math.random());
-      const vy = -speed * lift * (0.9 + 0.3 * Math.random());
-      const image = this.scene.add
-        .sprite(this.sprite.x + sheet.frameWidth / 2, this.sprite.y + sheet.frameHeight / 2, sheet.key, trapFrame(this.sheet, BOX_DEBRIS.row, i))
-        // Just behind the terrain: pieces that fall into the ground disappear into it.
-        .setDepth(VIEW_CONFIG.depth.tiles - 0.5);
-      pieces.push(new Debris(image, vx, vy, dirX * (2 + Math.random() * 3)));
-    }
-    return pieces;
+    const center = this.center();
+    this.cue({ cue: 'boxBreak', ...center, isSelf });
+    return boxDebris(this.scene, this.sheet, center.x, center.y);
+  }
+
+  markBroken(): void {
+    this.broken = true;
+    this.sprite.setVisible(false);
   }
 
   update(): void {
@@ -446,6 +454,14 @@ class BoxView implements TrapView {
       this.broken = true;
       this.sprite.setVisible(false);
     }
+    if (this.broken) return;
+    // Picked up by an ability (drawn by the prop views meanwhile), or put down somewhere else.
+    const rect = this.field.boxRect(this.trap.id);
+    this.sprite.setVisible(rect !== null && !this.isProp(this.trap.id));
+    if (rect) {
+      const sheet = TRAP_SHEETS[this.sheet];
+      this.sprite.setPosition(rect.x - sheet.bodyX, rect.y - sheet.bodyY);
+    }
   }
 
   destroy(): void {
@@ -453,8 +469,29 @@ class BoxView implements TrapView {
   }
 
   private center(): { x: number; y: number } {
-    return { x: this.trap.x + this.trap.width / 2, y: this.trap.y + this.trap.height / 2 };
+    const rect = this.field.boxRect(this.trap.id) ?? this.trap;
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   }
+}
+
+/** Box pieces flying out from (cx, cy). */
+function boxDebris(scene: Phaser.Scene, sheetName: TrapSheetName, cx: number, cy: number): Debris[] {
+  const sheet = TRAP_SHEETS[sheetName];
+  const pieces: Debris[] = [];
+  const { pieces: count, speed } = BOX_DEBRIS;
+  for (let i = 0; i < count; i++) {
+    // Left pieces fly left, right pieces right; all start with a hop.
+    const dirX = i % 2 === 0 ? -1 : 1;
+    const lift = i < 2 ? 1 : 0.55;
+    const vx = dirX * speed * (0.55 + 0.45 * Math.random());
+    const vy = -speed * lift * (0.9 + 0.3 * Math.random());
+    const image = scene.add
+      .sprite(cx + sheet.frameWidth / 2 - sheet.bodyX - 10, cy + sheet.frameHeight / 2 - sheet.bodyY - 10, sheet.key, trapFrame(sheetName, BOX_DEBRIS.row, i))
+      // Just behind the terrain: pieces that fall into the ground disappear into it.
+      .setDepth(VIEW_CONFIG.depth.tiles - 0.5);
+    pieces.push(new Debris(image, vx, vy, dirX * (2 + Math.random() * 3)));
+  }
+  return pieces;
 }
 
 /** One flying box piece: ballistic, spinning, fading out, then gone. */

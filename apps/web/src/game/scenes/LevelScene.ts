@@ -1,15 +1,25 @@
 import {
+  ABILITIES,
+  Ability,
+  CARRIED_FEET_BELOW_GRIP,
+  CHARACTER_ABILITY,
+  Cargo,
+  Held,
   LEVELS,
   MOVEMENT_TUNING,
   NET_CONFIG,
   NEUTRAL_INPUT,
   PLAYER_CONFIG,
+  Phase,
   TICK_DT,
   TICK_MS,
   TrapField,
   TypedEmitter,
   attackReachBox,
   defaultCharacterForSlot,
+  droneGrip,
+  feetOf,
+  healSpot,
   isAttackActive,
   levelChecksum,
   parseTiledLevel,
@@ -17,10 +27,13 @@ import {
   resolveCombat,
   resolveMovement,
   slotStyle,
+  tongueOrigin,
+  tongueTip,
   type CompiledCombat,
   type GameEvent,
   type LevelData,
   type LevelManifestEntry,
+  type MovementBody,
   type MovementContext,
   type NetWorldState,
   type RoomInfo,
@@ -34,6 +47,9 @@ import { devVirtualButtons, registerDevProvider } from '@/devtools/devHook';
 import type { WorldUpdate } from '@/net/GameClient';
 import { Interpolator } from '@/net/Interpolator';
 import { LocalPredictor } from '@/net/LocalPredictor';
+import { ABILITY_SHEETS } from '../abilities/abilityArt';
+import { playFx } from '../abilities/abilityFx';
+import { PropViews } from '../abilities/PropViews';
 import { fallbackTilesetCanvas } from '../art/tilesetFallback';
 import { SoundController } from '../audio/SoundController';
 import { VIEW_CONFIG } from '../config';
@@ -51,6 +67,14 @@ import { TrapViews } from '../traps/TrapViews';
 import { SCENE_KEYS } from './keys';
 
 const INTERPOLATION_DELAY_TICKS = NET_CONFIG.interpolationDelayMs / TICK_MS;
+const HEAL_AFTERGLOW_MS = ABILITIES.heal.afterglow * 1000;
+
+/** Positions of what the local player's ability holds (players: feet; boxes: top-left). */
+interface Attachments {
+  players: ReadonlyMap<string, { x: number; y: number }>;
+  props: ReadonlyMap<number, { x: number; y: number }>;
+}
+const NO_ATTACHMENTS: Attachments = { players: new Map(), props: new Map() };
 const HITBOX = PLAYER_CONFIG.hitbox;
 
 const tilesetKey = (def: TiledTileset) => `tileset:${def.name ?? 'tileset'}:${def.image ?? ''}`;
@@ -84,6 +108,8 @@ export class LevelScene extends Phaser.Scene {
   private entityViews: EntityViews | null = null;
   private traps: TrapField | null = null;
   private trapViews: TrapViews | null = null;
+  private propViews: PropViews | null = null;
+  private followTarget: Phaser.GameObjects.GameObject | null = null;
   private backdrop: Backdrop | null = null;
   private debugDraw: DebugDraw | null = null;
   private controls: InputController | null = null;
@@ -114,6 +140,8 @@ export class LevelScene extends Phaser.Scene {
     this.entityViews = null;
     this.traps = null;
     this.trapViews = null;
+    this.propViews = null;
+    this.followTarget = null;
     this.backdrop = null;
     this.debugDraw = null;
     this.controls = null;
@@ -196,6 +224,7 @@ export class LevelScene extends Phaser.Scene {
     this.buildTilemap(json as TiledMap);
     this.entityViews = new EntityViews(this, level);
     this.trapViews = new TrapViews(this, traps, (event) => this.presentation.emit('world', event));
+    this.propViews = new PropViews(this, traps.config.box);
     this.debugDraw = new DebugDraw(this, level, HITBOX);
     this.debugDraw.setVisible(bridge.debug);
     this.controls = new InputController(this, () => bridge.emit('input:menu'));
@@ -219,6 +248,8 @@ export class LevelScene extends Phaser.Scene {
       this.views.clear();
       this.trapViews?.destroy();
       this.trapViews = null;
+      this.propViews?.destroy();
+      this.propViews = null;
       this.presentation.removeAllListeners();
       sound.destroy();
       this.sfx = null;
@@ -231,8 +262,8 @@ export class LevelScene extends Phaser.Scene {
   }
 
   override update(): void {
-    const { predictor, controls, entityViews, trapViews } = this;
-    if (!predictor || !controls || !entityViews || !trapViews) return;
+    const { predictor, controls, entityViews, trapViews, propViews } = this;
+    if (!predictor || !controls || !entityViews || !trapViews || !propViews) return;
     const { client, bridge } = this.services;
     const now = performance.now();
     const frameMs = Math.min(now - this.lastFrame, VIEW_CONFIG.maxFrameMs);
@@ -242,6 +273,8 @@ export class LevelScene extends Phaser.Scene {
     // Fixed-step prediction at the server's tick rate.
     const room = client.room;
     const simulate = room?.phase === 'playing' && !room.paused && client.isOpen && predictor.ready;
+    // Aim of the special ability, from the predicted body (mouse / stick / arrow keys).
+    const aim = this.sampleAim(controls, predictor.current);
     if (simulate) {
       this.accumulator += frameMs;
       let steps = 0;
@@ -250,7 +283,7 @@ export class LevelScene extends Phaser.Scene {
           this.accumulator = 0;
           break;
         }
-        const buttons = bridge.menuOpen ? NEUTRAL_INPUT : controls.sample() | devVirtualButtons();
+        const buttons = bridge.menuOpen ? NEUTRAL_INPUT : controls.sample(aim) | devVirtualButtons();
         const seq = client.sendInput(buttons);
         const contacts = predictor.step(seq, buttons);
         // Trampolines spring the moment you land on them (the server event is for everyone else).
@@ -273,11 +306,24 @@ export class LevelScene extends Phaser.Scene {
     const local = selfId ? this.views.get(selfId) : undefined;
     const position = predictor.renderPosition(alpha);
     const body = predictor.current;
+    const renderTick = client.clock.tickAt(now) - INTERPOLATION_DELAY_TICKS;
+    this.remoteRenderTick = renderTick;
+    const samples = this.interpolator.sample(renderTick);
+    // What the local player's ability holds is drawn where the prediction has it, not 100 ms late.
+    const attached = body && position ? this.localAttachments({ ...body, x: position.x, y: position.y }) : NO_ATTACHMENTS;
     if (local && position && body) {
       const signals = signalsFromBody(body, predictor.teleports);
       const server = predictor.lastServer;
       local.setInvulnerable(server !== null && server.invulnUntil > server.stepTick);
-      local.render(position.x + HITBOX.width / 2, position.y + HITBOX.height, body.facing, signals, frameMs);
+      // Held by someone else's ability: the server places us, in step with the (interpolated) captor.
+      const self = body.held !== Held.NONE && selfId ? samples.get(selfId) : undefined;
+      const feetX = self ? self.x + HITBOX.width / 2 : position.x + HITBOX.width / 2;
+      const feetY = self ? self.y + HITBOX.height : position.y + HITBOX.height;
+      const frog = CHARACTER_ABILITY[local.characterId] === Ability.TONGUE;
+      const ahead = body.facing > 0 ? 0 : Math.PI;
+      const preview = frog ? (aim ?? (body.phase === Phase.TONGUE_HOLD ? ahead : null)) : null;
+      local.render(feetX, feetY, body.facing, signals, frameMs, preview);
+      this.follow(local.droneTarget ?? local.container);
       if (!this.cameraSnapped) {
         this.cameras.main.centerOn(local.container.x, local.container.y);
         this.cameraSnapped = true;
@@ -291,21 +337,21 @@ export class LevelScene extends Phaser.Scene {
       }
     }
 
-    const renderTick = client.clock.tickAt(now) - INTERPOLATION_DELAY_TICKS;
-    this.remoteRenderTick = renderTick;
-    const samples = this.interpolator.sample(renderTick);
     for (const [id, view] of this.views) {
       if (id === selfId) continue;
       const s = samples.get(id);
       if (!s) continue;
       view.setInvulnerable(s.invulnUntil > renderTick);
-      view.render(s.x + HITBOX.width / 2, s.y + HITBOX.height, s.facing, signalsFromSample(s), frameMs);
+      const feet = attached.players.get(id) ?? { x: s.x + HITBOX.width / 2, y: s.y + HITBOX.height };
+      view.render(feet.x, feet.y, s.facing, signalsFromSample(s), frameMs);
       if (debug) {
         boxes.push({ x: s.x, y: s.y, color: this.slotColor(id) });
         this.pushReachBox(boxes, s, this.slotColor(id));
       }
     }
 
+    // Boxes an ability carries or spat; their trap views hide meanwhile.
+    trapViews.setProps(propViews.update(this.interpolator.sampleProps(renderTick), attached.props, frameMs));
     // Traps are drawn at the local player's predicted tick: where they are when you meet them.
     trapViews.update(predictor.renderTick(alpha) ?? renderTick, frameMs);
     if (debug) trapViews.debugBoxes(boxes);
@@ -381,11 +427,54 @@ export class LevelScene extends Phaser.Scene {
     });
     view.setConnected(info?.connected ?? true);
     this.views.set(id, view);
-    if (isSelf) {
-      const { lerp } = VIEW_CONFIG.camera;
-      this.cameras.main.startFollow(view.container, true, lerp, lerp);
-    }
+    if (isSelf) this.follow(view.container);
     return view;
+  }
+
+  /** The camera follows the local player, or their drone while they fly it. */
+  private follow(target: Phaser.GameObjects.GameObject & { x: number; y: number }): void {
+    if (this.followTarget === target) return;
+    this.followTarget = target;
+    const { lerp } = VIEW_CONFIG.camera;
+    this.cameras.main.startFollow(target, true, lerp, lerp);
+  }
+
+  /** The special ability's aim this frame (null = straight ahead), from the tongue's origin. */
+  private sampleAim(controls: InputController, body: Readonly<MovementBody> | null): number | null {
+    if (!body) return null;
+    const origin = tongueOrigin(body, HITBOX, ABILITIES);
+    return controls.aimAngle(origin.x, origin.y, body.facing);
+  }
+
+  /**
+   * Where the local player's ability holds its catch (players by feet, boxes by top-left), from
+   * the predicted body: the claw's grip, the tongue tip, the hug spot.
+   */
+  private localAttachments(body: Readonly<MovementBody>): Attachments {
+    const grab = this.predictor?.lastServer?.grab ?? '';
+    if (!grab) return NO_ATTACHMENTS;
+    const isBox = grab.startsWith('b:');
+    const id = grab.slice(2);
+    const box = this.traps?.config.box ?? { width: 20, height: 20 };
+    let feet: { x: number; y: number } | null = null;
+    let topLeft: { x: number; y: number } | null = null;
+    if (body.phase === Phase.DRONE_PILOT && body.cargo !== Cargo.NONE) {
+      const grip = droneGrip(body, ABILITIES);
+      feet = { x: grip.x, y: grip.y + CARRIED_FEET_BELOW_GRIP };
+      topLeft = { x: grip.x - box.width / 2, y: grip.y };
+    } else if (body.phase === Phase.TONGUE_PULL) {
+      const tip = tongueTip(body, HITBOX, ABILITIES);
+      feet = { x: tip.x, y: tip.y + HITBOX.height / 2 };
+      topLeft = { x: tip.x - box.width / 2, y: tip.y - box.height / 2 };
+    } else if (body.phase === Phase.HEAL && body.phaseTime >= ABILITIES.heal.pullTo) {
+      const me = feetOf(body, HITBOX);
+      const spot = healSpot(ABILITIES.heal.track, body.phaseTime);
+      feet = { x: me.x + body.facing * spot.dx, y: me.y + spot.dy };
+    }
+    const out = { players: new Map<string, { x: number; y: number }>(), props: new Map<number, { x: number; y: number }>() };
+    if (isBox && topLeft) out.props.set(Number(id), topLeft);
+    else if (!isBox && feet) out.players.set(id, feet);
+    return out;
   }
 
   private playEvent(event: GameEvent, state: NetWorldState): void {
@@ -432,6 +521,42 @@ export class LevelScene extends Phaser.Scene {
         break;
       case 'boxHit':
         this.trapViews?.boxHit(event.boxId, event.broken, event.playerId === selfId);
+        break;
+      case 'heal': {
+        const fx = ABILITY_SHEETS.healFx.key;
+        const depth = VIEW_CONFIG.depth.effects;
+        const heart = '\u2665';
+        playFx(this, fx, 'heal_ring', event.x, event.y + HITBOX.height / 2, { depth });
+        playFx(this, fx, 'heart_burst', event.x, event.y - 6, { depth });
+        playFx(this, fx, 'heal_sparkles', event.x, event.y + HITBOX.height / 2, { depth, durationMs: HEAL_AFTERGLOW_MS, fade: true });
+        floatText(this, event.x, event.y - 12, `+${ABILITIES.heal.amount} ${heart}`, '#ff8fb8');
+        const healer = state.players.find((p) => p.id === event.playerId);
+        if (healer && event.targetId) {
+          floatText(this, healer.x + HITBOX.width / 2, healer.y - 12, `+${ABILITIES.heal.selfAmount} ${heart}`, '#ff8fb8');
+        }
+        this.presentation.emit('world', { cue: 'heal', x: event.x, y: event.y, isSelf: event.playerId === selfId || event.targetId === selfId });
+        break;
+      }
+      case 'grab': {
+        if (event.targetId === null && event.boxId === null) break;
+        const captor = state.players.find((p) => p.id === event.playerId);
+        if (captor) this.presentation.emit('world', { cue: 'grab', x: captor.x, y: captor.y, isSelf: event.playerId === selfId });
+        break;
+      }
+      case 'release':
+        if (!event.spit) this.presentation.emit('world', { cue: 'drop', x: event.x, y: event.y, isSelf: event.playerId === selfId });
+        break;
+      case 'abilityHit': {
+        const attacker = this.services.client.room?.players.find((p) => p.id === event.by);
+        const spat = attacker ? CHARACTER_ABILITY[attacker.characterId] === Ability.TONGUE : false;
+        if (spat) playFx(this, ABILITY_SHEETS.spitFx.key, 'impact', event.x, event.y, { depth: VIEW_CONFIG.depth.effects });
+        else puff(this, event.x, event.y, 0xffe08a, 12);
+        this.presentation.emit('world', { cue: 'splat', x: event.x, y: event.y, isSelf: event.playerId === selfId });
+        if (event.playerId === selfId) this.cameras.main.shake(160, 0.006);
+        break;
+      }
+      case 'propBreak':
+        this.trapViews?.burstAt(event.boxId, event.variant, event.x, event.y, false);
         break;
       case 'levelComplete': {
         // React shows the results overlay.
@@ -600,6 +725,18 @@ export class LevelScene extends Phaser.Scene {
             attackSeq: body.attackSeq,
             hurt: round(body.hurt),
             stepTick: body.stepTick,
+            ability: body.ability,
+            specialHeld: body.specialHeld,
+            serverPhase: this.predictor?.lastServer?.phase ?? null,
+            phase: body.phase,
+            phaseTime: round(body.phaseTime),
+            specialCooldown: round(body.specialCooldown),
+            giant: round(body.giant),
+            held: body.held,
+            flight: round(body.flight),
+            drone: { x: round(body.droneX), y: round(body.droneY), cargo: body.cargo },
+            grab: this.predictor?.lastServer?.grab ?? '',
+            maxHp: this.predictor?.lastServer?.maxHp ?? null,
             hp: this.predictor?.lastServer?.hp ?? null,
             invulnUntil: this.predictor?.lastServer?.invulnUntil ?? null,
             state: selfView?.state ?? null,

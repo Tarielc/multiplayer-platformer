@@ -1,5 +1,5 @@
 /** Bumped whenever the wire protocol changes incompatibly. Checked on join. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export interface NetConfig {
   /** Fixed simulation rate shared by server authority and client prediction. */

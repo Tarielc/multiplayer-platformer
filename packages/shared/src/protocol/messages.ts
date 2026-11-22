@@ -1,7 +1,7 @@
 import type { CharacterId } from '../config/characters';
 import type { GameEvent } from '../sim/events';
 import type { NetTrapState } from '../sim/traps/types';
-import type { NetPlayerPatch, NetWorldState } from './state';
+import type { NetPlayerPatch, NetPropState, NetWorldState } from './state';
 
 export type RoomPhase = 'lobby' | 'countdown' | 'playing' | 'levelComplete';
 
@@ -117,6 +117,8 @@ export type ServerMessage =
       collected: number[];
       /** Only present when the trap state changed. */
       traps?: NetTrapState[];
+      /** Only present when the props changed. */
+      props?: NetPropState[];
       events: GameEvent[];
     }
   | { t: 'pong'; id: number; at: number; serverTick: number }

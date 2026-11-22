@@ -8,9 +8,9 @@ interface InputFrame {
 /**
  * Buttons that act on a *press* (edge-detected by the simulation). Stall steps keep them as they
  * last were: releasing them would turn the same button, still held when input resumes, into a
- * fresh press, i.e. a phantom double jump or swing after every lag spike.
+ * fresh press, i.e. a phantom double jump, swing or special after every lag spike.
  */
-const EDGE_BUTTONS = Button.JUMP | Button.ATTACK;
+const EDGE_BUTTONS = Button.JUMP | Button.ATTACK | Button.SPECIAL;
 
 /**
  * Per-player input buffer consumed by the server's fixed tick.

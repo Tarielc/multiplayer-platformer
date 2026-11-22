@@ -1,3 +1,4 @@
+import { ABILITY_TUNING } from './abilities';
 import { CHARACTERS } from './characters';
 import { COMBAT_TUNING } from './combat';
 import { ENTITY_CONFIG } from './entities';
@@ -6,6 +7,7 @@ import { NET_CONFIG } from './net';
 import { PLAYER_CONFIG, PLAYER_SLOTS } from './players';
 import { TRAP_TUNING } from './traps';
 
+export * from './abilities';
 export * from './characters';
 export * from './combat';
 export * from './entities';
@@ -18,6 +20,7 @@ export * from './traps';
 export const GAME_CONFIG = {
   movement: MOVEMENT_TUNING,
   combat: COMBAT_TUNING,
+  abilities: ABILITY_TUNING,
   players: PLAYER_CONFIG,
   slots: PLAYER_SLOTS,
   characters: CHARACTERS,

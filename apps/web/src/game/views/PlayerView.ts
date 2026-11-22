@@ -1,5 +1,6 @@
 import { slotStyle, type CharacterId, type HitboxSize } from '@platformer/shared';
 import type * as Phaser from 'phaser';
+import { AbilityView } from '../abilities/AbilityView';
 import { TEXTURES } from '../art/textures';
 import { VIEW_CONFIG } from '../config';
 import { PlayerAnimationController } from '../player/PlayerAnimationController';
@@ -30,6 +31,9 @@ export class PlayerView {
   private readonly fsm = new PlayerStateMachine(VIEW_CONFIG.animation);
   private readonly label: Phaser.GameObjects.Text;
   private readonly marker: Phaser.GameObjects.Image | null = null;
+  private readonly ability: AbilityView;
+  private readonly labelY: number;
+  private readonly markerY: number = 0;
   private squash: Phaser.Tweens.Tween | null = null;
   private grounded = true;
   private invulnerable = false;
@@ -54,10 +58,12 @@ export class PlayerView {
       })
       .setOrigin(0.5, 1)
       .setResolution(2);
-    const children: Phaser.GameObjects.GameObject[] = [this.anim.sprite, this.label];
+    this.labelY = this.label.y;
+    this.ability = new AbilityView(scene, options.characterId, (cue) => this.emit(cue));
+    const children: Phaser.GameObjects.GameObject[] = [this.anim.sprite, this.ability.sprite, this.label];
     if (options.isSelf) {
-      const markerY = this.label.y - this.label.height - 2;
-      this.marker = scene.add.image(0, markerY, TEXTURES.marker).setOrigin(0.5, 1);
+      this.markerY = this.label.y - this.label.height - 2;
+      this.marker = scene.add.image(0, this.markerY, TEXTURES.marker).setOrigin(0.5, 1);
       children.push(this.marker);
     }
     this.container = scene.add.container(0, 0, children).setDepth(depth.players + (options.isSelf ? 1 : 0));
@@ -82,6 +88,12 @@ export class PlayerView {
 
   setCharacter(id: CharacterId): void {
     this.anim.setCharacter(id);
+    this.ability.setCharacter(id);
+  }
+
+  /** The pilot's drone while it is out (the camera follows it). */
+  get droneTarget(): Phaser.GameObjects.Sprite | null {
+    return this.ability.droneTarget;
   }
 
   /** Blinks the sprite while traps can't hurt the player (after taking a hit). */
@@ -89,8 +101,11 @@ export class PlayerView {
     this.invulnerable = on;
   }
 
-  /** `feetX/feetY` = bottom-centre of the hitbox in world pixels. */
-  render(feetX: number, feetY: number, facing: 1 | -1, signals: PlayerSignals, dtMs: number): void {
+  /**
+   * `feetX/feetY` = bottom-centre of the hitbox in world pixels. `aimPreview` (local frog only)
+   * shows where the tongue would go.
+   */
+  render(feetX: number, feetY: number, facing: 1 | -1, signals: PlayerSignals, dtMs: number, aimPreview: number | null = null): void {
     // Dead players stay where they died, so the Death clip plays on the spot.
     this.container.setPosition(feetX, feetY);
     this.grounded = signals.grounded;
@@ -101,7 +116,25 @@ export class PlayerView {
     this.marker?.setVisible(signals.alive);
     const { blinkPeriodMs, blinkAlpha } = VIEW_CONFIG.invulnerable;
     this.blinkMs = this.invulnerable && signals.alive ? this.blinkMs + dtMs : 0;
-    this.anim.sprite.setAlpha(this.blinkMs > 0 && Math.floor(this.blinkMs / blinkPeriodMs) % 2 === 0 ? blinkAlpha : 1);
+    const alpha = this.blinkMs > 0 && Math.floor(this.blinkMs / blinkPeriodMs) % 2 === 0 ? blinkAlpha : 1;
+    this.anim.sprite.setAlpha(alpha);
+
+    const look = this.ability.update(
+      {
+        ...signals,
+        feetX,
+        feetY,
+        facing,
+        state: this.fsm.state,
+        timeInState: this.fsm.timeInState,
+        aimPreview,
+        alpha,
+      },
+      dtMs,
+    );
+    this.anim.sprite.setVisible(signals.alive ? !look.hideBase && !look.hidden : !look.hideBase && this.anim.sprite.visible);
+    this.label.setVisible(signals.alive && !look.hidden).setY(this.labelY - look.labelLift);
+    this.marker?.setVisible(signals.alive && !look.hidden).setY(this.markerY - look.labelLift);
 
     const { squash } = VIEW_CONFIG;
     for (const cue of cues) {
@@ -113,6 +146,7 @@ export class PlayerView {
 
   destroy(): void {
     this.squash?.remove();
+    this.ability.destroy();
     this.anim.destroy();
     this.container.destroy();
   }

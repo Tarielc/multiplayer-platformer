@@ -4,6 +4,8 @@ import { LEVELS } from '@platformer/shared';
 import type { CSSProperties } from 'react';
 import type { NetStats } from '@/game/bridge';
 import type { HudPlayer, RoomView } from '@/net/RoomStore';
+import { abilityIconPath } from '@/game/abilities/abilityArt';
+import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './Hud.module.css';
 
@@ -26,7 +28,7 @@ export function Hud({ view, stats }: { view: RoomView; stats: NetStats | null })
           </span>
         )}
         <span className={styles.hint}>
-          <kbd>Esc</kbd> menu
+          <kbd>L</kbd>/<kbd>C</kbd>/right-click special · <kbd>Esc</kbd> menu
         </span>
       </div>
       {stats && (
@@ -60,9 +62,23 @@ function PlayerChip({ player }: { player: HudPlayer }) {
       <span className={styles.badge}>{player.label}</span>
       <span className={styles.name}>{player.name}</span>
       <Hearts hp={player.hp} max={player.maxHp} />
+      <AbilityIcon player={player} />
       <span className={styles.score}>{player.score}</span>
       {status && <span className={styles.status}>{status}</span>}
     </div>
+  );
+}
+
+/** The special ability's icon: dimmed with the seconds left while it recharges, lit while in use. */
+function AbilityIcon({ player }: { player: HudPlayer }) {
+  const { name, cooldown, active } = player.ability;
+  const ready = cooldown <= 0;
+  const label = active ? `${name} (active)` : ready ? `${name} (ready)` : `${name} (${cooldown.toFixed(1)} s)`;
+  return (
+    <span className={styles.ability} data-ready={ready} data-active={active} title={label} aria-label={label} role="img">
+      <img src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(player.characterId)}`} alt="" width={20} height={20} />
+      {!ready && !active && <span className={styles.cooldown}>{Math.ceil(cooldown)}</span>}
+    </span>
   );
 }
 

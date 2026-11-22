@@ -7,7 +7,42 @@ import type { RemoteSample } from '@/net/Interpolator';
  * drives both. Everything is replicated *state* (not one-off events), which keeps late joiners
  * and interpolated players correct.
  */
-export interface PlayerSignals {
+/** Special-ability state (see `MovementBody`); timers in seconds. */
+export interface AbilitySignals {
+  phase: number;
+  phaseTime: number;
+  specialCooldown: number;
+  aim: number;
+  reach: number;
+  giant: number;
+  droneX: number;
+  droneY: number;
+  droneVx: number;
+  droneVy: number;
+  cargo: number;
+  held: number;
+  flight: number;
+}
+
+export function abilitySignals(s: Readonly<AbilitySignals>): AbilitySignals {
+  return {
+    phase: s.phase,
+    phaseTime: s.phaseTime,
+    specialCooldown: s.specialCooldown,
+    aim: s.aim,
+    reach: s.reach,
+    giant: s.giant,
+    droneX: s.droneX,
+    droneY: s.droneY,
+    droneVx: s.droneVx,
+    droneVy: s.droneVy,
+    cargo: s.cargo,
+    held: s.held,
+    flight: s.flight,
+  };
+}
+
+export interface PlayerSignals extends AbilitySignals {
   alive: boolean;
   grounded: boolean;
   vx: number;
@@ -35,6 +70,7 @@ export function signalsFromBody(body: Readonly<MovementBody>, tp: number): Playe
     hurt: body.hurt,
     airJumpsLeft: body.airJumpsLeft,
     tp,
+    ...abilitySignals(body),
   };
 }
 
@@ -49,5 +85,6 @@ export function signalsFromSample(sample: Readonly<RemoteSample>): PlayerSignals
     hurt: sample.hurt,
     airJumpsLeft: sample.airJumpsLeft,
     tp: sample.tp,
+    ...abilitySignals(sample),
   };
 }

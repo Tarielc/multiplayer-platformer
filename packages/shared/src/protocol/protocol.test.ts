@@ -39,18 +39,37 @@ function player(id: string, overrides: Partial<NetPlayerState> = {}): NetPlayerS
     stepTick: 0,
     hp: 3,
     invulnUntil: 0,
+    ability: 0,
+    specialHeld: false,
+    phase: 0,
+    phaseTime: 0,
+    specialCooldown: 0,
+    specialSeq: 0,
+    aim: 0,
+    reach: 0,
+    giant: 0,
+    droneX: 0,
+    droneY: 0,
+    droneVx: 0,
+    droneVy: 0,
+    cargo: 0,
+    held: 0,
+    flight: 0,
+    grab: '',
+    maxHp: 3,
     ack: 0,
     ...overrides,
   };
 }
 
 describe('world deltas', () => {
-  const prev: NetWorldState = { tick: 10, players: [player('a'), player('b'), player('c')], collected: [3], traps: [] };
+  const prev: NetWorldState = { tick: 10, players: [player('a'), player('b'), player('c')], collected: [3], traps: [], props: [] };
   const next: NetWorldState = {
     tick: 13,
     players: [player('a', { x: 14, vx: 220, ack: 3, hp: 2, invulnUntil: 70 }), player('c'), player('d', { x: 99 })],
     collected: [3, 7],
     traps: [{ id: 4, hits: 1 }],
+    props: [],
   };
 
   it('contains only what changed', () => {
@@ -151,7 +170,8 @@ describe('parseClientMessage', () => {
     ['non-objects', 'ready'],
     ['arrays', [{ t: 'leave' }]],
     ['unknown types', { t: 'teleport', x: 1 }],
-    ['unknown button bits', { t: 'input', seq: 1, buttons: 32 }],
+    ['unknown button bits', { t: 'input', seq: 1, buttons: 64 }],
+    ['buttons above the aim bits', { t: 'input', seq: 1, buttons: 1 << 15 }],
     ['negative sequence numbers', { t: 'input', seq: -1, buttons: 0 }],
     ['fractional sequence numbers', { t: 'input', seq: 1.5, buttons: 0 }],
     ['wrong field types', { t: 'ready', ready: 'yes' }],

@@ -74,7 +74,7 @@ export function parseClientMessage(value: unknown): ClientMessage | null {
     case 'selectLevel':
       return isStr(value.levelId, 1, 64) ? { t: 'selectLevel', levelId: value.levelId } : null;
     case 'input':
-      return isInt(value.seq, 0, 2 ** 31 - 1) && isInt(value.buttons, 0, ALL_BUTTONS)
+      return isInt(value.seq, 0, 2 ** 31 - 1) && isInt(value.buttons, 0, ALL_BUTTONS) && (value.buttons & ~ALL_BUTTONS) === 0
         ? { t: 'input', seq: value.seq, buttons: value.buttons }
         : null;
     case 'menu':

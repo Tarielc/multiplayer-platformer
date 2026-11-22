@@ -64,12 +64,30 @@ function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlay
     stepTick: 0,
     hp: 3,
     invulnUntil: 0,
+    ability: 0,
+    specialHeld: false,
+    phase: 0,
+    phaseTime: 0,
+    specialCooldown: 0,
+    specialSeq: 0,
+    aim: 0,
+    reach: 0,
+    giant: 0,
+    droneX: 0,
+    droneY: 0,
+    droneVx: 0,
+    droneVy: 0,
+    cargo: 0,
+    held: 0,
+    flight: 0,
+    grab: '',
+    maxHp: 3,
     ack: 0,
     ...overrides,
   };
 }
 
-const world = (tick: number, players: NetPlayerState[], collected: number[] = []): NetWorldState => ({ tick, players, collected, traps: [] });
+const world = (tick: number, players: NetPlayerState[], collected: number[] = []): NetWorldState => ({ tick, players, collected, traps: [], props: [] });
 
 describe('LocalPredictor', () => {
   it('predicts moving traps exactly: riding, pushes, launches, wind, falling platforms', () => {

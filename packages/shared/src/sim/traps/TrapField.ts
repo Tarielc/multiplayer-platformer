@@ -28,6 +28,9 @@ export class TrapField {
   private readonly byId = new Map<number, TrapDef>();
   private readonly hits = new Map<number, number>();
   private readonly triggers = new Map<number, number>();
+  /** Boxes moved by abilities (top-left), and boxes currently picked up. */
+  private readonly boxPos = new Map<number, { x: number; y: number }>();
+  private readonly taken = new Set<number>();
   /** Server bookkeeping for the box hit cooldown (not replicated). */
   private readonly lastHit = new Map<number, number>();
 
@@ -55,13 +58,15 @@ export class TrapField {
     for (const [id, hits] of this.hits) copy.hits.set(id, hits);
     for (const [id, tick] of this.triggers) copy.triggers.set(id, tick);
     for (const [id, tick] of this.lastHit) copy.lastHit.set(id, tick);
+    for (const [id, pos] of this.boxPos) copy.boxPos.set(id, { ...pos });
+    for (const id of this.taken) copy.taken.add(id);
     return copy;
   }
 
   // --- replication -----------------------------------------------------------------------------
 
   toNet(): NetTrapState[] {
-    const ids = new Set([...this.hits.keys(), ...this.triggers.keys()]);
+    const ids = new Set([...this.hits.keys(), ...this.triggers.keys(), ...this.boxPos.keys(), ...this.taken]);
     return [...ids]
       .sort((a, b) => a - b)
       .map((id) => {
@@ -70,6 +75,12 @@ export class TrapField {
         const trigger = this.triggers.get(id);
         if (hits !== undefined) entry.hits = hits;
         if (trigger !== undefined) entry.trigger = trigger;
+        const pos = this.boxPos.get(id);
+        if (pos) {
+          entry.x = pos.x;
+          entry.y = pos.y;
+        }
+        if (this.taken.has(id)) entry.taken = true;
         return entry;
       });
   }
@@ -78,9 +89,13 @@ export class TrapField {
   applyNet(states: readonly NetTrapState[]): void {
     this.hits.clear();
     this.triggers.clear();
+    this.boxPos.clear();
+    this.taken.clear();
     for (const s of states) {
       if (s.hits !== undefined) this.hits.set(s.id, s.hits);
       if (s.trigger !== undefined) this.triggers.set(s.id, s.trigger);
+      if (s.x !== undefined && s.y !== undefined) this.boxPos.set(s.id, { x: s.x, y: s.y });
+      if (s.taken) this.taken.add(s.id);
     }
   }
 
@@ -95,16 +110,63 @@ export class TrapField {
     return trap?.kind === 'box' && this.boxHits(id) >= trap.maxHits;
   }
 
-  /**
-   * One hit on a box (server). Returns the new hit count, or null when the id is not an intact
-   * box or it was hit too recently.
-   */
-  hitBox(id: number, tick: number): { hits: number; broken: boolean } | null {
+  /** Picked up by an ability: out of the level (no collider, not drawn) until placed again. */
+  isTaken(id: number): boolean {
+    return this.taken.has(id);
+  }
+
+  /** Where an intact box in the level is now (moved boxes included); null if broken or taken. */
+  boxRect(id: number): Rect | null {
     const trap = this.byId.get(id);
-    if (trap?.kind !== 'box' || this.isBroken(id)) return null;
+    if (trap?.kind !== 'box' || this.isBroken(id) || this.taken.has(id)) return null;
+    const pos = this.boxPos.get(id);
+    return { x: pos?.x ?? trap.x, y: pos?.y ?? trap.y, width: trap.width, height: trap.height };
+  }
+
+  /** Intact boxes currently in the level. */
+  boxes(): { id: number; rect: Rect; variant: 1 | 2 | 3 }[] {
+    const out: { id: number; rect: Rect; variant: 1 | 2 | 3 }[] = [];
+    for (const trap of this.traps) {
+      if (trap.kind !== 'box') continue;
+      const rect = this.boxRect(trap.id);
+      if (rect) out.push({ id: trap.id, rect, variant: trap.variant });
+    }
+    return out;
+  }
+
+  /** Picks an intact box up (server). Returns its rect, or null if it can't be taken. */
+  takeBox(id: number): Rect | null {
+    const rect = this.boxRect(id);
+    if (rect) this.taken.add(id);
+    return rect;
+  }
+
+  /** Puts a taken box back into the level at a new top-left (server). */
+  placeBox(id: number, x: number, y: number): void {
+    const trap = this.byId.get(id);
+    if (trap?.kind !== 'box') return;
+    this.taken.delete(id);
+    this.boxPos.set(id, { x, y });
+  }
+
+  /** Breaks a box for good (a spat box shattering), wherever it is (server). */
+  destroyBox(id: number): void {
+    const trap = this.byId.get(id);
+    if (trap?.kind !== 'box') return;
+    this.taken.delete(id);
+    this.hits.set(id, trap.maxHits);
+  }
+
+  /**
+   * `count` hits on a box (server). Returns the new hit count, or null when the id is not an
+   * intact box in the level or it was hit too recently.
+   */
+  hitBox(id: number, tick: number, count = 1): { hits: number; broken: boolean } | null {
+    const trap = this.byId.get(id);
+    if (trap?.kind !== 'box' || this.isBroken(id) || this.taken.has(id)) return null;
     const last = this.lastHit.get(id);
     if (last !== undefined && tick - last < this.config.box.hitCooldownTicks) return null;
-    const hits = this.boxHits(id) + 1;
+    const hits = Math.min(trap.maxHits, this.boxHits(id) + Math.max(1, count));
     this.hits.set(id, hits);
     this.lastHit.set(id, tick);
     return { hits, broken: hits >= trap.maxHits };
@@ -176,17 +238,11 @@ export class TrapField {
         return { ...base, ...rockHeadRect(trap, tick), oneWay: false, bounce: 0 };
       case 'spikeHead':
         return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: false, bounce: 0 };
-      case 'box':
-        if (this.isBroken(trap.id)) return null;
-        return {
-          ...base,
-          x: trap.x,
-          y: trap.y,
-          width: trap.width,
-          height: trap.height,
-          oneWay: false,
-          bounce: this.config.box.stompBounce,
-        };
+      case 'box': {
+        const rect = this.boxRect(trap.id);
+        if (!rect) return null;
+        return { ...base, ...rect, oneWay: false, bounce: this.config.box.stompBounce };
+      }
       default:
         return null;
     }

@@ -1,0 +1,255 @@
+{
+  "image": "virtual-guy.png",
+  "animations": {
+    "hugged": {
+      "row": 0,
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frames": 4,
+      "loop": true,
+      "durationsMs": [
+        100,
+        120,
+        130,
+        130
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          64,
+          32
+        ],
+        [
+          64,
+          0,
+          64,
+          32
+        ],
+        [
+          128,
+          0,
+          64,
+          32
+        ],
+        [
+          192,
+          0,
+          64,
+          32
+        ]
+      ]
+    },
+    "pulled": {
+      "row": 1,
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frames": 3,
+      "loop": true,
+      "loopFrom": 1,
+      "note": "frame 0 starts the pull; loop 1-2 while being dragged",
+      "durationsMs": [
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          32,
+          64,
+          32
+        ],
+        [
+          64,
+          32,
+          64,
+          32
+        ],
+        [
+          128,
+          32,
+          64,
+          32
+        ]
+      ]
+    },
+    "carried": {
+      "row": 2,
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frames": 2,
+      "loop": true,
+      "note": "hang the sprite so 'grip' sits under the drone's 'claw' point",
+      "durationsMs": [
+        160,
+        160
+      ],
+      "rects": [
+        [
+          0,
+          64,
+          64,
+          32
+        ],
+        [
+          64,
+          64,
+          64,
+          32
+        ]
+      ],
+      "points": [
+        {
+          "grip": [
+            32,
+            6
+          ]
+        },
+        {
+          "grip": [
+            32,
+            6
+          ]
+        }
+      ]
+    },
+    "tumble": {
+      "row": 3,
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frames": 4,
+      "loop": true,
+      "note": "thrown/spinning; place by 'center', not by the feet pivot",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          96,
+          64,
+          32
+        ],
+        [
+          64,
+          96,
+          64,
+          32
+        ],
+        [
+          128,
+          96,
+          64,
+          32
+        ],
+        [
+          192,
+          96,
+          64,
+          32
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            32,
+            16
+          ]
+        },
+        {
+          "center": [
+            32,
+            16
+          ]
+        },
+        {
+          "center": [
+            32,
+            16
+          ]
+        },
+        {
+          "center": [
+            32,
+            16
+          ]
+        }
+      ]
+    },
+    "spat": {
+      "row": 4,
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frames": 4,
+      "loop": true,
+      "note": "flying after char4_frog's spit",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          128,
+          64,
+          32
+        ],
+        [
+          64,
+          128,
+          64,
+          32
+        ],
+        [
+          128,
+          128,
+          64,
+          32
+        ],
+        [
+          192,
+          128,
+          64,
+          32
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            32,
+            16
+          ]
+        },
+        {
+          "center": [
+            32,
+            16
+          ]
+        },
+        {
+          "center": [
+            32,
+            16
+          ]
+        },
+        {
+          "center": [
+            32,
+            16
+          ]
+        }
+      ]
+    }
+  },
+  "pivot": {
+    "x": 32,
+    "y": 31
+  },
+  "facing": "right"
+}

@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { BACKGROUND_TILES } from '@platformer/shared';
+import { queueAbilitySheets, registerAbilitySheets } from '../abilities/abilityAnimations';
 import { backgroundKey, backgroundPath } from '../art/backgroundArt';
 import { createProceduralTextures } from '../art/textures';
 import { prepareSoundCues, queueSoundOverrides } from '../audio/SoundController';
@@ -37,6 +38,7 @@ export class BootScene extends Phaser.Scene {
       this.load.spritesheet(key, `${this.services.assetBase}/${path}`, { frameWidth, frameHeight });
     }
     queueTrapSheets(this, this.services.assetBase);
+    queueAbilitySheets(this, this.services.assetBase);
     for (const name of BACKGROUND_TILES) {
       if (!this.textures.exists(backgroundKey(name))) this.load.image(backgroundKey(name), `${this.services.assetBase}/${backgroundPath(name)}`);
     }
@@ -60,6 +62,12 @@ export class BootScene extends Phaser.Scene {
       });
     }
     registerTrapAnimations(this);
+    const missingAbilities = registerAbilitySheets(this);
+    if (missingAbilities.length > 0) {
+      this.services.bridge.emit('level:warning', {
+        message: `Special-ability sprites (${missingAbilities.join(', ')}) could not be loaded; abilities use the normal animations. Run "npm run assets:sync".`,
+      });
+    }
     prepareSoundCues(this);
 
     this.add

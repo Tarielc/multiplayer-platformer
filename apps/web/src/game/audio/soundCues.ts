@@ -25,6 +25,18 @@ export const SOUND_CUES = [
   'boxBreak',
   'thud',
   'shake',
+  'healStart',
+  'kiss',
+  'heal',
+  'drone',
+  'grab',
+  'drop',
+  'grow',
+  'shrink',
+  'tongue',
+  'gulp',
+  'spit',
+  'splat',
 ] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
 
@@ -282,6 +294,137 @@ export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
     volume: 0.35,
     detuneJitter: 60,
     maxVoices: 2,
+  }),
+  // --- special abilities -----------------------------------------------------------------------
+  /** Bunny-man opens his arms (heal starts). */
+  healStart: cue({
+    recipe: {
+      layers: [{ wave: 'triangle', freq: 330, freqEnd: 660, attack: 0.02, sustain: 0.06, decay: 0.18, vibrato: { depth: 0.3, rate: 9 }, gain: 0.5 }],
+    },
+    volume: 0.45,
+    voiced: true,
+  }),
+  /** The kiss: a tiny smack. */
+  kiss: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 6000, freqEnd: 2500, attack: 0.001, sustain: 0.006, decay: 0.03, lowpass: 6000, gain: 0.6 },
+        { wave: 'sine', freq: 1400, freqEnd: 2200, attack: 0.001, sustain: 0.01, decay: 0.05, gain: 0.35, delay: 0.01 },
+      ],
+    },
+    volume: 0.45,
+    detuneJitter: 60,
+  }),
+  /** Hearts restored: a warm rising arpeggio. */
+  heal: cue({
+    recipe: {
+      layers: [
+        {
+          wave: 'triangle',
+          freq: 523,
+          attack: 0.01,
+          sustain: 0.3,
+          decay: 0.3,
+          arpeggio: [
+            { at: 0.08, mult: 1.26 },
+            { at: 0.16, mult: 1.5 },
+            { at: 0.24, mult: 2 },
+          ],
+          gain: 0.5,
+        },
+        { wave: 'sine', freq: 1046, freqEnd: 1568, attack: 0.05, sustain: 0.2, decay: 0.3, vibrato: { depth: 0.2, rate: 6 }, gain: 0.2 },
+      ],
+    },
+    volume: 0.55,
+    maxVoices: 2,
+  }),
+  /** The drone spins up. */
+  drone: cue({
+    recipe: {
+      layers: [
+        { wave: 'saw', freq: 90, freqEnd: 240, attack: 0.05, sustain: 0.25, decay: 0.2, vibrato: { depth: 0.4, rate: 40 }, lowpass: 1400, gain: 0.35 },
+        { wave: 'noise', freq: 2400, attack: 0.05, sustain: 0.25, decay: 0.2, lowpass: 1800, gain: 0.2 },
+      ],
+    },
+    volume: 0.45,
+    maxVoices: 2,
+  }),
+  /** A claw or a tongue catches something. */
+  grab: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.25, freq: 880, freqEnd: 440, attack: 0.001, sustain: 0.02, decay: 0.06, lowpass: 3000, gain: 0.4 },
+        { wave: 'noise', freq: 3000, freqEnd: 900, attack: 0.001, sustain: 0.01, decay: 0.05, lowpass: 2400, gain: 0.5 },
+      ],
+    },
+    volume: 0.5,
+  }),
+  /** The claw lets go. */
+  drop: cue({
+    recipe: { layers: [{ wave: 'square', duty: 0.25, freq: 440, freqEnd: 880, attack: 0.001, sustain: 0.02, decay: 0.06, lowpass: 3000, gain: 0.4 }] },
+    volume: 0.45,
+  }),
+  /** Mask-dude grows: a big rising rumble. */
+  grow: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.5, freq: 70, freqEnd: 220, attack: 0.02, sustain: 0.4, decay: 0.25, vibrato: { depth: 0.6, rate: 14 }, lowpass: 1200, gain: 0.5 },
+        { wave: 'noise', freq: 600, freqEnd: 1800, attack: 0.1, sustain: 0.3, decay: 0.2, lowpass: 1000, gain: 0.3 },
+      ],
+    },
+    volume: 0.6,
+    maxVoices: 2,
+  }),
+  /** ...and shrinks back. */
+  shrink: cue({
+    recipe: {
+      layers: [{ wave: 'square', duty: 0.5, freq: 260, freqEnd: 90, attack: 0.01, sustain: 0.25, decay: 0.2, vibrato: { depth: 0.5, rate: 16 }, lowpass: 1600, gain: 0.45 }],
+    },
+    volume: 0.5,
+    maxVoices: 2,
+  }),
+  /** The frog's tongue shoots out. */
+  tongue: cue({
+    recipe: {
+      layers: [
+        { wave: 'sine', freq: 300, freqEnd: 1400, attack: 0.002, sustain: 0.03, decay: 0.1, gain: 0.5 },
+        { wave: 'noise', freq: 4000, freqEnd: 1500, attack: 0.002, sustain: 0.02, decay: 0.06, lowpass: 3000, gain: 0.3 },
+      ],
+    },
+    volume: 0.5,
+    detuneJitter: 60,
+  }),
+  /** Gulp. */
+  gulp: cue({
+    recipe: {
+      layers: [
+        { wave: 'sine', freq: 420, freqEnd: 110, attack: 0.005, sustain: 0.05, decay: 0.12, gain: 0.7 },
+        { wave: 'sine', freq: 300, freqEnd: 90, attack: 0.005, sustain: 0.03, decay: 0.1, gain: 0.5, delay: 0.1 },
+      ],
+    },
+    volume: 0.55,
+    voiced: true,
+  }),
+  /** Ptooey. */
+  spit: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 5000, freqEnd: 1200, attack: 0.002, sustain: 0.03, decay: 0.12, lowpass: 4000, gain: 0.7 },
+        { wave: 'square', duty: 0.25, freq: 200, freqEnd: 700, attack: 0.002, sustain: 0.02, decay: 0.08, lowpass: 2500, gain: 0.35 },
+      ],
+    },
+    volume: 0.55,
+    voiced: true,
+  }),
+  /** Something spat hits a player. */
+  splat: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 2000, freqEnd: 300, attack: 0.001, sustain: 0.03, decay: 0.18, lowpass: 1800, gain: 0.9 },
+        { wave: 'sine', freq: 180, freqEnd: 50, attack: 0.001, sustain: 0.02, decay: 0.15, gain: 0.6 },
+      ],
+    },
+    volume: 0.6,
   }),
 };
 

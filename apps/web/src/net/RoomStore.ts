@@ -1,4 +1,4 @@
-import { PLAYER_CONFIG, slotStyle, type CharacterId, type NetWorldState, type RoomInfo } from '@platformer/shared';
+import { ABILITY_NAMES, PLAYER_CONFIG, abilityForCharacter, slotStyle, type CharacterId, type NetWorldState, type RoomInfo } from '@platformer/shared';
 import type { ConnectionStatus, FatalError, GameClient } from './GameClient';
 
 export interface HudPlayer {
@@ -19,6 +19,8 @@ export interface HudPlayer {
   /** Hearts left (traps cost one) out of `maxHp`. */
   hp: number;
   maxHp: number;
+  /** Special ability: name, seconds until it can be used again (0 = ready), in use now. */
+  ability: { name: string; cooldown: number; active: boolean };
 }
 
 export interface Notice {
@@ -150,7 +152,13 @@ export class RoomStore {
         alive: s?.alive ?? true,
         atExit: s?.atExit ?? false,
         hp: s?.hp ?? PLAYER_CONFIG.maxHp,
-        maxHp: PLAYER_CONFIG.maxHp,
+        maxHp: s?.maxHp ?? PLAYER_CONFIG.maxHp,
+        ability: {
+          name: ABILITY_NAMES[abilityForCharacter(p.characterId)],
+          // Tenths of a second keep HUD updates rare while a cooldown runs.
+          cooldown: Math.ceil((s?.specialCooldown ?? 0) * 10) / 10,
+          active: (s?.phase ?? 0) !== 0 || (s?.giant ?? 0) > 0,
+        },
       };
     });
     const key = JSON.stringify(hud);

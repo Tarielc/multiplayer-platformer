@@ -1,7 +1,10 @@
 import type { CompiledCombat } from '../config/combat';
 import type { Rect } from '../util/math';
 import { Button, NEUTRAL_INPUT } from './input';
+import { Phase } from '../config/abilities';
+import { stepAbility } from './abilities';
 import {
+  moveAndCollide,
   noContacts,
   stepPlayerMovement,
   type HitboxSize,
@@ -30,8 +33,11 @@ export function stepPlayerBody(
 ): StepContacts {
   const contacts = noContacts();
   const attackDown = (buttons & Button.ATTACK) !== 0;
+  const specialDown = (buttons & Button.SPECIAL) !== 0;
+  const jumpDown = (buttons & Button.JUMP) !== 0;
   if (!body.alive) {
     body.attackHeld = attackDown;
+    body.specialHeld = specialDown;
     stepPlayerMovement(body, buttons, ctx, tick, contacts); // records the jump edge only
     return contacts;
   }
@@ -39,23 +45,43 @@ export function stepPlayerBody(
   const dt = ctx.dt;
   const attackPressed = attackDown && !body.attackHeld;
   body.attackHeld = attackDown;
+  const specialPressed = specialDown && !body.specialHeld;
+  body.specialHeld = specialDown;
 
   body.attack = Math.max(0, body.attack - dt);
   body.attackCooldown = Math.max(0, body.attackCooldown - dt);
   body.hurt = Math.max(0, body.hurt - dt);
 
-  const started = attackPressed && body.attackCooldown <= 0 && body.hurt <= 0;
+  if (body.held > 0) {
+    // Held by someone's ability: the server places the body every tick.
+    body.attack = 0;
+    body.vx = body.vy = 0;
+    body.grounded = body.jumping = false;
+    body.coyote = body.buffer = 0;
+    body.jumpHeld = jumpDown;
+    body.stepTick = tick;
+    return contacts;
+  }
+  if (body.flight > 0) {
+    stepFlight(body, ctx, tick, contacts);
+    body.jumpHeld = jumpDown;
+    return contacts;
+  }
+
+  const control = stepAbility(body, buttons, ctx, specialPressed, attackPressed);
+  const busy = body.phase !== Phase.NONE; // no swings while the ability is going (mouth full, sitting, ...)
+  const started = control === 'free' && !busy && attackPressed && body.attackCooldown <= 0 && body.hurt <= 0;
   if (started) {
     body.attack = c.attackDuration;
     body.attackCooldown = c.attackCooldown;
     body.attackSeq += 1;
   }
 
-  if (body.hurt > 0) {
-    // Stunned: no control, knockback carries the body. Keep tracking the real jump button so a
-    // jump held through the stun is not treated as a fresh press when control returns.
+  if (body.hurt > 0 || control === 'locked') {
+    // Stunned or busy with the ability: no control, momentum and gravity carry the body. Keep
+    // tracking the real jump button so a jump held through it is not a fresh press afterwards.
     stepPlayerMovement(body, NEUTRAL_INPUT, ctx, tick, contacts);
-    body.jumpHeld = (buttons & Button.JUMP) !== 0;
+    body.jumpHeld = jumpDown;
     return contacts;
   }
 
@@ -64,6 +90,33 @@ export function stepPlayerBody(
   // Turning still works on the step a swing starts (Left + Attack together swings left).
   if (body.attack > 0 && c.lockFacing && !started) body.facing = facing;
   return contacts;
+}
+
+/**
+ * Spat by the frog: a straight, uncontrolled flight along the launch velocity. Hitting a wall,
+ * floor or ceiling (or running out of time) ends it with a short stun.
+ */
+function stepFlight(body: MovementBody, ctx: MovementContext, tick: number, contacts: StepContacts): void {
+  const vx = body.vx;
+  const vy = body.vy;
+  body.flight = Math.max(0, body.flight - ctx.dt);
+  const colliders = ctx.traps ? ctx.traps.colliders(tick) : [];
+  moveAndCollide(body, vx * ctx.dt, vy * ctx.dt, ctx, colliders, contacts);
+  const hit = body.vx !== vx || body.vy !== vy;
+  if (hit || body.flight <= 0) {
+    body.flight = 0;
+    if (hit) {
+      body.vx = 0;
+      if (body.vy < 0 && vy >= 0) body.vy = 0; // no trampoline launch out of a flight
+    } else {
+      body.vx *= 0.35;
+      body.vy *= 0.35;
+    }
+    body.hurt = Math.max(body.hurt, ctx.combat.stun);
+  } else {
+    body.grounded = false;
+  }
+  body.stepTick = tick;
 }
 
 /** Whether the body's current swing is inside its hit window. */
@@ -83,8 +136,12 @@ export function attackReachBox(
   body: Pick<MovementBody, 'x' | 'y' | 'facing'>,
   hitbox: HitboxSize,
   combat: CompiledCombat,
+  /** Giants reach further (width) and a little higher. */
+  scale = 1,
 ): Rect {
-  const { width: reach, height, offsetY } = combat.reach;
+  const reach = combat.reach.width * scale;
+  const height = combat.reach.height * (1 + (scale - 1) / 2);
+  const offsetY = combat.reach.offsetY;
   const half = hitbox.width / 2;
   const width = half + reach;
   const feetY = body.y + hitbox.height;

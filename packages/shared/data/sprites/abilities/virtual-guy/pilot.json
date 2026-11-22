@@ -1,0 +1,293 @@
+{
+  "image": "pilot.png",
+  "animations": {
+    "deploy": {
+      "row": 0,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 5,
+      "loop": false,
+      "note": "start the drone's 'deploy' at 'droneSpawn' on frame 2",
+      "durationsMs": [
+        140,
+        110,
+        70,
+        90,
+        120
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          64,
+          40
+        ],
+        [
+          64,
+          0,
+          64,
+          40
+        ],
+        [
+          128,
+          0,
+          64,
+          40
+        ],
+        [
+          192,
+          0,
+          64,
+          40
+        ],
+        [
+          256,
+          0,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {},
+        {},
+        {
+          "droneSpawn": [
+            33,
+            4
+          ]
+        },
+        {},
+        {}
+      ]
+    },
+    "sit_down": {
+      "row": 1,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 4,
+      "loop": false,
+      "durationsMs": [
+        90,
+        80,
+        90,
+        110
+      ],
+      "rects": [
+        [
+          0,
+          40,
+          64,
+          40
+        ],
+        [
+          64,
+          40,
+          64,
+          40
+        ],
+        [
+          128,
+          40,
+          64,
+          40
+        ],
+        [
+          192,
+          40,
+          64,
+          40
+        ]
+      ]
+    },
+    "pilot": {
+      "row": 2,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": true,
+      "note": "loop while the player flies the drone",
+      "durationsMs": [
+        130,
+        130,
+        130,
+        130,
+        130,
+        130
+      ],
+      "rects": [
+        [
+          0,
+          80,
+          64,
+          40
+        ],
+        [
+          64,
+          80,
+          64,
+          40
+        ],
+        [
+          128,
+          80,
+          64,
+          40
+        ],
+        [
+          192,
+          80,
+          64,
+          40
+        ],
+        [
+          256,
+          80,
+          64,
+          40
+        ],
+        [
+          320,
+          80,
+          64,
+          40
+        ]
+      ]
+    },
+    "pilot_excited": {
+      "row": 3,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 4,
+      "loop": true,
+      "note": "optional: play while the claw grabs or something is carried",
+      "durationsMs": [
+        110,
+        110,
+        110,
+        110
+      ],
+      "rects": [
+        [
+          0,
+          120,
+          64,
+          40
+        ],
+        [
+          64,
+          120,
+          64,
+          40
+        ],
+        [
+          128,
+          120,
+          64,
+          40
+        ],
+        [
+          192,
+          120,
+          64,
+          40
+        ]
+      ]
+    },
+    "stand_up": {
+      "row": 4,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 4,
+      "loop": false,
+      "durationsMs": [
+        90,
+        80,
+        90,
+        110
+      ],
+      "rects": [
+        [
+          0,
+          160,
+          64,
+          40
+        ],
+        [
+          64,
+          160,
+          64,
+          40
+        ],
+        [
+          128,
+          160,
+          64,
+          40
+        ],
+        [
+          192,
+          160,
+          64,
+          40
+        ]
+      ]
+    },
+    "catch": {
+      "row": 5,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 4,
+      "loop": false,
+      "note": "the drone's 'recall' cube lands at 'catch' on frame 0",
+      "durationsMs": [
+        90,
+        80,
+        110,
+        140
+      ],
+      "rects": [
+        [
+          0,
+          200,
+          64,
+          40
+        ],
+        [
+          64,
+          200,
+          64,
+          40
+        ],
+        [
+          128,
+          200,
+          64,
+          40
+        ],
+        [
+          192,
+          200,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "catch": [
+            33,
+            4
+          ]
+        },
+        {},
+        {},
+        {}
+      ]
+    }
+  },
+  "pivot": {
+    "x": 32,
+    "y": 39
+  },
+  "facing": "right",
+  "note": "64x40 cells (room above the head for the thrown drone)"
+}

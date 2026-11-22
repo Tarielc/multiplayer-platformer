@@ -1,3 +1,4 @@
+import type { CompiledAbilities } from '../config/abilities';
 import type { CompiledCombat } from '../config/combat';
 import type { CompiledMovement } from '../config/movement';
 import { CellFlag, type LevelData } from '../level/types';
@@ -48,6 +49,34 @@ export interface MovementBody {
    * to know how far they moved since (riding a platform, being pushed).
    */
   stepTick: number;
+  /** Special ability (`Ability` in config/abilities.ts), fixed per character; 0 = none. */
+  ability: number;
+  /** Special button state on the previous step (edge detection). */
+  specialHeld: boolean;
+  /** What the ability is doing (`Phase`), and for how long (s). */
+  phase: number;
+  phaseTime: number;
+  /** Seconds until the ability may be used again (counts down while it is idle). */
+  specialCooldown: number;
+  /** Special presses the ability accepted; the server reacts to an increase. */
+  specialSeq: number;
+  /** Aim (radians, 0 = right, +π/2 = down) of the current tongue shot or spit. */
+  aim: number;
+  /** Current tongue length, px. */
+  reach: number;
+  /** Seconds of giant form left. */
+  giant: number;
+  /** Drone centre and velocity (meaningful during drone phases). */
+  droneX: number;
+  droneY: number;
+  droneVx: number;
+  droneVy: number;
+  /** What the drone's claw holds (`Cargo`); set by the server. */
+  cargo: number;
+  /** Held by another player's ability (`Held`): the server places the body, inputs are ignored. */
+  held: number;
+  /** Seconds left flying as a spat projectile (straight line, no control). */
+  flight: number;
 }
 
 export interface HitboxSize {
@@ -64,6 +93,8 @@ export interface MovementContext {
   dt: number;
   /** Traps and moving platforms. Without them, bodies only collide with tiles. */
   traps?: TrapField | null;
+  /** Special ability tuning (defaults to `ABILITIES`). */
+  abilities?: CompiledAbilities;
 }
 
 /**
@@ -117,12 +148,29 @@ export function createBody(feetX: number, feetY: number, hitbox: HitboxSize, ste
     attackSeq: 0,
     hurt: 0,
     stepTick,
+    ability: 0,
+    specialHeld: false,
+    phase: 0,
+    phaseTime: 0,
+    specialCooldown: 0,
+    specialSeq: 0,
+    aim: 0,
+    reach: 0,
+    giant: 0,
+    droneX: 0,
+    droneY: 0,
+    droneVx: 0,
+    droneVy: 0,
+    cargo: 0,
+    held: 0,
+    flight: 0,
   };
 }
 
 /**
  * Teleports a body to a new feet position and clears motion and action timers (respawn).
- * Keeps the button edges (`jumpHeld`, `attackHeld`), `attackSeq` and `stepTick`.
+ * Keeps the button edges (`jumpHeld`, `attackHeld`, `specialHeld`), `attackSeq`, `specialSeq`,
+ * `ability` and `stepTick`.
  */
 export function resetBody(body: MovementBody, feetX: number, feetY: number, hitbox: HitboxSize, airJumps = 0): void {
   body.x = feetX - hitbox.width / 2;
@@ -139,6 +187,16 @@ export function resetBody(body: MovementBody, feetX: number, feetY: number, hitb
   body.attack = 0;
   body.attackCooldown = 0;
   body.hurt = 0;
+  body.phase = 0;
+  body.phaseTime = 0;
+  body.specialCooldown = 0;
+  body.reach = 0;
+  body.giant = 0;
+  body.droneVx = 0;
+  body.droneVy = 0;
+  body.cargo = 0;
+  body.held = 0;
+  body.flight = 0;
 }
 
 export function cloneBody(body: MovementBody): MovementBody {
@@ -252,7 +310,7 @@ export function stepPlayerMovement(
  * Axis-separated AABB movement against the tile grid and trap colliders, sub-stepped so a step
  * never exceeds half a tile.
  */
-function moveAndCollide(
+export function moveAndCollide(
   body: MovementBody,
   dx: number,
   dy: number,

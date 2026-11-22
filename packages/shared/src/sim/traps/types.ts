@@ -116,6 +116,11 @@ export interface NetTrapState {
   hits?: number;
   /** Falling platform: tick it was stood on. */
   trigger?: number;
+  /** Box: moved by an ability (drone drop); new top-left. */
+  x?: number;
+  y?: number;
+  /** Box: picked up by an ability (not in the level right now; see `NetPropState`). */
+  taken?: boolean;
 }
 
 /** Something a body collides with this tick. */

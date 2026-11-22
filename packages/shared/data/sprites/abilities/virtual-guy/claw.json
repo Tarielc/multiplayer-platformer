@@ -1,0 +1,167 @@
+{
+  "image": "claw.png",
+  "animations": {
+    "open": {
+      "row": 0,
+      "frameWidth": 16,
+      "frameHeight": 12,
+      "frames": 1,
+      "loop": true,
+      "note": "hang from the drone's 'winch' point by 'top'",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          16,
+          12
+        ]
+      ],
+      "points": [
+        {
+          "top": [
+            8,
+            0
+          ],
+          "grip": [
+            8,
+            5
+          ]
+        }
+      ]
+    },
+    "close": {
+      "row": 1,
+      "frameWidth": 16,
+      "frameHeight": 12,
+      "frames": 3,
+      "loop": false,
+      "note": "cargo attaches on the last frame: its 'grip' on the claw's 'grip'",
+      "durationsMs": [
+        50,
+        60,
+        80
+      ],
+      "rects": [
+        [
+          0,
+          12,
+          16,
+          12
+        ],
+        [
+          16,
+          12,
+          16,
+          12
+        ],
+        [
+          32,
+          12,
+          16,
+          12
+        ]
+      ],
+      "points": [
+        {
+          "top": [
+            8,
+            0
+          ],
+          "grip": [
+            8,
+            5
+          ]
+        },
+        {
+          "top": [
+            8,
+            0
+          ],
+          "grip": [
+            8,
+            6
+          ]
+        },
+        {
+          "top": [
+            8,
+            0
+          ],
+          "grip": [
+            8,
+            6
+          ]
+        }
+      ]
+    },
+    "release": {
+      "row": 2,
+      "frameWidth": 16,
+      "frameHeight": 12,
+      "frames": 2,
+      "loop": false,
+      "durationsMs": [
+        60,
+        80
+      ],
+      "rects": [
+        [
+          0,
+          24,
+          16,
+          12
+        ],
+        [
+          16,
+          24,
+          16,
+          12
+        ]
+      ],
+      "points": [
+        {
+          "top": [
+            8,
+            0
+          ],
+          "grip": [
+            8,
+            6
+          ]
+        },
+        {
+          "top": [
+            8,
+            0
+          ],
+          "grip": [
+            8,
+            5
+          ]
+        }
+      ]
+    },
+    "cable": {
+      "row": 3,
+      "frameWidth": 2,
+      "frameHeight": 4,
+      "frames": 1,
+      "loop": true,
+      "note": "tile vertically from 'winch' down to the claw's 'top' (x = winch.x - 1)",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          36,
+          2,
+          4
+        ]
+      ]
+    }
+  }
+}

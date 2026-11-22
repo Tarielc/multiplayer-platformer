@@ -1,0 +1,206 @@
+{
+  "image": "tongue_aim_parts.png",
+  "animations": {
+    "bead_outline": {
+      "row": 0,
+      "frameWidth": 4,
+      "frameHeight": 4,
+      "frames": 1,
+      "loop": false,
+      "note": "pass 1: stamp at every 1px step from 'mouth' along the aim",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          4,
+          4
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            2,
+            2
+          ]
+        }
+      ]
+    },
+    "bead_fill": {
+      "row": 1,
+      "frameWidth": 2,
+      "frameHeight": 2,
+      "frames": 1,
+      "loop": false,
+      "note": "pass 2: stamp at the same points, after all outlines",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          4,
+          2,
+          2
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "tip": {
+      "row": 2,
+      "frameWidth": 6,
+      "frameHeight": 6,
+      "frames": 1,
+      "loop": false,
+      "note": "last point, while flying",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          6,
+          6,
+          6
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            3,
+            3
+          ]
+        }
+      ]
+    },
+    "tip_grab": {
+      "row": 3,
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "frames": 1,
+      "loop": false,
+      "note": "last point, stuck to a target (pull the target with it)",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          12,
+          8,
+          8
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            4,
+            4
+          ]
+        }
+      ]
+    },
+    "droplet": {
+      "row": 4,
+      "frameWidth": 4,
+      "frameHeight": 4,
+      "frames": 3,
+      "loop": false,
+      "note": "spit trail particle: emit behind a spat target in any direction",
+      "durationsMs": [
+        80,
+        80,
+        80
+      ],
+      "rects": [
+        [
+          0,
+          20,
+          4,
+          4
+        ],
+        [
+          4,
+          20,
+          4,
+          4
+        ],
+        [
+          8,
+          20,
+          4,
+          4
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            1,
+            2
+          ]
+        },
+        {
+          "center": [
+            1,
+            2
+          ]
+        },
+        {
+          "center": [
+            1,
+            2
+          ]
+        }
+      ]
+    },
+    "reticle": {
+      "row": 5,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 2,
+      "loop": true,
+      "note": "aim cursor; place at the aim point",
+      "durationsMs": [
+        200,
+        200
+      ],
+      "rects": [
+        [
+          0,
+          24,
+          16,
+          16
+        ],
+        [
+          16,
+          24,
+          16,
+          16
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            8,
+            8
+          ]
+        },
+        {
+          "center": [
+            8,
+            8
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -127,3 +127,38 @@
   font-size: 0.8em;
   color: var(--ok);
 }
+
+.ability {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  outline: 1px solid rgb(255 255 255 / 18%);
+}
+
+.ability img {
+  image-rendering: pixelated;
+}
+
+.ability[data-ready='false'] img {
+  filter: grayscale(1) brightness(0.55);
+}
+
+.ability[data-active='true'] {
+  outline: 2px solid var(--slot);
+  box-shadow: 0 0 8px var(--slot);
+}
+
+.cooldown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+}

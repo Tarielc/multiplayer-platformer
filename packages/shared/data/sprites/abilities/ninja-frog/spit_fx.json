@@ -1,0 +1,92 @@
+{
+  "image": "spit_fx.png",
+  "animations": {
+    "trail": {
+      "row": 0,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "loop": true,
+      "note": "follows a spat target; place behind it (flip to match direction)",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          16,
+          16
+        ],
+        [
+          16,
+          0,
+          16,
+          16
+        ],
+        [
+          32,
+          0,
+          16,
+          16
+        ],
+        [
+          48,
+          0,
+          16,
+          16
+        ]
+      ]
+    },
+    "impact": {
+      "row": 1,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 5,
+      "loop": false,
+      "note": "where the spat target hits something; centre (16,16)",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          16,
+          32,
+          32
+        ],
+        [
+          32,
+          16,
+          32,
+          32
+        ],
+        [
+          64,
+          16,
+          32,
+          32
+        ],
+        [
+          96,
+          16,
+          32,
+          32
+        ],
+        [
+          128,
+          16,
+          32,
+          32
+        ]
+      ]
+    }
+  }
+}

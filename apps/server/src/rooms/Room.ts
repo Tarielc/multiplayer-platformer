@@ -370,7 +370,7 @@ export class Room {
     this.level = level;
     this.world = new GameWorld({ level: level.data, movement: level.movement });
     for (const player of this.playersBySlot()) {
-      this.world.addPlayer(player.id, player.slot);
+      this.world.addPlayer(player.id, player.slot, player.characterId);
       this.world.setPresent(player.id, player.connection !== null);
       player.inputs.reset();
       player.menuOpen = false;
@@ -544,7 +544,7 @@ export class Room {
     player.inputs.reset();
     if (this.world) {
       // Drop-in (new player mid-level) or return from a disconnect.
-      this.world.addPlayer(player.id, player.slot);
+      this.world.addPlayer(player.id, player.slot, player.characterId);
       this.world.setPresent(player.id, true);
     }
     connection.send({

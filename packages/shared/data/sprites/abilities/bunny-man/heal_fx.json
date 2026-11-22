@@ -1,0 +1,218 @@
+{
+  "image": "heal_fx.png",
+  "animations": {
+    "heart": {
+      "row": 0,
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "frames": 4,
+      "loop": false,
+      "note": "spawn above the healed player, drift upwards",
+      "durationsMs": [
+        110,
+        110,
+        110,
+        110
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          8,
+          8
+        ],
+        [
+          8,
+          0,
+          8,
+          8
+        ],
+        [
+          16,
+          0,
+          8,
+          8
+        ],
+        [
+          24,
+          0,
+          8,
+          8
+        ]
+      ]
+    },
+    "heal_ring": {
+      "row": 1,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 6,
+      "loop": false,
+      "note": "centre bottom (16,31) on the healed player's feet",
+      "durationsMs": [
+        90,
+        90,
+        90,
+        90,
+        90,
+        90
+      ],
+      "rects": [
+        [
+          0,
+          8,
+          32,
+          32
+        ],
+        [
+          32,
+          8,
+          32,
+          32
+        ],
+        [
+          64,
+          8,
+          32,
+          32
+        ],
+        [
+          96,
+          8,
+          32,
+          32
+        ],
+        [
+          128,
+          8,
+          32,
+          32
+        ],
+        [
+          160,
+          8,
+          32,
+          32
+        ]
+      ]
+    },
+    "heart_burst": {
+      "row": 2,
+      "frameWidth": 40,
+      "frameHeight": 40,
+      "frames": 5,
+      "loop": false,
+      "note": "centre (20,20) on the healed player's chest",
+      "durationsMs": [
+        80,
+        80,
+        80,
+        80,
+        80
+      ],
+      "rects": [
+        [
+          0,
+          40,
+          40,
+          40
+        ],
+        [
+          40,
+          40,
+          40,
+          40
+        ],
+        [
+          80,
+          40,
+          40,
+          40
+        ],
+        [
+          120,
+          40,
+          40,
+          40
+        ],
+        [
+          160,
+          40,
+          40,
+          40
+        ]
+      ]
+    },
+    "heal_sparkles": {
+      "row": 3,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "loop": true,
+      "note": "loop over a player while healing",
+      "durationsMs": [
+        100,
+        100,
+        100,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          80,
+          16,
+          16
+        ],
+        [
+          16,
+          80,
+          16,
+          16
+        ],
+        [
+          32,
+          80,
+          16,
+          16
+        ],
+        [
+          48,
+          80,
+          16,
+          16
+        ]
+      ]
+    },
+    "kiss": {
+      "row": 4,
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "frames": 3,
+      "loop": false,
+      "durationsMs": [
+        100,
+        100,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          96,
+          8,
+          8
+        ],
+        [
+          8,
+          96,
+          8,
+          8
+        ],
+        [
+          16,
+          96,
+          8,
+          8
+        ]
+      ]
+    }
+  }
+}

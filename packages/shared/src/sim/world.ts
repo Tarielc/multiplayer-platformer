@@ -1,3 +1,5 @@
+import { ABILITIES, Ability, Held, abilityForCharacter, type AbilityId, type CompiledAbilities } from '../config/abilities';
+import type { CharacterId } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import type { CompiledMovement } from '../config/movement';
@@ -9,6 +11,8 @@ import type { NetPlayerState, NetWorldState } from '../protocol/state';
 import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/math';
 import { cellAt } from './collision';
 import type { DeathCause, GameEvent } from './events';
+import { giantActive } from './abilities';
+import { AbilitySystem, cloneAbilityPlayerState, newAbilityPlayerState, type AbilityHit, type AbilityPlayerState } from './abilitySystem';
 import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
 import { cloneBody, createBody, resetBody, type MovementBody, type MovementContext, type StepContacts } from './movement';
 import { TrapField } from './traps/TrapField';
@@ -46,6 +50,8 @@ export interface WorldPlayer {
   /** Server-only: boxes already hit by the current swing (`boxSwingSeq`), one hit per swing. */
   boxSwingSeq: number;
   swingBoxes: Set<number>;
+  /** Server-only special ability bookkeeping (what it holds, flights, ...). */
+  ability: AbilityPlayerState;
 }
 
 export interface GameWorldOptions {
@@ -59,6 +65,8 @@ export interface GameWorldOptions {
   traps?: Readonly<CompiledTraps>;
   /** Fixed step in seconds (defaults to 1 / tickRate). */
   dt?: number;
+  /** Special ability tuning (defaults to `ABILITIES`). */
+  abilities?: CompiledAbilities;
 }
 
 /**
@@ -82,6 +90,7 @@ export class GameWorld {
   private teamCheckpoint: LevelZone | null = null;
   private events: GameEvent[] = [];
   private traps: TrapField;
+  private abilities: AbilitySystem;
 
   constructor(private readonly options: GameWorldOptions) {
     this.level = options.level;
@@ -95,7 +104,9 @@ export class GameWorld {
       combat: options.combat ?? resolveCombat(),
       dt: options.dt ?? TICK_DT,
       traps: this.traps.traps.length > 0 ? this.traps : null,
+      abilities: options.abilities ?? ABILITIES,
     };
+    this.abilities = new AbilitySystem(this.abilityHost());
     this.respawnDelayTicks = Math.max(1, msToTicks(this.playerConfig.respawnDelayMs));
   }
 
@@ -120,10 +131,17 @@ export class GameWorld {
     copy.events = [...this.events];
     for (const id of this.collected) copy.collected.add(id);
     for (const [id, p] of this.players) {
-      copy.players.set(id, { ...p, body: cloneBody(p.body), respawnPoint: { ...p.respawnPoint }, swingBoxes: new Set(p.swingBoxes) });
+      copy.players.set(id, {
+        ...p,
+        body: cloneBody(p.body),
+        respawnPoint: { ...p.respawnPoint },
+        swingBoxes: new Set(p.swingBoxes),
+        ability: cloneAbilityPlayerState(p.ability),
+      });
     }
     copy.traps = this.traps.clone();
     copy.ctx.traps = copy.ctx.traps ? copy.traps : null;
+    copy.abilities = this.abilities.cloneFor(copy.abilityHost());
     return copy;
   }
 
@@ -143,7 +161,11 @@ export class GameWorld {
     return this.collected.has(entityId);
   }
 
-  addPlayer(id: string, slot: number): WorldPlayer {
+  /**
+   * Adds a player (no-op if the id exists). `character` decides the special ability; without
+   * one the player has none.
+   */
+  addPlayer(id: string, slot: number, character?: CharacterId): WorldPlayer {
     const existing = this.players.get(id);
     if (existing) return existing;
     const respawnPoint = this.teamCheckpoint
@@ -169,13 +191,32 @@ export class GameWorld {
       invulnUntil: 0,
       boxSwingSeq: 0,
       swingBoxes: new Set(),
+      ability: newAbilityPlayerState(),
     };
+    player.body.ability = character ? abilityForCharacter(character) : Ability.NONE;
     this.players.set(id, player);
     return player;
   }
 
   removePlayer(id: string): void {
+    const player = this.players.get(id);
+    if (player) this.abilities.onRemove(player);
     this.players.delete(id);
+  }
+
+  /** Sets a player's special ability directly (tests, dev tools). */
+  setAbility(id: string, ability: AbilityId): void {
+    const player = this.players.get(id);
+    if (player) player.body.ability = ability;
+  }
+
+  /** Hearts when full: the base, plus the giant bonus while it lasts. */
+  maxHp(player: WorldPlayer): number {
+    return this.playerConfig.maxHp + (giantActive(player.body) ? this.abilityTuning.giant.bonusHp : 0);
+  }
+
+  private get abilityTuning(): CompiledAbilities {
+    return this.ctx.abilities ?? ABILITIES;
   }
 
   setPresent(id: string, present: boolean): void {
@@ -193,6 +234,7 @@ export class GameWorld {
 
   /** World-level rules that run once per tick regardless of input (hits, respawns, exit rule). */
   endTick(): void {
+    this.abilities.update();
     if (this.ctx.combat.playerHits) this.resolveAttacks();
     this.resolveBoxAttacks();
     this.traps.expire(this.tick);
@@ -231,13 +273,78 @@ export class GameWorld {
   toNetState(ackFor: (playerId: string) => number): NetWorldState {
     return {
       tick: this.tick,
-      players: this.listPlayers().map((p) => toNetPlayer(p, ackFor(p.id))),
+      players: this.listPlayers().map((p) => toNetPlayer(p, ackFor(p.id), this.maxHp(p))),
       collected: [...this.collected].sort((a, b) => a - b),
       traps: this.traps.toNet(),
+      props: this.abilities.toNet(),
     };
   }
 
   // --- internals -----------------------------------------------------------------------
+
+  private abilityHost() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const world = this;
+    return {
+      get tick() {
+        return world.tick;
+      },
+      get ctx() {
+        return world.ctx;
+      },
+      get traps() {
+        return world.traps;
+      },
+      listPlayers: () => world.listPlayers(),
+      getPlayer: (id: string) => world.players.get(id),
+      emit: (event: GameEvent) => {
+        world.events.push(event);
+      },
+      maxHp: (p: WorldPlayer) => world.maxHp(p),
+      hurt: (target: WorldPlayer, hit: AbilityHit) => world.abilityHurt(target, hit),
+      hitBox: (by: WorldPlayer | null, boxId: number, count: number) => world.hitBox(by, boxId, count),
+      ticksFor: (seconds: number) => msToTicks(seconds * 1000),
+    };
+  }
+
+  /** Hearts lost to an ability, then death or the usual stun + knockback. */
+  private abilityHurt(target: WorldPlayer, hit: AbilityHit): void {
+    const t = target.body;
+    if (!t.alive || t.held !== Held.NONE) return;
+    target.hp = Math.max(0, target.hp - hit.damage);
+    this.events.push({
+      type: 'abilityHit',
+      playerId: target.id,
+      by: hit.by,
+      hp: target.hp,
+      x: t.x + this.ctx.hitbox.width / 2,
+      y: t.y + this.ctx.hitbox.height / 2,
+    });
+    if (target.hp <= 0) {
+      this.kill(target, 'ability');
+      return;
+    }
+    const taken = giantActive(t) ? this.abilityTuning.giant.knockbackTaken : 1;
+    this.stun(target, hit.dirX >= 0 ? 1 : -1, hit.knockbackX * taken, hit.knockbackY * taken);
+  }
+
+  /** Stun + knockback towards `dir` (shared by swings and abilities). */
+  private stun(target: WorldPlayer, dir: 1 | -1, knockbackX: number, knockbackY: number): void {
+    const combat = this.ctx.combat;
+    const t = target.body;
+    target.hitImmuneTicks = msToTicks((combat.stun + combat.immunity) * 1000);
+    t.hurt = combat.stun;
+    t.attack = 0; // a hit cancels the target's own swing
+    t.flight = 0;
+    t.vx = dir * knockbackX;
+    t.vy = -knockbackY;
+    t.grounded = false;
+    t.jumping = false;
+    t.coyote = 0;
+    t.buffer = 0;
+    // Face the attacker: the Hurt frames draw the impact on the side the body faces.
+    t.facing = dir > 0 ? -1 : 1;
+  }
 
   private levelSpawn(slot: number): Vec2 {
     const spawns = this.level.spawns;
@@ -309,35 +416,48 @@ export class GameWorld {
     for (const attacker of players) {
       const a = attacker.body;
       if (!isAttackActive(a, combat)) continue;
-      const reach = attackReachBox(a, hitbox, combat);
+      const reach = attackReachBox(a, hitbox, combat, this.reachScale(a));
       for (const target of players) {
         const t = target.body;
-        if (target === attacker || !t.alive || t.hurt > 0 || target.hitImmuneTicks > 0) continue;
+        if (target === attacker || !t.alive || t.hurt > 0 || target.hitImmuneTicks > 0 || t.held !== Held.NONE) continue;
         if (attacker.swingHits & (1 << target.slot)) continue;
         if (!rectsOverlap(reach, { x: t.x, y: t.y, width: hitbox.width, height: hitbox.height })) continue;
         if (!hits.has(target)) hits.set(target, attacker);
       }
     }
-    const immuneTicks = msToTicks((combat.stun + combat.immunity) * 1000);
+    const giant = this.abilityTuning.giant;
     for (const [target, attacker] of hits) {
       const a = attacker.body;
       const t = target.body;
       attacker.swingHits |= 1 << target.slot;
-      target.hitImmuneTicks = immuneTicks;
-      t.hurt = combat.stun;
-      t.attack = 0; // a hit cancels the target's own swing
       // Away from the attacker; when exactly overlapping, along the attacker's facing.
       const away = t.x - a.x;
       const dir = away > 0 ? 1 : away < 0 ? -1 : a.facing;
-      t.vx = dir * combat.knockbackX;
-      t.vy = -combat.knockbackY;
-      t.grounded = false;
-      t.jumping = false;
-      t.coyote = 0;
-      t.buffer = 0;
-      // Face the attacker: the Hurt frames draw the impact on the side the body faces.
-      t.facing = dir > 0 ? -1 : 1;
+      const big = giantActive(a);
+      if (big) {
+        // Giant swings cost hearts.
+        target.hp = Math.max(0, target.hp - giant.swingDamage);
+        this.events.push({
+          type: 'abilityHit',
+          playerId: target.id,
+          by: attacker.id,
+          hp: target.hp,
+          x: t.x + hitbox.width / 2,
+          y: t.y + hitbox.height / 2,
+        });
+        if (target.hp <= 0) {
+          this.kill(target, 'ability');
+          continue;
+        }
+      }
+      const scale = (big ? giant.knockbackMultiplier : 1) * (giantActive(t) ? giant.knockbackTaken : 1);
+      this.stun(target, dir, combat.knockbackX * scale, combat.knockbackY * scale);
     }
+  }
+
+  /** Giants swing further. */
+  private reachScale(body: MovementBody): number {
+    return giantActive(body) ? this.abilityTuning.giant.reachMultiplier : 1;
   }
 
   /** First trap hurting the player this tick costs a heart (none while invulnerable or stunned). */
@@ -381,9 +501,9 @@ export class GameWorld {
     player.invulnUntil = this.tick + cfg.invulnerabilityTicks;
   }
 
-  private hitBox(player: WorldPlayer, boxId: number): void {
-    const result = this.traps.hitBox(boxId, this.tick);
-    if (result) this.events.push({ type: 'boxHit', playerId: player.id, boxId, hits: result.hits, broken: result.broken });
+  private hitBox(player: WorldPlayer | null, boxId: number, count = 1): void {
+    const result = this.traps.hitBox(boxId, this.tick, count);
+    if (result) this.events.push({ type: 'boxHit', playerId: player?.id ?? '', boxId, hits: result.hits, broken: result.broken });
   }
 
   /** Swings break boxes too (whether or not they can hit players), once per box per swing. */
@@ -398,12 +518,13 @@ export class GameWorld {
         player.swingBoxes.clear();
       }
       if (!isAttackActive(body, combat)) continue;
-      const reach = attackReachBox(body, this.ctx.hitbox, combat);
+      const reach = attackReachBox(body, this.ctx.hitbox, combat, this.reachScale(body));
       boxes ??= this.traps.colliders(this.tick).filter((c) => c.kind === 'box');
+      const count = giantActive(body) ? this.abilityTuning.giant.boxHits : 1;
       for (const box of boxes) {
         if (player.swingBoxes.has(box.id) || !rectsOverlap(reach, box)) continue;
         player.swingBoxes.add(box.id);
-        this.hitBox(player, box.id);
+        this.hitBox(player, box.id, count);
       }
     }
   }
@@ -450,6 +571,7 @@ export class GameWorld {
   private kill(player: WorldPlayer, cause: DeathCause): void {
     const body = player.body;
     if (!body.alive) return;
+    this.abilities.onDeath(player);
     body.alive = false;
     body.vx = 0;
     body.vy = 0;
@@ -481,7 +603,7 @@ export class GameWorld {
   }
 }
 
-function toNetPlayer(p: WorldPlayer, ack: number): NetPlayerState {
+function toNetPlayer(p: WorldPlayer, ack: number, maxHp: number): NetPlayerState {
   const b = p.body;
   return {
     id: p.id,
@@ -512,8 +634,32 @@ function toNetPlayer(p: WorldPlayer, ack: number): NetPlayerState {
     stepTick: b.stepTick,
     hp: p.hp,
     invulnUntil: p.invulnUntil,
+    ability: b.ability,
+    specialHeld: b.specialHeld,
+    phase: b.phase,
+    phaseTime: b.phaseTime,
+    specialCooldown: b.specialCooldown,
+    specialSeq: b.specialSeq,
+    aim: b.aim,
+    reach: b.reach,
+    giant: b.giant,
+    droneX: b.droneX,
+    droneY: b.droneY,
+    droneVx: b.droneVx,
+    droneVy: b.droneVy,
+    cargo: b.cargo,
+    held: b.held,
+    flight: b.flight,
+    grab: grabKey(p),
+    maxHp,
     ack,
   };
+}
+
+function grabKey(p: WorldPlayer): string {
+  const grab = p.ability.grab;
+  if (!grab) return '';
+  return grab.kind === 'player' ? `p:${grab.id}` : `b:${grab.id}`;
 }
 
 /** Which side of the hazard the player touched (for knockback and the spike-head squash). */
