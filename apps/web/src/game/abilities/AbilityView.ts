@@ -5,11 +5,13 @@ import {
   Cargo,
   Held,
   Phase,
+  giantActive,
   isDroneOut,
   isHealPhase,
   type CharacterId,
 } from '@platformer/shared';
 import type * as Phaser from 'phaser';
+import { clipDurationMs } from '../characters/characterArt';
 import { VIEW_CONFIG } from '../config';
 import type { AbilitySignals } from '../player/playerSignals';
 import type { PlayerState } from '../player/PlayerStateMachine';
@@ -129,6 +131,8 @@ export class AbilityView {
   private droneFlip = false;
   private lastHealFrame = -1;
   private trailMs = 0;
+  /** Giant (or growing / shrinking) on the last frame alive: the death is drawn big. */
+  private wasBig = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -192,14 +196,21 @@ export class AbilityView {
       }
     }
     if (!f.alive) {
-      // A giant dies big; the pose goes away with the clip, like the normal Death clip.
+      // A giant dies big (the server ends the giant form on death, so remember it from the
+      // last frame alive). The clip is timed like the normal Death clip, which must finish
+      // before the respawn, and the pose goes away when it ends.
       const death = abilityAnim(ABILITY_SHEETS.bigForm.key, 'big_death');
-      if (f.giant > 0 && death) {
+      if ((this.wasBig || f.giant > 0) && death) {
         look.hideBase = true;
-        if (f.timeInState < animLengthMs(death)) this.pose(ABILITY_SHEETS.bigForm.key, 'big_death', f.timeInState, f);
+        const scale = Math.min(1, clipDurationMs('death') / animLengthMs(death));
+        if (f.timeInState < animLengthMs(death) * scale) {
+          const i = frameAt(death, f.timeInState, scale);
+          this.pose(ABILITY_SHEETS.bigForm.key, 'big_death', 0, f, i);
+        }
       }
       return look;
     }
+    this.wasBig = giantActive(f);
 
     // Someone else's ability has this player.
     if (f.held === Held.SWALLOWED) {

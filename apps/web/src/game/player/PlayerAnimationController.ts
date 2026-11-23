@@ -56,7 +56,9 @@ export class PlayerAnimationController {
     const clip = CLIP_FOR_STATE[state];
     const def = CLIPS[clip];
     const id = this.character;
-    if (state !== 'dead') this.sprite.setVisible(true);
+    // Show the sprite for every new clip (an ability pose may have hidden it, e.g. a giant
+    // dying); only a finished Death clip stays hidden.
+    if (state !== 'dead' || changed || restart) this.sprite.setVisible(true);
 
     if (def.loopFrom !== undefined) {
       if (!changed && !restart) return;
