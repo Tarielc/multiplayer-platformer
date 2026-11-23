@@ -112,6 +112,14 @@
   color: var(--warn);
 }
 
+.scaledFor {
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(10 12 23 / 60%);
+  font-size: clamp(0.7rem, 1.6vw, 0.95rem);
+  font-weight: 600;
+}
+
 .results tfoot td {
   border-bottom: 0;
   font-weight: 700;

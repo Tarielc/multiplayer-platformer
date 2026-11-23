@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FOE_TUNING } from '../../config/foes';
 import { resolveMovement } from '../../config/movement';
 import { msToTicks } from '../../config/net';
+import { modeWorldOptions } from '../../config/modes';
 import { PLAYER_CONFIG } from '../../config/players';
 import { asciiToLevel } from '../../dev/asciiMap';
 import { levelChecksum } from '../../level/checksum';
@@ -265,5 +266,19 @@ describe('foes', () => {
     const level = asciiToLevel({ rows: FLOOR, objects: [foe('mushroom', 300, 160)] });
     const world = new GameWorld({ level, movement: resolveMovement(), foes: null });
     expect(world.toNetState(() => 0).foes).toEqual([]);
+  });
+});
+
+describe('foes: co-op scaling', () => {
+  it('spawns tougher foes for a bigger co-op team', () => {
+    const level = asciiToLevel({ rows: FLOOR, objects: [foe('bull', 400, 160), foe('mushroom', 600, 160)] });
+    const health = (players: number) => {
+      const world = new GameWorld({ level, movement: resolveMovement(), ...modeWorldOptions('coop', players) });
+      return Object.fromEntries(world.foeField.toNetFoes().map((f) => [f.kind, f.hp]));
+    };
+    expect(health(1)).toEqual({ bull: FOE_TUNING.bull.hp, mushroom: FOE_TUNING.mushroom.hp });
+    const four = modeWorldOptions('coop', 4).foes;
+    expect(health(4)).toEqual({ bull: four.bull.hp, mushroom: four.mushroom.hp });
+    expect(four.bull.hp).toBeGreaterThan(FOE_TUNING.bull.hp);
   });
 });

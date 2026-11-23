@@ -33,13 +33,16 @@ export interface FoeClip {
 
 const clip = (anim: string, scale = 1): FoeClip => ({ anim, scale });
 
-/** The rhino is in a rage at half health or less (it plays its enrage clip on the way). */
-export function rhinoRage(foe: Pick<NetFoeState, 'hp'>): boolean {
-  return foe.hp <= FOE_TUNING.rhino.hp / 2;
+/**
+ * The rhino is in a rage at half health or less (it plays its enrage clip on the way).
+ * `maxHp`: its full health in this level (co-op scales it to the team).
+ */
+export function rhinoRage(foe: Pick<NetFoeState, 'hp'>, maxHp: number = FOE_TUNING.rhino.hp): boolean {
+  return foe.hp <= maxHp / 2;
 }
 
-/** Which clip shows a foe's state. */
-export function foeClip(foe: Pick<NetFoeState, 'kind' | 'state' | 'wall' | 'hp'>): FoeClip {
+/** Which clip shows a foe's state (`rhinoHp`: the rhino's full health in this level). */
+export function foeClip(foe: Pick<NetFoeState, 'kind' | 'state' | 'wall' | 'hp'>, rhinoHp: number = FOE_TUNING.rhino.hp): FoeClip {
   const { state } = foe;
   if (state === 'dead') return clip('death');
   // On a tongue, in a claw, in a mouth (not drawn) or spat out: wriggling.
@@ -64,7 +67,7 @@ export function foeClip(foe: Pick<NetFoeState, 'kind' | 'state' | 'wall' | 'hp'>
     case 'bull':
       return clip(state === 'windup' || state === 'charge' || state === 'crash' || state === 'stunned' || state === 'walk' || state === 'hurt' ? state : 'idle');
     case 'rhino': {
-      const rage = rhinoRage(foe);
+      const rage = rhinoRage(foe, rhinoHp);
       switch (state) {
         case 'idle':
         case 'walk':

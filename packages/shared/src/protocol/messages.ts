@@ -63,6 +63,11 @@ export interface RoomInfo {
   countdownMs: number;
   /** Race: time left for the others after the first finish, when this was sent; `null` before. */
   raceEndsInMs: number | null;
+  /**
+   * Co-op: the team size the running level's foes were scaled for (counted when it started;
+   * `modeFoes(mode, scaledFor)` gives the tuning). `null` when nothing is scaled (race, lobby).
+   */
+  scaledFor: number | null;
   results: LevelResult[] | null;
   nextLevelId: string | null;
   /** Set when returning to the lobby after the final level. */

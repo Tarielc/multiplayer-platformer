@@ -1,4 +1,4 @@
-import { FOE_TUNING, isBoss, type NetFoeState } from '@platformer/shared';
+import { FOE_TUNING, isBoss, type FoeTuning, type NetFoeState } from '@platformer/shared';
 import type * as Phaser from 'phaser';
 import { abilitySheet } from '../abilities/abilityAnimations';
 import { frameName } from '../abilities/abilityArt';
@@ -51,7 +51,8 @@ export class BossBar {
     this.root.add([frame, back, this.trail, this.fill, this.name, ...(this.portrait ? [this.portrait] : [])]);
   }
 
-  update(foes: readonly NetFoeState[], frameMs: number): void {
+  /** `tuning`: the level's foe tuning, for the boss's full health (co-op scales it). */
+  update(foes: readonly NetFoeState[], frameMs: number, tuning: Readonly<FoeTuning> = FOE_TUNING): void {
     const boss = foes.find((f) => isBoss(f.kind));
     if (boss && boss.state !== 'idle') this.awake.add(boss.id);
     const showing = !!boss && this.awake.has(boss.id) && boss.state !== 'dead';
@@ -64,11 +65,11 @@ export class BossBar {
       this.trailFrac = 1;
       this.name.setText(NAMES[boss.kind] ?? boss.kind.toUpperCase());
     }
-    const frac = Math.max(0, Math.min(1, boss.hp / FOE_TUNING[boss.kind].hp));
+    const frac = Math.max(0, Math.min(1, boss.hp / tuning[boss.kind].hp));
     this.trailFrac = Math.max(frac, this.trailFrac - TRAIL_RATE * (frameMs / 1000));
     this.fill.setSize(WIDTH * frac, HEIGHT);
     this.trail.setSize(WIDTH * this.trailFrac, HEIGHT);
-    const rage = boss.kind === 'rhino' && rhinoRage(boss);
+    const rage = boss.kind === 'rhino' && rhinoRage(boss, tuning.rhino.hp);
     this.fill.setFillStyle(rage ? 0xff7a2f : 0xd8483b);
     this.portrait?.setFrame(frameName('portrait', rage ? 1 : 0));
   }

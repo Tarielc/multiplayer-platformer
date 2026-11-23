@@ -459,6 +459,25 @@ describe('Room: game modes', () => {
     expect(racer.gameWorld!.isRace).toBe(true);
   });
 
+  it('co-op scales each level to the team it starts with', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    const b = join(room, 'B');
+    expect(room.info().scaledFor).toBeNull();
+    startPlaying(room, [a, b]);
+    expect(room.info().scaledFor).toBe(2);
+    // Dropping in mid-level makes the next level harder, not this one.
+    join(room, 'C');
+    expect(room.info().scaledFor).toBe(2);
+
+    const racer = createRoom();
+    const c = join(racer, 'C');
+    const d = join(racer, 'D');
+    racer.handle(c.id, { t: 'selectMode', mode: 'race' });
+    startPlaying(racer, [c, d]);
+    expect(racer.info().scaledFor).toBeNull();
+  });
+
   it('race: places finishers, shows the race clock and adds placement points', () => {
     const room = createRoom();
     const a = join(room, 'A');

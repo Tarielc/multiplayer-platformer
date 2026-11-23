@@ -116,6 +116,8 @@ export class Room {
   /** Game mode the host picked; applies to every level of the campaign. */
   private mode: GameMode = DEFAULT_GAME_MODE;
   private level: ServerLevel | null = null;
+  /** Co-op: the team size the running level's foes were scaled for; `null` when unscaled. */
+  private scaledFor: number | null = null;
   private world: GameWorld | null = null;
   private run = 0;
   private countdownFromLobby = false;
@@ -195,6 +197,7 @@ export class Room {
       countdownMs:
         this.phase === 'countdown' || this.phase === 'levelComplete' ? Math.round(ticksToMs(this.phaseTicks)) : 0,
       raceEndsInMs: this.raceEndsInMs(),
+      scaledFor: this.level ? this.scaledFor : null,
       results: this.results,
       nextLevelId: this.nextLevelId,
       campaignComplete: this.campaignComplete,
@@ -385,7 +388,10 @@ export class Room {
     }
     this.run += 1;
     this.level = level;
-    this.world = new GameWorld({ level: level.data, movement: level.movement, ...modeWorldOptions(this.mode) });
+    // Co-op foes scale to everyone in the room now (players still reconnecting count too).
+    const team = this.players.size;
+    this.scaledFor = MODE_CONFIG[this.mode].scaling ? team : null;
+    this.world = new GameWorld({ level: level.data, movement: level.movement, ...modeWorldOptions(this.mode, team) });
     for (const player of this.playersBySlot()) {
       this.world.addPlayer(player.id, player.slot, player.characterId);
       this.world.setPresent(player.id, player.connection !== null);
@@ -401,7 +407,8 @@ export class Room {
     this.results = null;
     this.nextLevelId = null;
     this.setPhase('countdown', Math.max(1, msToTicks(this.net.room.countdownMs)));
-    this.log.info(`starting "${level.entry.id}" (run ${this.run}, ${this.mode}) with ${this.players.size} player(s)`);
+    const scaled = this.scaledFor !== null && this.scaledFor > 1 ? `, foes scaled for ${this.scaledFor}` : '';
+    this.log.info(`starting "${level.entry.id}" (run ${this.run}, ${this.mode}${scaled}) with ${team} player(s)`);
   }
 
   private updateCountdown(): void {

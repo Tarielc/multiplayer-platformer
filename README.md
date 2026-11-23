@@ -143,8 +143,18 @@ The host picks a mode in the lobby; it applies to the whole campaign. Solo play 
 | Other players | Swings shove, but nothing costs a teammate hearts | Swings shove; giant swings and spit cost hearts |
 | End of level | When every player stands in the trophy | When everyone has finished, or 20 s after the first finish |
 | Score | Fruit and foes, with a team total | Fruit and foes, plus placement points (1st 300, 2nd 200, 3rd 100, 4th 50) |
+| Foes | Tougher for every extra player (below) | As tuned |
 
 In a race, a player who reaches the trophy gets a place and leaves play, and their camera follows a player still racing. The HUD shows places and the time left. The rules are in `packages/shared/src/config/modes.ts`.
+
+In co-op, each player after the first gives foes **+40% health** (bosses **+60%**) and makes them attack **15% more often**. Health is rounded and never drops below the tuned value. Sizes, speeds, reach and damage stay the same, and traps and player hearts never scale. The team is counted when a level starts, so a player who drops in mid-level makes the *next* level harder. The lobby and the level countdown say how much tougher the foes are. Tune it in `MODE_CONFIG.coop.scaling`.
+
+| Players | Mushroom, wasp | Chicken, monkey | Bull | Rhino (boss) | Attack rate |
+|---|---|---|---|---|---|
+| 1 | 1 | 2 | 3 | 12 | ×1 |
+| 2 | 1 | 3 | 4 | 19 | ×1.15 |
+| 3 | 2 | 4 | 5 | 26 | ×1.3 |
+| 4 | 2 | 4 | 7 | 34 | ×1.45 |
 
 ### Traps and health
 

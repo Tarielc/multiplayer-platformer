@@ -13,6 +13,9 @@ export function CountdownOverlay({ room, receivedAt }: { room: RoomInfo; receive
       <div className={styles.modeName} data-mode={room.mode}>
         {MODE_CONFIG[room.mode].name}
       </div>
+      {room.scaledFor !== null && room.scaledFor > 1 && (
+        <div className={styles.scaledFor}>Foes scaled for {room.scaledFor} players</div>
+      )}
       <div key={seconds} className={styles.number}>
         {seconds > 0 ? seconds : 'Go!'}
       </div>

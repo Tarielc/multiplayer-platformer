@@ -1,4 +1,4 @@
-import { FOE_TUNING, type NetFoeState, type NetShotState } from '@platformer/shared';
+import { FOE_TUNING, modeFoes, type FoeTuning, type GameMode, type NetFoeState, type NetShotState } from '@platformer/shared';
 import type * as Phaser from 'phaser';
 import { abilitySheet } from '../abilities/abilityAnimations';
 import { frameAt, frameName, type AbilitySheetDef } from '../abilities/abilityArt';
@@ -38,12 +38,23 @@ export class FoeViews {
   private readonly shots = new Map<number, { sprite: Phaser.GameObjects.Sprite; hit: boolean }>();
   private last: readonly NetFoeState[] = [];
   private readonly bossBar: BossBar;
+  /** The level's foe tuning: co-op scales foe health to the team (boss bar, rhino rage). */
+  private tuning: Readonly<FoeTuning> = FOE_TUNING;
+  private team: { mode: GameMode; players: number } | null = null;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly onCue: (event: WorldCueEvent) => void,
   ) {
     this.bossBar = new BossBar(scene);
+  }
+
+  /** The room's mode and the team the level was scaled for (`RoomInfo.scaledFor`); cheap to call every frame. */
+  setTeam(mode: GameMode, scaledFor: number | null): void {
+    const players = scaledFor ?? 1;
+    if (this.team?.mode === mode && this.team.players === players) return;
+    this.team = { mode, players };
+    this.tuning = modeFoes(mode, players);
   }
 
   update(
@@ -54,7 +65,7 @@ export class FoeViews {
   ): void {
     const foes = held.size > 0 ? samples.map((foe) => anchored(foe, held.get(foe.id))) : samples;
     this.last = foes;
-    this.bossBar.update(foes, frameMs);
+    this.bossBar.update(foes, frameMs, this.tuning);
     const seen = new Set<number>();
     for (const foe of foes) {
       const sheet = abilitySheet(FOE_SHEETS[foe.kind].key);
@@ -73,7 +84,7 @@ export class FoeViews {
         view.sprite.setVisible(false);
         continue;
       }
-      const { anim, scale } = foeClip(foe);
+      const { anim, scale } = foeClip(foe, this.tuning.rhino.hp);
       const at = foePivot(foe, sheet);
       if (!this.pose(view.sprite, sheet, anim, foe.t * 1000, scale)) continue;
       if (foe.state === 'flying') {

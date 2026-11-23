@@ -370,6 +370,7 @@ export class LevelScene extends Phaser.Scene {
     trapViews.update(predictor.renderTick(alpha) ?? renderTick, frameMs);
     if (debug) trapViews.debugBoxes(boxes);
     // Foes and their shots: server-only, drawn where the other players are (100 ms behind).
+    if (room) this.foeViews?.setTeam(room.mode, room.scaledFor);
     this.foeViews?.update(this.interpolator.sampleFoes(renderTick), this.interpolator.sampleShots(renderTick), attached.foes, frameMs);
     if (debug) this.foeViews?.debugBoxes(boxes);
     entityViews.update(frameMs);

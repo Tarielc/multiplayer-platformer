@@ -1,6 +1,6 @@
 'use client';
 
-import { LEVELS, MAX_PLAYERS, MODE_CONFIG, PLAYER_SLOTS, slotStyle, type CharacterId } from '@platformer/shared';
+import { LEVELS, MAX_PLAYERS, MODE_CONFIG, PLAYER_SLOTS, scalingSummary, slotStyle, type CharacterId } from '@platformer/shared';
 import type { CSSProperties } from 'react';
 import type { GameSession } from '@/hooks/useGameSession';
 import { savePreferredCharacter } from '@/net/identity';
@@ -23,6 +23,8 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
   const teamTotal = finalScores.reduce((sum, p) => sum + p.campaignScore, 0);
   const race = room.mode === 'race';
   const mode = MODE_CONFIG[room.mode];
+  // Everyone in the room counts when the level starts (see Room.startLevel).
+  const scaling = scalingSummary(room.mode, room.players.length);
   const takenBy = new Map<CharacterId, string>(
     room.players.filter((p) => p.id !== view.selfId).map((p) => [p.characterId, slotStyle(p.slot).label]),
   );
@@ -100,6 +102,7 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
         disabled={!isHost}
         title={isHost ? undefined : 'Only the host can change the mode'}
       />
+      {scaling && <p className={styles.scaling}>{scaling}</p>}
 
       <div className={styles.controls}>
         <label className={styles.level}>

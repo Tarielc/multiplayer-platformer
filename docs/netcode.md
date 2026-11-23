@@ -143,7 +143,7 @@ lobby ──(all connected players ready)──► countdown (3 s) ──► pla
 - **Slots:** a new player gets the lowest free slot (P1–P4) and its color. A fifth player gets `ROOM_FULL`.
 - **Host:** the first player is host and picks the game mode and the starting level in the lobby. When the host leaves or their grace expires, the next player by slot (connected players first) becomes host.
 - **Modes:** `RoomInfo.mode` is `coop` (the default, also used for solo) or `race`, and stays fixed for the campaign. `modeWorldOptions` (`config/modes.ts`) turns it into `GameWorld` options:
-  - **Co-op:** team checkpoints, every present player must stand in the exit, and swings still shove teammates, but giant swings and spat projectiles cost no hearts (`playerDamage: false`).
+  - **Co-op:** team checkpoints, every present player must stand in the exit, and swings still shove teammates, but giant swings and spat projectiles cost no hearts (`playerDamage: false`). Foes scale to the team: `startLevel` counts the room's players and passes `modeFoes('coop', n)` as the world's `foes` tuning (more health, shorter attack cooldowns). `RoomInfo.scaledFor` carries `n` for the running level, so clients rebuild the same tuning for the boss bar and the rhino's rage look (at half its *scaled* health). The count is fixed for the level; drop-ins only affect the next one.
   - **Race:** checkpoints are per player. A player who reaches the exit gets a `place`, a `finish` event and leaves play: their body is `alive: false` with no respawn, so nothing can hit or grab them, and clients hide them instead of playing the Death clip. The first finish starts the finish window (20 s, `RoomInfo.raceEndsInMs`); the level ends when every present player has a place or the window runs out. Results carry `place`, `timeMs` and `placePoints`, and `campaignScore` adds the placement points to the level score.
 - **Start:** when every connected player is ready (at least `minPlayersToStart`, default 1), a 3 s countdown starts. It is cancelled if someone un-readies or a new, unready player joins. Countdowns between levels can't be cancelled.
 - **Level complete:** results show for 4 s, then the next level (`next` in the manifest) counts down. After the last level, the room returns to the lobby with `campaignComplete`, and everyone is un-readied.
@@ -184,7 +184,7 @@ All messages are JSON objects with a `t` field. The types are in `packages/share
 | `t` | Fields | When |
 |---|---|---|
 | `welcome` | `protocol`, `roomId`, `playerId`, `slot`, `rejoined`, `tickRate`, `snapshotRate` | After a successful join. |
-| `room` | `room: RoomInfo` (phase, mode, players, host, level and `run`, paused, countdown, race clock, results, campaign flags) | Whenever room state changes. |
+| `room` | `room: RoomInfo` (phase, mode, players, host, level and `run`, paused, countdown, race clock, co-op `scaledFor`, results, campaign flags) | Whenever room state changes. |
 | `snapshot` | `run`, `tick`, `state`, `events` | Keyframes (see above). |
 | `delta` | `run`, `tick`, `baseTick`, `upserts`, `removed`, `collected`, `events` | Every other broadcast. |
 | `pong` | `id`, `at`, `serverTick` | Reply to `ping`. |
