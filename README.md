@@ -78,7 +78,7 @@ Pausing only stops the game when **every** connected player has the menu open. S
 
 - **The server owns the game.** Clients send one small input frame (a button bitmask) per tick. The server simulates every room, then broadcasts 20 snapshots per second, as full keyframes or field-level deltas.
 - **Clients predict their own player** by running the same `stepPlayerBody` function (movement plus attack and stun timers) as the server, and reconcile when authoritative state arrives. **Other players are interpolated** 100 ms in the past. Details are in [docs/netcode.md](docs/netcode.md).
-- **Room flow:** `lobby → countdown → playing → levelComplete → next level … → lobby (campaign complete)`. The first player is host and picks the level. A refresh or a dropped connection keeps your slot for 15 s.
+- **Room flow:** `lobby → countdown → playing → levelComplete → next level … → lobby (campaign complete)`. The first player is host and picks the game mode and the level. A refresh or a dropped connection keeps your slot for 15 s.
 
 ```
 apps/
@@ -118,6 +118,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
+| `modes.ts` | game modes (co-op, race): checkpoint scope, shoves, friendly damage, the race finish window and placement points |
 | `traps.ts` | trap damage, knockback and invulnerability; per-trap sizes, speeds and timings (see [Traps and health](#traps-and-health)) |
 | `net.ts` | tick and snapshot rates, interpolation delay, input queue limits, room timers, reconnect and rate limits |
 
@@ -130,6 +131,20 @@ Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42
 3. Add it to `packages/shared/src/levels/manifest.ts`.
 
 `npm run levels:validate` reports problems with a hint on how to fix each one. In development the server hot-reloads saved maps, and the asset watcher copies them to the client.
+
+### Game modes
+
+The host picks a mode in the lobby; it applies to the whole campaign. Solo play uses co-op.
+
+| | Co-op (default) | Race |
+|---|---|---|
+| Goal | Everyone reaches the trophy | First to the trophy |
+| Checkpoints | Shared: one touch moves everyone's respawn point | Your own |
+| Other players | Swings shove, but nothing costs a teammate hearts | Swings shove; giant swings and spit cost hearts |
+| End of level | When every player stands in the trophy | When everyone has finished, or 20 s after the first finish |
+| Score | Fruit and foes, with a team total | Fruit and foes, plus placement points (1st 300, 2nd 200, 3rd 100, 4th 50) |
+
+In a race, a player who reaches the trophy gets a place and leaves play, and their camera follows a player still racing. The HUD shows places and the time left. The rules are in `packages/shared/src/config/modes.ts`.
 
 ### Traps and health
 

@@ -1,6 +1,6 @@
 'use client';
 
-import type { RoomInfo } from '@platformer/shared';
+import { MODE_CONFIG, type RoomInfo } from '@platformer/shared';
 import styles from './Overlays.module.css';
 import { useCountdown } from './useCountdown';
 
@@ -10,6 +10,9 @@ export function CountdownOverlay({ room, receivedAt }: { room: RoomInfo; receive
   return (
     <div className={styles.countdown}>
       <div className={styles.levelName}>{room.level?.name}</div>
+      <div className={styles.modeName} data-mode={room.mode}>
+        {MODE_CONFIG[room.mode].name}
+      </div>
       <div key={seconds} className={styles.number}>
         {seconds > 0 ? seconds : 'Go!'}
       </div>

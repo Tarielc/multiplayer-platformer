@@ -23,6 +23,7 @@ import {
   healShoulder,
   isAttackActive,
   levelChecksum,
+  ordinal,
   parseTiledLevel,
   propertiesToRecord,
   resolveCombat,
@@ -46,7 +47,7 @@ import {
 import * as Phaser from 'phaser';
 import { devVirtualButtons, registerDevProvider } from '@/devtools/devHook';
 import type { WorldUpdate } from '@/net/GameClient';
-import { Interpolator } from '@/net/Interpolator';
+import { Interpolator, type RemoteSample } from '@/net/Interpolator';
 import { LocalPredictor } from '@/net/LocalPredictor';
 import { ABILITY_SHEETS } from '../abilities/abilityArt';
 import { playFx } from '../abilities/abilityFx';
@@ -323,6 +324,7 @@ export class LevelScene extends Phaser.Scene {
     if (local && position && body) {
       const signals = signalsFromBody(body, predictor.teleports);
       const server = predictor.lastServer;
+      local.setFinished(server !== null && server.place > 0);
       local.setInvulnerable(server !== null && server.invulnUntil > server.stepTick);
       // Held by someone else's ability: the server places us, in step with the (interpolated) captor.
       const self = body.held !== Held.NONE && selfId ? samples.get(selfId) : undefined;
@@ -333,7 +335,8 @@ export class LevelScene extends Phaser.Scene {
       const preview =
         ability === Ability.TONGUE ? (aim ?? (body.phase === Phase.TONGUE_HOLD ? ahead : null)) : ability === Ability.HEAL ? aim : null;
       local.render(feetX, feetY, body.facing, signals, frameMs, preview);
-      this.follow(local.droneTarget ?? local.container);
+      // Race: once you finished, watch someone still racing.
+      this.follow((local.isFinished ? this.spectateTarget(samples) : null) ?? local.droneTarget ?? local.container);
       if (!this.cameraSnapped) {
         this.cameras.main.centerOn(local.container.x, local.container.y);
         this.cameraSnapped = true;
@@ -352,6 +355,7 @@ export class LevelScene extends Phaser.Scene {
       const s = samples.get(id);
       if (!s) continue;
       view.setInvulnerable(s.invulnUntil > renderTick);
+      view.setFinished(s.place > 0);
       const feet = attached.players.get(id) ?? { x: s.x + HITBOX.width / 2, y: s.y + HITBOX.height };
       view.render(feet.x, feet.y, s.facing, signalsFromSample(s), frameMs);
       if (debug) {
@@ -419,7 +423,7 @@ export class LevelScene extends Phaser.Scene {
     else this.traps?.applyNet(state.traps);
 
     for (const event of events) this.playEvent(event, state);
-    entityViews.sync(state);
+    entityViews.sync(state, this.services.client.room?.mode === 'race');
   }
 
   private ensureView(id: string): PlayerView {
@@ -442,6 +446,19 @@ export class LevelScene extends Phaser.Scene {
     this.views.set(id, view);
     if (isSelf) this.follow(view.container);
     return view;
+  }
+
+  /** Race spectating: the lowest-slot player still racing (or their drone), if any. */
+  private spectateTarget(samples: ReadonlyMap<string, RemoteSample>): (Phaser.GameObjects.GameObject & { x: number; y: number }) | null {
+    const { client } = this.services;
+    const players = [...(client.room?.players ?? [])].sort((a, b) => a.slot - b.slot);
+    for (const player of players) {
+      if (player.id === client.playerId) continue;
+      const view = this.views.get(player.id);
+      const sample = samples.get(player.id);
+      if (view && sample && sample.place === 0) return view.droneTarget ?? view.container;
+    }
+    return null;
   }
 
   /** The camera follows the local player, or their drone while they fly it. */
@@ -615,6 +632,15 @@ export class LevelScene extends Phaser.Scene {
         puff(this, event.x, event.y, 0xfff1c1, 8);
         this.presentation.emit('world', { cue: 'parry', x: event.x, y: event.y, isSelf: event.playerId === selfId });
         break;
+      case 'finish': {
+        // The racer's view hides (it left play); the trophy celebrates the arrival.
+        const color = this.slotCss(event.playerId);
+        puff(this, event.x, event.y, this.slotColor(event.playerId), 14, 1.4);
+        floatText(this, event.x, event.y - HITBOX.height, `${ordinal(event.place)}!`, color);
+        this.presentation.emit('world', { cue: 'finish', x: event.x, y: event.y, isSelf: event.playerId === selfId });
+        if (event.playerId === selfId) this.cameras.main.flash(180, 255, 241, 193);
+        break;
+      }
       case 'levelComplete': {
         // React shows the results overlay.
         const camera = this.cameras.main;

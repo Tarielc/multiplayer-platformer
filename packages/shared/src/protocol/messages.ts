@@ -1,4 +1,5 @@
 import type { CharacterId } from '../config/characters';
+import type { GameMode } from '../config/modes';
 import type { GameEvent } from '../sim/events';
 import type { NetFoeState, NetShotState } from '../sim/foes/types';
 import type { NetTrapState } from '../sim/traps/types';
@@ -36,6 +37,12 @@ export interface LevelResult {
   score: number;
   collected: number;
   deaths: number;
+  /** Race: finishing place (1-based); `null` if they didn't finish in time (or in co-op). */
+  place: number | null;
+  /** Race: time to the trophy; `null` without a place. */
+  timeMs: number | null;
+  /** Race: campaign points for the place (`racePoints`), added to `campaignScore` with `score`. */
+  placePoints: number;
 }
 
 export interface RoomInfo {
@@ -44,6 +51,8 @@ export interface RoomInfo {
   hostId: string | null;
   maxPlayers: number;
   players: RoomPlayerInfo[];
+  /** Game mode the host picked in the lobby (kept for the whole campaign). */
+  mode: GameMode;
   /** Level the host picked in the lobby. */
   selectedLevelId: string;
   /** Level currently loaded (countdown / playing / levelComplete). */
@@ -52,6 +61,8 @@ export interface RoomInfo {
   paused: boolean;
   /** Remaining time of the current countdown or results screen when this was sent. */
   countdownMs: number;
+  /** Race: time left for the others after the first finish, when this was sent; `null` before. */
+  raceEndsInMs: number | null;
   results: LevelResult[] | null;
   nextLevelId: string | null;
   /** Set when returning to the lobby after the final level. */
@@ -76,6 +87,7 @@ export type ClientMessage =
   | { t: 'ready'; ready: boolean }
   | { t: 'selectCharacter'; characterId: CharacterId }
   | { t: 'selectLevel'; levelId: string }
+  | { t: 'selectMode'; mode: GameMode }
   | { t: 'input'; seq: number; buttons: number }
   | { t: 'menu'; open: boolean }
   | { t: 'ping'; id: number; at: number }

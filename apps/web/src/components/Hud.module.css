@@ -188,3 +188,31 @@
   color: #fff;
   text-shadow: 0 1px 2px #000;
 }
+
+.chip[data-finished='true'] .status {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* Race: time left after the first finish, under the player chips. */
+/* Its own row under the chips, so it never covers them when they wrap. */
+.raceClock {
+  grid-column: 1 / -1;
+  justify-self: center;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  background: rgb(10 12 23 / 72%);
+  border: 1px solid var(--warn);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.raceClock[data-urgent='true'] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.raceSeconds {
+  font-family: var(--mono);
+  font-size: 1.2em;
+}

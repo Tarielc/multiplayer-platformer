@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto';
 import {
   type CharacterId,
   CloseCode,
+  DEFAULT_GAME_MODE,
   GameWorld,
+  MODE_CONFIG,
   MAX_PLAYERS,
   NET_CONFIG,
   NEUTRAL_INPUT,
@@ -12,14 +14,17 @@ import {
   defaultCharacterForSlot,
   diffWorld,
   isDeltaEmpty,
+  modeWorldOptions,
   msToTicks,
   pickFreeCharacter,
+  racePoints,
   sanitizePlayerName,
   ticksToMs,
   type ClientMessage,
   type DevCommand,
   type ErrorCode,
   type GameEvent,
+  type GameMode,
   type LevelManifest,
   type LevelResult,
   type NetConfig,
@@ -84,7 +89,7 @@ export interface RoomSummary {
 /**
  * One game room: 1-4 players, lobby flow and the authoritative simulation of the current level.
  *
- *   lobby --(all connected players ready)--> countdown --> playing --(exit rule)--> levelComplete
+ *   lobby --(all connected players ready)--> countdown --> playing --(exit rule / race)--> levelComplete
  *   levelComplete --> countdown (next level)  |  lobby + campaignComplete (last level)
  *
  * Everything is driven by `tick()` at the fixed simulation rate; all timers count ticks, so
@@ -108,6 +113,8 @@ export class Room {
   private phaseTicks = 0;
   private hostId: string | null = null;
   private selectedLevelId: string;
+  /** Game mode the host picked; applies to every level of the campaign. */
+  private mode: GameMode = DEFAULT_GAME_MODE;
   private level: ServerLevel | null = null;
   private world: GameWorld | null = null;
   private run = 0;
@@ -168,6 +175,7 @@ export class Room {
       phase: this.phase,
       hostId: this.hostId,
       maxPlayers: MAX_PLAYERS,
+      mode: this.mode,
       players: this.playersBySlot().map((p) => ({
         id: p.id,
         name: p.name,
@@ -186,11 +194,17 @@ export class Room {
       paused: this.isPaused(),
       countdownMs:
         this.phase === 'countdown' || this.phase === 'levelComplete' ? Math.round(ticksToMs(this.phaseTicks)) : 0,
+      raceEndsInMs: this.raceEndsInMs(),
       results: this.results,
       nextLevelId: this.nextLevelId,
       campaignComplete: this.campaignComplete,
       devCommands: this.devCommands,
     };
+  }
+
+  private raceEndsInMs(): number | null {
+    const ticks = this.phase === 'playing' ? this.world?.raceEndsInTicks : null;
+    return ticks === null || ticks === undefined ? null : Math.round(ticksToMs(ticks));
   }
 
   summary(): RoomSummary {
@@ -282,6 +296,9 @@ export class Room {
       case 'selectLevel':
         this.selectLevel(player, message.levelId);
         break;
+      case 'selectMode':
+        this.selectMode(player, message.mode);
+        break;
       case 'selectCharacter':
         this.selectCharacter(player, message.characterId);
         break;
@@ -368,7 +385,7 @@ export class Room {
     }
     this.run += 1;
     this.level = level;
-    this.world = new GameWorld({ level: level.data, movement: level.movement });
+    this.world = new GameWorld({ level: level.data, movement: level.movement, ...modeWorldOptions(this.mode) });
     for (const player of this.playersBySlot()) {
       this.world.addPlayer(player.id, player.slot, player.characterId);
       this.world.setPresent(player.id, player.connection !== null);
@@ -384,7 +401,7 @@ export class Room {
     this.results = null;
     this.nextLevelId = null;
     this.setPhase('countdown', Math.max(1, msToTicks(this.net.room.countdownMs)));
-    this.log.info(`starting "${level.entry.id}" (run ${this.run}) with ${this.players.size} player(s)`);
+    this.log.info(`starting "${level.entry.id}" (run ${this.run}, ${this.mode}) with ${this.players.size} player(s)`);
   }
 
   private updateCountdown(): void {
@@ -413,14 +430,19 @@ export class Room {
       }
       world.endTick();
     }
-    this.pendingEvents.push(...world.drainEvents());
+    const events = world.drainEvents();
+    // A finish starts (or shortens) the race clock: clients read it from the room info.
+    if (events.some((e) => e.type === 'finish')) this.markRoomDirty();
+    this.pendingEvents.push(...events);
     if (world.completed) this.finishLevel(world);
   }
 
   private finishLevel(world: GameWorld): void {
     const results: LevelResult[] = world.listPlayers().map((wp) => {
       const player = this.players.get(wp.id);
-      if (player) player.campaignScore += wp.score;
+      const place = wp.place > 0 ? wp.place : null;
+      const placePoints = racePoints(place, this.mode);
+      if (player) player.campaignScore += wp.score + placePoints;
       return {
         playerId: wp.id,
         name: player?.name ?? 'Player',
@@ -428,6 +450,9 @@ export class Room {
         score: wp.score,
         collected: wp.collected,
         deaths: wp.deaths,
+        place,
+        timeMs: place === null ? null : Math.round(ticksToMs(wp.finishTick)),
+        placePoints,
       };
     });
     this.results = results;
@@ -495,6 +520,15 @@ export class Room {
     }
     if (this.selectedLevelId === levelId) return;
     this.selectedLevelId = levelId;
+    this.markRoomDirty();
+  }
+
+  private selectMode(player: RoomPlayer, mode: GameMode): void {
+    if (player.id !== this.hostId) return this.reject(player, 'NOT_ALLOWED', 'Only the host can choose the mode.');
+    if (this.phase !== 'lobby') return this.reject(player, 'NOT_ALLOWED', 'The mode can only be changed in the lobby.');
+    if (this.mode === mode) return;
+    this.mode = mode;
+    this.log.info(`mode set to ${MODE_CONFIG[mode].name} by ${describe(player)}`);
     this.markRoomDirty();
   }
 

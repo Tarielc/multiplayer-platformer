@@ -1,4 +1,5 @@
 import { isCharacterId } from '../config/characters';
+import { isGameMode } from '../config/modes';
 import { PLAYER_CONFIG } from '../config/players';
 import { ALL_BUTTONS } from '../sim/input';
 import { DEV_COMMANDS, type ClientMessage, type DevCommand } from './messages';
@@ -73,6 +74,8 @@ export function parseClientMessage(value: unknown): ClientMessage | null {
       return isCharacterId(value.characterId) ? { t: 'selectCharacter', characterId: value.characterId } : null;
     case 'selectLevel':
       return isStr(value.levelId, 1, 64) ? { t: 'selectLevel', levelId: value.levelId } : null;
+    case 'selectMode':
+      return isGameMode(value.mode) ? { t: 'selectMode', mode: value.mode } : null;
     case 'input':
       return isInt(value.seq, 0, 2 ** 31 - 1) && isInt(value.buttons, 0, ALL_BUTTONS) && (value.buttons & ~ALL_BUTTONS) === 0
         ? { t: 'input', seq: value.seq, buttons: value.buttons }

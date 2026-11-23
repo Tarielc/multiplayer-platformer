@@ -570,6 +570,12 @@ export class AbilityView {
     playFx(this.scene, ABILITY_SHEETS.spitFx.key, 'trail', f.feetX, f.feetY - 12, { fade: true, depth: DEPTH - 0.6 });
   }
 
+  /** Hides everything this view draws (the owner left play: finished a race). */
+  hide(): void {
+    this.hideExtras();
+    this.sprite.setVisible(false);
+  }
+
   private hideExtras(): void {
     this.front.setVisible(false);
     this.drone.setVisible(false);

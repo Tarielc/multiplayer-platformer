@@ -5,6 +5,7 @@ import {
   NEUTRAL_INPUT,
   applyWorldDelta,
   msToTicks,
+  racePoints,
   type CharacterId,
   type NetWorldState,
 } from '@platformer/shared';
@@ -358,7 +359,9 @@ describe('Room: level flow', () => {
       room.tick();
     }
     expect(room.currentPhase).toBe('levelComplete');
-    expect(room.info().results).toEqual([{ playerId: a.id, name: 'A', slot: 0, score: 10, collected: 1, deaths: 0 }]);
+    expect(room.info().results).toEqual([
+      { playerId: a.id, name: 'A', slot: 0, score: 10, collected: 1, deaths: 0, place: null, timeMs: null, placePoints: 0 },
+    ]);
     expect(room.info().players[0]!.campaignScore).toBe(10);
     expect(a.conn.sent.some((m) => (m.t === 'delta' || m.t === 'snapshot') && m.events.some((e) => e.type === 'levelComplete'))).toBe(true);
   });
@@ -420,5 +423,69 @@ describe('Room: housekeeping', () => {
     expect(a.conn.last('error')).toMatchObject({ code: 'SERVER_SHUTDOWN' });
     expect(a.conn.closed?.code).toBe(CloseCode.SHUTDOWN);
     expect(room.join(new FakeConnection(), { name: 'B', clientId: 'client-B-secret' })).toMatchObject({ ok: false, code: 'ROOM_NOT_FOUND' });
+  });
+});
+
+describe('Room: game modes', () => {
+  it('starts in co-op; only the host can switch modes, and only in the lobby', () => {
+    const room = createRoom();
+    const host = join(room, 'A');
+    const guest = join(room, 'B');
+    expect(room.info().mode).toBe('coop');
+
+    room.handle(guest.id, { t: 'selectMode', mode: 'race' });
+    expect(guest.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(room.info().mode).toBe('coop');
+
+    room.handle(host.id, { t: 'selectMode', mode: 'race' });
+    expect(guest.conn.last('room')?.room.mode).toBe('race');
+
+    startPlaying(room, [host, guest]);
+    room.handle(host.id, { t: 'selectMode', mode: 'coop' });
+    expect(host.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(room.info().mode).toBe('race');
+  });
+
+  it('builds race worlds only in race mode', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    startPlaying(room, [a]);
+    expect(room.gameWorld!.isRace).toBe(false);
+
+    const racer = createRoom();
+    const b = join(racer, 'B');
+    racer.handle(b.id, { t: 'selectMode', mode: 'race' });
+    startPlaying(racer, [b]);
+    expect(racer.gameWorld!.isRace).toBe(true);
+  });
+
+  it('race: places finishers, shows the race clock and adds placement points', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    const b = join(room, 'B');
+    room.handle(a.id, { t: 'selectMode', mode: 'race' });
+    startPlaying(room, [a, b]);
+    expect(room.info().raceEndsInMs).toBeNull();
+
+    // B spawns one column closer to the trophy, so B gets the coin and wins.
+    let clock: number | null = null;
+    for (let seq = 1; seq <= 300 && room.currentPhase === 'playing'; seq++) {
+      room.handle(a.id, { t: 'input', seq, buttons: Button.RIGHT });
+      room.handle(b.id, { t: 'input', seq, buttons: Button.RIGHT });
+      room.tick();
+      clock ??= a.conn.last('room')?.room.raceEndsInMs ?? null;
+    }
+    expect(clock).toBeGreaterThan(0);
+    expect(room.currentPhase).toBe('levelComplete');
+
+    const results = room.info().results!;
+    const byId = new Map(results.map((r) => [r.playerId, r]));
+    expect(byId.get(b.id)).toMatchObject({ place: 1, placePoints: racePoints(1), score: 10 });
+    expect(byId.get(a.id)).toMatchObject({ place: 2, placePoints: racePoints(2), score: 0 });
+    expect(byId.get(b.id)!.timeMs).toBeLessThan(byId.get(a.id)!.timeMs!);
+    const totals = new Map(room.info().players.map((p) => [p.id, p.campaignScore]));
+    expect(totals.get(b.id)).toBe(10 + racePoints(1));
+    expect(totals.get(a.id)).toBe(racePoints(2));
+    expect(room.info().raceEndsInMs).toBeNull();
   });
 });

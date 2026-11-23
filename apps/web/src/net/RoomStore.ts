@@ -1,5 +1,16 @@
-import { ABILITY_NAMES, PLAYER_CONFIG, abilityForCharacter, slotStyle, type CharacterId, type NetWorldState, type RoomInfo } from '@platformer/shared';
-import type { ConnectionStatus, FatalError, GameClient } from './GameClient';
+import {
+  ABILITY_NAMES,
+  MODE_CONFIG,
+  PLAYER_CONFIG,
+  abilityForCharacter,
+  ordinal,
+  slotStyle,
+  type CharacterId,
+  type GameEvent,
+  type NetWorldState,
+  type RoomInfo,
+} from '@platformer/shared';
+import type { ConnectionStatus, FatalError, GameClient, WorldUpdate } from './GameClient';
 
 export interface HudPlayer {
   id: string;
@@ -16,6 +27,8 @@ export interface HudPlayer {
   deaths: number;
   alive: boolean;
   atExit: boolean;
+  /** Race: finishing place (1-based) once at the trophy; 0 while racing (and in co-op). */
+  place: number;
   /** Hearts left (traps cost one) out of `maxHp`. */
   hp: number;
   maxHp: number;
@@ -73,7 +86,7 @@ export class RoomStore {
       events.on('fatal', (fatal) => this.patch({ fatal })),
       events.on('welcome', (welcome) => this.patch({ selfId: welcome.playerId })),
       events.on('room', (room) => this.onRoom(room)),
-      events.on('world', (update) => this.updateHud(this.view.room, update.state)),
+      events.on('world', (update) => this.onWorld(update)),
       events.on('rtt', (rtt) => {
         const rounded = Math.round(rtt);
         if (rounded !== this.view.rttMs) this.patch({ rttMs: rounded });
@@ -113,7 +126,25 @@ export class RoomStore {
     this.updateHud(room, room.level ? this.client.latestWorld : null, true);
   }
 
+  private onWorld(update: WorldUpdate): void {
+    for (const event of update.events) this.announceEvent(event);
+    this.updateHud(this.view.room, update.state);
+  }
+
+  /** Toasts for world events everyone should hear about (race finishes). */
+  private announceEvent(event: GameEvent): void {
+    if (event.type !== 'finish') return;
+    if (event.playerId === this.view.selfId) {
+      this.notify('info', `You finished ${ordinal(event.place)}!`);
+      return;
+    }
+    const player = this.view.room?.players.find((p) => p.id === event.playerId);
+    const who = player ? `${slotStyle(player.slot).label} ${player.name}` : 'Someone';
+    this.notify('info', `${who} finished ${ordinal(event.place)}!`);
+  }
+
   private announceChanges(previous: RoomInfo, room: RoomInfo): void {
+    if (previous.mode !== room.mode) this.notify('info', `Mode: ${MODE_CONFIG[room.mode].name}`);
     const before = new Map(previous.players.map((p) => [p.id, p]));
     const selfId = this.view.selfId;
     for (const player of room.players) {
@@ -151,6 +182,7 @@ export class RoomStore {
         deaths: s?.deaths ?? 0,
         alive: s?.alive ?? true,
         atExit: s?.atExit ?? false,
+        place: s?.place ?? 0,
         hp: s?.hp ?? PLAYER_CONFIG.maxHp,
         maxHp: s?.maxHp ?? PLAYER_CONFIG.maxHp,
         ability: {

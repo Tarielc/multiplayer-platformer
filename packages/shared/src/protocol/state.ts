@@ -42,6 +42,8 @@ export interface NetPlayerState {
   hp: number;
   /** Traps can't hurt the player before this server tick (they blink until then). */
   invulnUntil: number;
+  /** Race: finishing place (1-based) once at the trophy, out of play from then on; 0 while racing. */
+  place: number;
   /** Special ability state (see `MovementBody` and config/abilities.ts). */
   ability: number;
   specialHeld: boolean;

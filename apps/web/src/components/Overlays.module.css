@@ -99,3 +99,25 @@
 .results tr[data-self='true'] td {
   background: rgb(255 255 255 / 4%);
 }
+
+.modeName {
+  font-size: clamp(0.8rem, 2vw, 1.1rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.modeName[data-mode='race'] {
+  color: var(--warn);
+}
+
+.results tfoot td {
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.place {
+  font-family: var(--mono);
+  color: var(--warn);
+}

@@ -9,6 +9,7 @@ import {
   type DevCommand,
   type ErrorCode,
   type GameEvent,
+  type GameMode,
   type MessageCodec,
   type NetConfig,
   type NetWorldState,
@@ -207,6 +208,11 @@ export class GameClient {
 
   selectLevel(levelId: string): void {
     this.send({ t: 'selectLevel', levelId });
+  }
+
+  /** Host only, in the lobby. */
+  selectMode(mode: GameMode): void {
+    this.send({ t: 'selectMode', mode });
   }
 
   /** Lobby only; the server answers with a room update, or a notice if someone else has it. */

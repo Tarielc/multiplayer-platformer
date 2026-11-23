@@ -12,7 +12,7 @@ import { droneGrip, tongueTip } from './abilities';
 import { stepPlayerBody } from './actions';
 import type { GameEvent } from './events';
 import { aimFromButtons, Button, sanitizeButtons, withAim } from './input';
-import { GameWorld } from './world';
+import { GameWorld, type GameWorldOptions } from './world';
 
 const HITBOX = PLAYER_CONFIG.hitbox;
 /** 32 px tiles, 30 columns of open sky over a floor whose top is at y = 160. */
@@ -24,8 +24,8 @@ function box(x: number, variant = 1): Omit<TiledObject, 'id'> {
   return { name: 'box', type: 'box', x, y: GROUND, width: 0, height: 0, point: true, properties: [{ name: 'variant', type: 'int', value: variant }] };
 }
 
-function makeWorld(objects: Array<Omit<TiledObject, 'id'>> = []): GameWorld {
-  return new GameWorld({ level: asciiToLevel({ rows: FLOOR, objects }), movement: resolveMovement() });
+function makeWorld(objects: Array<Omit<TiledObject, 'id'>> = [], options: Partial<GameWorldOptions> = {}): GameWorld {
+  return new GameWorld({ level: asciiToLevel({ rows: FLOOR, objects }), movement: resolveMovement(), ...options });
 }
 
 function tick(world: GameWorld, buttons: Record<string, number> = {}): GameEvent[] {
@@ -545,5 +545,59 @@ describe('prediction', () => {
       stepPlayerBody(replay, buttons, world.movementContext);
     }
     expect(replay).toEqual(bodyFromNetState(world.toNetState(() => 0).players[0]!));
+  });
+});
+
+describe('co-op: no friendly damage (playerDamage off)', () => {
+  it('a giant swing shoves a teammate without costing hearts', () => {
+    const world = makeWorld([], { playerDamage: false });
+    world.addPlayer('a', 0, 'mask-dude');
+    world.addPlayer('b', 1);
+    ticks(world, 5);
+    place(world, 'a', 100);
+    place(world, 'b', 125);
+    ticks(world, 5);
+    const a = world.getPlayer('a')!;
+    const b = world.getPlayer('b')!;
+    press(world, 'a');
+    ticks(world, seconds(ABILITIES.giant.grow) + 2);
+    expect(a.body.giant).toBeGreaterThan(0);
+
+    a.body.facing = 1;
+    const x = b.body.x;
+    const events = [...press(world, 'a', Button.ATTACK), ...ticks(world, 20)];
+    expect(events.some((e) => e.type === 'abilityHit')).toBe(false);
+    expect(b.hp).toBe(PLAYER_CONFIG.maxHp);
+    expect(b.body.x).toBeGreaterThan(x + 10);
+  });
+
+  it('a spat teammate flies into another without hurting them', () => {
+    const world = makeWorld([], { playerDamage: false });
+    world.addPlayer('a', 0, 'ninja-frog');
+    world.addPlayer('b', 1);
+    world.addPlayer('c', 2);
+    ticks(world, 5);
+    place(world, 'a', 100);
+    place(world, 'b', 190);
+    place(world, 'c', 360);
+    ticks(world, 5);
+    const b = world.getPlayer('b')!;
+    const c = world.getPlayer('c')!;
+    const grab = [...tick(world, { a: withAim(Button.SPECIAL, 0) }), ...ticks(world, 30)];
+    expect(grab).toContainEqual(expect.objectContaining({ type: 'grab', playerId: 'a', targetId: 'b' }));
+    ticks(world, seconds(ABILITIES.tongue.gulp) + 2);
+    ticks(world, 10, { a: Button.RIGHT });
+
+    let stunned = false;
+    const spit = [...tick(world, { a: withAim(Button.SPECIAL, 0) })];
+    for (let i = 0; i < 60; i++) {
+      spit.push(...tick(world));
+      if (c.body.hurt > 0) stunned = true;
+    }
+    expect(spit).toContainEqual(expect.objectContaining({ type: 'release', playerId: 'a', spit: true }));
+    expect(spit.some((e) => e.type === 'abilityHit')).toBe(false);
+    expect(stunned).toBe(true);
+    expect(c.hp).toBe(PLAYER_CONFIG.maxHp);
+    expect(b.hp).toBe(PLAYER_CONFIG.maxHp);
   });
 });

@@ -3,6 +3,7 @@ import { CHARACTERS } from './characters';
 import { COMBAT_TUNING } from './combat';
 import { ENTITY_CONFIG } from './entities';
 import { FOE_TUNING } from './foes';
+import { MODE_CONFIG } from './modes';
 import { MOVEMENT_TUNING } from './movement';
 import { NET_CONFIG } from './net';
 import { PLAYER_CONFIG, PLAYER_SLOTS } from './players';
@@ -13,6 +14,7 @@ export * from './characters';
 export * from './combat';
 export * from './entities';
 export * from './foes';
+export * from './modes';
 export * from './movement';
 export * from './net';
 export * from './players';
@@ -29,5 +31,6 @@ export const GAME_CONFIG = {
   entities: ENTITY_CONFIG,
   traps: TRAP_TUNING,
   foes: FOE_TUNING,
+  modes: MODE_CONFIG,
   net: NET_CONFIG,
 } as const;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { resolveMovement } from '../config/movement';
+import { modeWorldOptions } from '../config/modes';
 import { msToTicks } from '../config/net';
 import { PLAYER_CONFIG } from '../config/players';
 import { asciiToLevel } from '../dev/asciiMap';
@@ -242,6 +243,110 @@ describe('GameWorld: exit rule', () => {
     world.complete();
     world.complete();
     expect(world.drainEvents()).toEqual([{ type: 'levelComplete' }]);
+  });
+});
+
+describe('GameWorld: race', () => {
+  // Spawns 1-3 at columns 1-3, exit zone at x 224..256 (column 7).
+  const TRACK = ['          ', '          ', ' 123   E  ', '##########'];
+  const enterExit = (world: GameWorld, id: string) => place(world, id, 7 * 32 + 16, 96);
+
+  function race(finishWindowMs = 2000) {
+    const world = new GameWorld({
+      level: asciiToLevel({ rows: TRACK }),
+      movement: resolveMovement(),
+      race: { finishWindowMs },
+    });
+    const a = world.addPlayer('a', 0);
+    const b = world.addPlayer('b', 1);
+    const c = world.addPlayer('c', 2);
+    ticks(world, 5);
+    return { world, a, b, c };
+  }
+
+  it('gives places in arrival order and takes finishers out of play', () => {
+    const { world, a, b } = race();
+    expect(world.isRace).toBe(true);
+    expect(world.raceEndsInTicks).toBeNull();
+
+    enterExit(world, 'a');
+    const first = tick(world);
+    expect(first).toContainEqual(expect.objectContaining({ type: 'finish', playerId: 'a', place: 1 }));
+    expect(first.some((e) => e.type === 'death')).toBe(false);
+    expect(a.place).toBe(1);
+    expect(a.body.alive).toBe(false);
+    expect(world.completed).toBe(false);
+    expect(world.raceEndsInTicks).toBe(msToTicks(2000) - 1);
+
+    // Finished players never respawn and don't count as deaths.
+    const later = ticks(world, RESPAWN_TICKS + 5);
+    expect(later.some((e) => e.type === 'respawn')).toBe(false);
+    expect(a.body.alive).toBe(false);
+    expect(a.deaths).toBe(0);
+
+    enterExit(world, 'b');
+    expect(tick(world)).toContainEqual(expect.objectContaining({ type: 'finish', playerId: 'b', place: 2 }));
+    expect(b.place).toBe(2);
+    expect(world.toNetState(() => 0).players.map((p) => p.place)).toEqual([1, 2, 0]);
+    expect(world.completed).toBe(false); // c is still racing
+  });
+
+  it('completes as soon as every present player has finished', () => {
+    const { world } = race();
+    world.setPresent('c', false); // reconnecting players don't hold the race up
+    enterExit(world, 'a');
+    tick(world);
+    enterExit(world, 'b');
+    expect(tick(world)).toContainEqual({ type: 'levelComplete' });
+    expect(world.raceEndsInTicks).toBeNull();
+  });
+
+  it('gives same-tick arrivals consecutive places in slot order', () => {
+    const { world, a, b } = race();
+    enterExit(world, 'b');
+    enterExit(world, 'a');
+    tick(world);
+    expect([a.place, b.place]).toEqual([1, 2]);
+  });
+
+  it('ends the level when the finish window runs out', () => {
+    const { world, b, c } = race(500);
+    enterExit(world, 'a');
+    tick(world);
+    ticks(world, msToTicks(500) - 2);
+    expect(world.completed).toBe(false);
+    expect(tick(world)).toContainEqual({ type: 'levelComplete' });
+    expect([b.place, c.place]).toEqual([0, 0]);
+  });
+
+  it('keeps dead racers in the race; a dead player in the exit does not finish', () => {
+    const { world, b } = race();
+    enterExit(world, 'b');
+    world.killPlayer('b');
+    tick(world);
+    expect(b.place).toBe(0);
+    ticks(world, RESPAWN_TICKS + 1);
+    expect(b.body.alive).toBe(true);
+  });
+
+  it('finished players can no longer be hit', () => {
+    const { world, a, b } = race();
+    enterExit(world, 'a');
+    tick(world);
+    place(world, 'b', 7 * 32 + 16 - 20, 96);
+    b.body.facing = 1;
+    tick(world, { b: Button.ATTACK });
+    ticks(world, 30);
+    expect(a.body.hurt).toBe(0);
+    expect(a.body.vx).toBe(0);
+  });
+
+  it('maps each mode to its world options', () => {
+    const options = modeWorldOptions('race');
+    expect(options.entities.checkpointScope).toBe('player');
+    expect(options.race).not.toBeNull();
+    expect(options.playerDamage).toBe(true);
+    expect(modeWorldOptions('coop')).toMatchObject({ race: null, playerDamage: false, entities: { checkpointScope: 'team' } });
   });
 });
 

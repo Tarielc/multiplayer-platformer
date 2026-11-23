@@ -38,6 +38,7 @@ export class PlayerView {
   private grounded = true;
   private invulnerable = false;
   private blinkMs = 0;
+  private finished = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -96,6 +97,22 @@ export class PlayerView {
     return this.ability.droneTarget;
   }
 
+  /**
+   * Race: the player reached the trophy and left play. The view hides (the finish effect plays
+   * at the trophy) and its state machine stops, so the server's `alive: false` doesn't play the
+   * Death clip or its sound.
+   */
+  setFinished(finished: boolean): void {
+    if (this.finished === finished) return;
+    this.finished = finished;
+    this.container.setVisible(!finished);
+    if (finished) this.ability.hide();
+  }
+
+  get isFinished(): boolean {
+    return this.finished;
+  }
+
   /** Blinks the sprite while traps can't hurt the player (after taking a hit). */
   setInvulnerable(on: boolean): void {
     this.invulnerable = on;
@@ -108,6 +125,7 @@ export class PlayerView {
   render(feetX: number, feetY: number, facing: 1 | -1, signals: PlayerSignals, dtMs: number, aimPreview: number | null = null): void {
     // Dead players stay where they died, so the Death clip plays on the spot.
     this.container.setPosition(feetX, feetY);
+    if (this.finished) return;
     this.grounded = signals.grounded;
     const cues = this.fsm.update(signals, dtMs);
     this.anim.setFacing(facing);

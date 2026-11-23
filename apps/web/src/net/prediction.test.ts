@@ -64,6 +64,7 @@ function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlay
     stepTick: 0,
     hp: 3,
     invulnUntil: 0,
+    place: 0,
     ability: 0,
     specialHeld: false,
     phase: 0,

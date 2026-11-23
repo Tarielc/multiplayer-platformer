@@ -23,6 +23,7 @@ export type WorldCueName =
   | 'gem'
   | 'checkpoint'
   | 'levelComplete'
+  | 'finish'
   | 'bounce'
   | 'boxHit'
   | 'boxBreak'

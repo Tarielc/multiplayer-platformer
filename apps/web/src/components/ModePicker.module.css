@@ -1,0 +1,82 @@
+.picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.picker legend {
+  padding: 0;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 520px) {
+  .options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.option {
+  position: relative;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-sunken);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+
+.option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.option:hover {
+  border-color: var(--accent);
+}
+
+.option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.option[data-selected='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-raised));
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.picker:disabled .option {
+  cursor: not-allowed;
+}
+
+.picker:disabled .option:hover {
+  border-color: var(--border);
+}
+
+.picker:disabled .option[data-selected='true']:hover {
+  border-color: var(--accent);
+}
+
+.name {
+  font-weight: 700;
+}
+
+.summary {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--text-dim);
+}

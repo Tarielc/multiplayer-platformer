@@ -1,6 +1,6 @@
 'use client';
 
-import { LEVELS, MAX_PLAYERS, PLAYER_SLOTS, slotStyle, type CharacterId } from '@platformer/shared';
+import { LEVELS, MAX_PLAYERS, MODE_CONFIG, PLAYER_SLOTS, slotStyle, type CharacterId } from '@platformer/shared';
 import type { CSSProperties } from 'react';
 import type { GameSession } from '@/hooks/useGameSession';
 import { savePreferredCharacter } from '@/net/identity';
@@ -8,6 +8,7 @@ import type { RoomView } from '@/net/RoomStore';
 import { CharacterPicker } from './CharacterPicker';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './LobbyPanel.module.css';
+import { ModePicker } from './ModePicker';
 
 export function LobbyPanel({ session, view }: { session: GameSession; view: RoomView }) {
   const room = view.room!;
@@ -19,6 +20,9 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
   const readyCount = connected.filter((p) => p.ready).length;
   const selected = LEVELS.get(room.selectedLevelId);
   const finalScores = room.campaignComplete ? [...room.players].sort((a, b) => b.campaignScore - a.campaignScore) : [];
+  const teamTotal = finalScores.reduce((sum, p) => sum + p.campaignScore, 0);
+  const race = room.mode === 'race';
+  const mode = MODE_CONFIG[room.mode];
   const takenBy = new Map<CharacterId, string>(
     room.players.filter((p) => p.id !== view.selfId).map((p) => [p.characterId, slotStyle(p.slot).label]),
   );
@@ -31,7 +35,7 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
     <section className={styles.lobby}>
       {room.campaignComplete && (
         <div className={styles.banner}>
-          <h2>Campaign complete!</h2>
+          <h2>{race && finalScores[0] ? `Race over: ${finalScores[0].name} wins!` : 'Campaign complete!'}</h2>
           <ol>
             {finalScores.map((p) => (
               <li key={p.id} style={{ color: PLAYER_SLOTS[p.slot]?.css }}>
@@ -39,6 +43,7 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
               </li>
             ))}
           </ol>
+          {!race && finalScores.length > 1 && <p className={styles.team}>Team total: {teamTotal} pts</p>}
           <p>Ready up to play again.</p>
         </div>
       )}
@@ -89,6 +94,13 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
         />
       )}
 
+      <ModePicker
+        value={room.mode}
+        onChange={(next) => client.selectMode(next)}
+        disabled={!isHost}
+        title={isHost ? undefined : 'Only the host can change the mode'}
+      />
+
       <div className={styles.controls}>
         <label className={styles.level}>
           <span>Level</span>
@@ -111,8 +123,8 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
       </div>
 
       <p className={styles.hint}>
-        {readyCount}/{connected.length} ready · starts at “{selected?.name ?? room.selectedLevelId}” when everyone is
-        ready. Share the invite link (or room code) to play together — up to {MAX_PLAYERS} players.
+        {readyCount}/{connected.length} ready · {mode.name} from “{selected?.name ?? room.selectedLevelId}” starts when
+        everyone is ready. Share the invite link (or room code) to play together — up to {MAX_PLAYERS} players.
       </p>
     </section>
   );

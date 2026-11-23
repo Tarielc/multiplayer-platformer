@@ -31,6 +31,7 @@ const PLAYER_FIELDS = [
   'stepTick',
   'hp',
   'invulnUntil',
+  'place',
   'ability',
   'specialHeld',
   'phase',

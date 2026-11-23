@@ -58,6 +58,10 @@ export interface WorldPlayer {
   swingFoes: Set<number>;
   /** Server-only special ability bookkeeping (what it holds, flights, ...). */
   ability: AbilityPlayerState;
+  /** Race: finishing place (1-based) once the player reached the trophy; 0 while still racing. */
+  place: number;
+  /** Race: tick the player finished on (valid when `place > 0`). */
+  finishTick: number;
 }
 
 export interface GameWorldOptions {
@@ -75,6 +79,17 @@ export interface GameWorldOptions {
   abilities?: CompiledAbilities;
   /** Foe tuning (defaults to `FOE_TUNING`; where they are comes from the level). `null`: no foes. */
   foes?: Readonly<FoeTuning> | null;
+  /**
+   * Giant swings and spat projectiles cost other players hearts (default `true`). `false` (co-op):
+   * they still stun and knock back, like a normal shove.
+   */
+  playerDamage?: boolean;
+  /**
+   * Race rules (default `null`: the entity config's `exitRule`). Reaching the trophy gives a
+   * place and takes the player out of play; the level ends once every present player finished,
+   * or `finishWindowMs` after the first finish.
+   */
+  race?: { finishWindowMs: number } | null;
 }
 
 /**
@@ -101,6 +116,11 @@ export class GameWorld {
   private abilities: AbilitySystem;
   private foes: FoeField;
   private readonly foeInvulnerabilityTicks: number;
+  private readonly playerDamage: boolean;
+  /** Race: ticks between the first finish and the end of the level; `null` outside races. */
+  private readonly raceWindowTicks: number | null;
+  private finishCount = 0;
+  private firstFinishTick: number | null = null;
 
   constructor(private readonly options: GameWorldOptions) {
     this.level = options.level;
@@ -121,6 +141,19 @@ export class GameWorld {
     const foes = options.foes ?? FOE_TUNING;
     this.foes = FoeField.forLevel(options.foes === null ? { ...options.level, foes: [] } : options.level, foes, this.ctx.dt);
     this.foeInvulnerabilityTicks = msToTicks(foes.hit.invulnerabilityMs);
+    this.playerDamage = options.playerDamage ?? true;
+    this.raceWindowTicks = options.race ? Math.max(1, msToTicks(options.race.finishWindowMs)) : null;
+  }
+
+  /** True when the world runs race rules. */
+  get isRace(): boolean {
+    return this.raceWindowTicks !== null;
+  }
+
+  /** Race: ticks until the level ends, once someone finished; `null` before that (or outside races). */
+  get raceEndsInTicks(): number | null {
+    if (this.raceWindowTicks === null || this.firstFinishTick === null || this.completed) return null;
+    return Math.max(0, this.firstFinishTick + this.raceWindowTicks - this.tick);
   }
 
   get movementContext(): Readonly<MovementContext> {
@@ -146,6 +179,8 @@ export class GameWorld {
     copy.tick = this.tick;
     copy.completed = this.completed;
     copy.teamCheckpoint = this.teamCheckpoint;
+    copy.finishCount = this.finishCount;
+    copy.firstFinishTick = this.firstFinishTick;
     copy.events = [...this.events];
     for (const id of this.collected) copy.collected.add(id);
     for (const [id, p] of this.players) {
@@ -214,6 +249,8 @@ export class GameWorld {
       foeSwingSeq: 0,
       swingFoes: new Set(),
       ability: newAbilityPlayerState(),
+      place: 0,
+      finishTick: 0,
     };
     player.body.ability = character ? abilityForCharacter(character) : Ability.NONE;
     this.players.set(id, player);
@@ -262,17 +299,62 @@ export class GameWorld {
     this.resolveFoes();
     this.traps.expire(this.tick);
     for (const player of this.players.values()) {
-      if (player.body.alive) continue;
+      if (player.body.alive || player.place > 0) continue;
       player.respawnTicks -= 1;
       if (player.respawnTicks <= 0) this.respawn(player);
     }
     if (!this.completed && this.level.exits.length > 0) {
-      const list = [...this.players.values()].filter((p) => p.present);
-      const arrived = (p: WorldPlayer) => p.body.alive && p.atExit;
-      const done = this.entityConfig.exitRule === 'all' ? list.every(arrived) : list.some(arrived);
-      if (list.length > 0 && done) this.complete();
+      if (this.raceWindowTicks !== null) this.updateRace(this.raceWindowTicks);
+      else {
+        const list = [...this.players.values()].filter((p) => p.present);
+        const arrived = (p: WorldPlayer) => p.body.alive && p.atExit;
+        const done = this.entityConfig.exitRule === 'all' ? list.every(arrived) : list.some(arrived);
+        if (list.length > 0 && done) this.complete();
+      }
     }
     this.tick += 1;
+  }
+
+  /**
+   * Race: everyone standing in the trophy finishes (same-tick arrivals in slot order), then the
+   * level ends when every present player has a place or the finish window ran out.
+   */
+  private updateRace(windowTicks: number): void {
+    for (const player of this.listPlayers()) {
+      if (player.present && player.place === 0 && player.body.alive && player.atExit) this.finish(player);
+    }
+    if (this.firstFinishTick === null) return;
+    const racing = [...this.players.values()].filter((p) => p.present && p.place === 0);
+    // The window counts the finish tick itself: it ends `windowTicks` ticks after the first finish.
+    if (racing.length === 0 || this.tick + 1 >= this.firstFinishTick + windowTicks) this.complete();
+  }
+
+  /** Race: the player reached the trophy. They get a place and leave play (no respawn). */
+  private finish(player: WorldPlayer): void {
+    const body = player.body;
+    const x = body.x + this.ctx.hitbox.width / 2;
+    const y = body.y + this.ctx.hitbox.height / 2;
+    this.abilities.onDeath(player); // drops whatever they hold, like a death would
+    body.alive = false;
+    body.vx = 0;
+    body.vy = 0;
+    body.jumping = false;
+    body.attack = 0;
+    body.hurt = 0;
+    player.hitImmuneTicks = 0;
+    player.invulnUntil = 0;
+    player.respawnTicks = 0;
+    player.place = ++this.finishCount;
+    player.finishTick = this.tick;
+    this.firstFinishTick ??= this.tick;
+    this.events.push({
+      type: 'finish',
+      playerId: player.id,
+      place: player.place,
+      timeMs: Math.round(this.tick * this.ctx.dt * 1000),
+      x,
+      y,
+    });
   }
 
   /** Dev/debug helpers. */
@@ -340,6 +422,12 @@ export class GameWorld {
   private abilityHurt(target: WorldPlayer, hit: AbilityHit): void {
     const t = target.body;
     if (!t.alive || t.held !== Held.NONE) return;
+    if (!this.playerDamage) {
+      // Co-op: the hit only shoves.
+      const taken = giantActive(t) ? this.abilityTuning.giant.knockbackTaken : 1;
+      this.stun(target, hit.dirX >= 0 ? 1 : -1, hit.knockbackX * taken, hit.knockbackY * taken);
+      return;
+    }
     target.hp = Math.max(0, target.hp - hit.damage);
     this.events.push({
       type: 'abilityHit',
@@ -463,8 +551,8 @@ export class GameWorld {
       const away = t.x - a.x;
       const dir = away > 0 ? 1 : away < 0 ? -1 : a.facing;
       const big = giantActive(a);
-      if (big) {
-        // Giant swings cost hearts.
+      if (big && this.playerDamage) {
+        // Giant swings cost hearts (outside co-op).
         target.hp = Math.max(0, target.hp - giant.swingDamage);
         this.events.push({
           type: 'abilityHit',
@@ -775,6 +863,7 @@ function toNetPlayer(p: WorldPlayer, ack: number, maxHp: number): NetPlayerState
     stepTick: b.stepTick,
     hp: p.hp,
     invulnUntil: p.invulnUntil,
+    place: p.place,
     ability: b.ability,
     specialHeld: b.specialHeld,
     phase: b.phase,

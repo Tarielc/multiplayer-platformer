@@ -157,3 +157,8 @@
   color: var(--text-dim);
   font-size: 0.85rem;
 }
+
+.banner .team {
+  color: var(--text);
+  font-weight: 700;
+}

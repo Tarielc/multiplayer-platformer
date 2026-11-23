@@ -137,7 +137,8 @@ export class EntityViews {
     });
   }
 
-  sync(state: NetWorldState): void {
+  /** `race`: the trophy counts finishers ("1/3 finished") instead of players standing in it. */
+  sync(state: NetWorldState, race = false): void {
     for (const id of state.collected) {
       const item = this.items.get(id);
       if (item?.visible && !item.getData('collecting')) item.setVisible(false);
@@ -168,9 +169,12 @@ export class EntityViews {
     }
 
     const alive = state.players.filter((p) => p.alive).length;
-    const atExit = state.players.filter((p) => p.alive && p.atExit).length;
+    const atExit = race
+      ? state.players.filter((p) => p.place > 0).length
+      : state.players.filter((p) => p.alive && p.atExit).length;
     for (const exit of this.exits) {
-      const text = state.players.length > 0 ? `${atExit}/${alive} at exit` : '';
+      const text =
+        state.players.length === 0 ? '' : race ? `${atExit}/${state.players.length} finished` : `${atExit}/${alive} at exit`;
       if (exit.label.text !== text) exit.label.setText(text);
       // A new arrival makes the trophy bounce.
       if (this.synced && atExit > this.atExit) exit.trophy.play(trapAnimKey('finish:pressed'));

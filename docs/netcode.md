@@ -60,7 +60,7 @@ The world state is small: `{ tick, players[], collected[], traps[] }`. Each play
 - **Why deltas are safe:** WebSockets deliver every message, in order. All clients of a room hold the same base, so one encoded delta serves everyone.
 - **Gap detection:** the client's `WorldStateStore` applies a delta only if its `baseTick` equals the tick of the state it already holds. Otherwise it sends `resync` and waits for the keyframe.
 - **Run counter:** `run` increments with every new `GameWorld` (level start or restart) and is part of the room's level info. Snapshots and deltas from an older run are dropped, so a slow packet can never leak the previous level into the next one.
-- **Events:** `collect`, `death`, `respawn`, `checkpoint`, `levelComplete`, `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
+- **Events:** `collect`, `death`, `respawn`, `checkpoint`, `finish` (race), `levelComplete`, `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
 
 ## Prediction and reconciliation (own player)
 
@@ -134,14 +134,17 @@ Client and server agree only because both run the same code on the same numbers:
 ## Rooms
 
 ```
-lobby ──(all connected players ready)──► countdown (3 s) ──► playing ──(exit rule)──► levelComplete (4 s)
+lobby ──(all connected players ready)──► countdown (3 s) ──► playing ──(exit / race rule)──► levelComplete (4 s)
   ▲          (un-ready / new player cancels)                    │ pause rule                  │
   │                                                             ▼                             ▼
   └──────────── lobby + campaignComplete ◄── last level ── next level? ── countdown (next level)
 ```
 
 - **Slots:** a new player gets the lowest free slot (P1–P4) and its color. A fifth player gets `ROOM_FULL`.
-- **Host:** the first player is host and picks the starting level in the lobby. When the host leaves or their grace expires, the next player by slot (connected players first) becomes host.
+- **Host:** the first player is host and picks the game mode and the starting level in the lobby. When the host leaves or their grace expires, the next player by slot (connected players first) becomes host.
+- **Modes:** `RoomInfo.mode` is `coop` (the default, also used for solo) or `race`, and stays fixed for the campaign. `modeWorldOptions` (`config/modes.ts`) turns it into `GameWorld` options:
+  - **Co-op:** team checkpoints, every present player must stand in the exit, and swings still shove teammates, but giant swings and spat projectiles cost no hearts (`playerDamage: false`).
+  - **Race:** checkpoints are per player. A player who reaches the exit gets a `place`, a `finish` event and leaves play: their body is `alive: false` with no respawn, so nothing can hit or grab them, and clients hide them instead of playing the Death clip. The first finish starts the finish window (20 s, `RoomInfo.raceEndsInMs`); the level ends when every present player has a place or the window runs out. Results carry `place`, `timeMs` and `placePoints`, and `campaignScore` adds the placement points to the level score.
 - **Start:** when every connected player is ready (at least `minPlayersToStart`, default 1), a 3 s countdown starts. It is cancelled if someone un-readies or a new, unready player joins. Countdowns between levels can't be cancelled.
 - **Level complete:** results show for 4 s, then the next level (`next` in the manifest) counts down. After the last level, the room returns to the lobby with `campaignComplete`, and everyone is un-readied.
 - **Pause:** the world is simulated only when the phase is `playing`, at least one player is connected, and **not every** connected player has the menu open. In solo, Esc really pauses. In multiplayer, the game pauses only when everyone has the menu open.
@@ -149,7 +152,7 @@ lobby ──(all connected players ready)──► countdown (3 s) ──► pla
 - **Reconnect:** each browser tab has a secret `clientId`, kept in `sessionStorage` so it survives reloads but isn't shared between tabs. Browsers copy `sessionStorage` when a tab is duplicated, so a new tab asks the others over a `BroadcastChannel` and picks a new id if its id is taken.
   - A `join` with a known `clientId` re-attaches the same player and slot (`welcome.rejoined = true`).
   - If that player still had an open socket, the old socket gets `REPLACED` (close 4001).
-  - While disconnected, a player keeps their slot for 15 s. They don't count toward "everyone at the exit" or "everyone ready".
+  - While disconnected, a player keeps their slot for 15 s. They don't count toward "everyone at the exit", "everyone finished" (race) or "everyone ready".
   - `playerId` is public, but `clientId` never leaves the client except in `join`.
 - **Client reconnect:** after an unexpected close, the client retries with backoff (300 ms × 2ⁿ, capped at 5 s), up to 8 times. It then shows *Connection lost* with a Retry button. A reconnected client re-sends its menu state and drops its pending inputs, because the server reset its input queue.
 - **Strict Mode:** `GameClient.connect()` opens its socket on a zero-delay timer that `disconnect()` cancels. React's mount → unmount → mount therefore opens a single socket.
@@ -168,6 +171,7 @@ All messages are JSON objects with a `t` field. The types are in `packages/share
 | `selectCharacter` | `characterId` | Lobby only. Refused with `NOT_ALLOWED` if another player has that character. |
 | `ready` | `ready` | Lobby (and the lobby countdown). |
 | `selectLevel` | `levelId` | Host only, in the lobby. |
+| `selectMode` | `mode` (`coop` \| `race`) | Host only, in the lobby. |
 | `input` | `seq`, `buttons` | Every fixed step while playing. |
 | `menu` | `open` | Pause menu opened or closed. |
 | `ping` | `id`, `at` | Every 2 s, for RTT. Answered by `pong`. |
@@ -180,7 +184,7 @@ All messages are JSON objects with a `t` field. The types are in `packages/share
 | `t` | Fields | When |
 |---|---|---|
 | `welcome` | `protocol`, `roomId`, `playerId`, `slot`, `rejoined`, `tickRate`, `snapshotRate` | After a successful join. |
-| `room` | `room: RoomInfo` (phase, players, host, level and `run`, paused, countdown, results, campaign flags) | Whenever room state changes. |
+| `room` | `room: RoomInfo` (phase, mode, players, host, level and `run`, paused, countdown, race clock, results, campaign flags) | Whenever room state changes. |
 | `snapshot` | `run`, `tick`, `state`, `events` | Keyframes (see above). |
 | `delta` | `run`, `tick`, `baseTick`, `upserts`, `removed`, `collected`, `events` | Every other broadcast. |
 | `pong` | `id`, `at`, `serverTick` | Reply to `ping`. |

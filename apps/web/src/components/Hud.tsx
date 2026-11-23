@@ -1,6 +1,6 @@
 'use client';
 
-import { LEVELS } from '@platformer/shared';
+import { LEVELS, MODE_CONFIG, ordinal, type RoomInfo } from '@platformer/shared';
 import type { CSSProperties } from 'react';
 import type { NetStats } from '@/game/bridge';
 import type { HudPlayer, RoomView } from '@/net/RoomStore';
@@ -9,15 +9,19 @@ import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { useTouchDevice } from '@/hooks/useTouchDevice';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './Hud.module.css';
+import { useCountdown } from './useCountdown';
 
 /**
  * Minimal HUD: one chip per active player (slot color, name, hearts, score, status) + level info.
+ * Co-op adds the team score; a race shows places and, after the first finish, the race clock.
  * On touch devices it also has the menu button (a phone has no Esc key).
  */
 export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats | null; onMenu: () => void }) {
   const room = view.room!;
   const levelIndex = room.level ? LEVELS.entries.findIndex((e) => e.id === room.level!.id) : -1;
   const touch = useTouchDevice();
+  const coop = room.mode === 'coop';
+  const teamScore = view.hud.reduce((sum, p) => sum + p.score, 0);
   return (
     <div className={styles.hud} data-touch={touch}>
       <div className={styles.players}>
@@ -28,8 +32,13 @@ export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats |
       <div className={styles.level}>
         {room.level && (
           <span>
-            {levelIndex >= 0 ? `${levelIndex + 1}/${LEVELS.entries.length} · ` : ''}
+            {MODE_CONFIG[room.mode].name} · {levelIndex >= 0 ? `${levelIndex + 1}/${LEVELS.entries.length} · ` : ''}
             {room.level.name}
+          </span>
+        )}
+        {coop && view.hud.length > 1 && (
+          <span>
+            Team <span className={styles.score}>{teamScore}</span>
           </span>
         )}
         <span className={styles.hint}>
@@ -43,6 +52,9 @@ export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats |
           </svg>
         </button>
       )}
+      {room.mode === 'race' && room.raceEndsInMs !== null && (
+        <RaceClock room={room} receivedAt={view.roomReceivedAt} />
+      )}
       {stats && (
         <div className={styles.stats}>
           {stats.fps} fps · rtt {stats.rttMs ?? '–'} ms · pending {stats.pendingInputs} · corr{' '}
@@ -53,10 +65,24 @@ export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats |
   );
 }
 
+/** Race: seconds left for everyone still racing (frozen while the game is paused). */
+function RaceClock({ room, receivedAt }: { room: RoomInfo; receivedAt: number }) {
+  const ms = room.raceEndsInMs ?? 0;
+  const ticking = useCountdown(ms, receivedAt);
+  const seconds = Math.ceil((room.paused ? ms : ticking) / 1000);
+  return (
+    <div className={styles.raceClock} data-urgent={seconds <= 5} role="timer" aria-live="off">
+      Race ends in <span className={styles.raceSeconds}>{seconds}</span>s
+    </div>
+  );
+}
+
 function PlayerChip({ player }: { player: HudPlayer }) {
   const status = !player.connected
     ? 'reconnecting'
-    : !player.alive
+    : player.place > 0
+      ? `finished ${ordinal(player.place)}`
+      : !player.alive
       ? 'respawning'
       : player.atExit
         ? 'at exit'
@@ -67,7 +93,8 @@ function PlayerChip({ player }: { player: HudPlayer }) {
     <div
       className={styles.chip}
       data-self={player.isSelf}
-      data-dim={!player.connected || !player.alive}
+      data-dim={!player.connected || (!player.alive && player.place === 0)}
+      data-finished={player.place > 0}
       style={{ '--slot': player.color } as CSSProperties}
     >
       <CharacterPortrait characterId={player.characterId} scale={1} className={styles.portrait} />

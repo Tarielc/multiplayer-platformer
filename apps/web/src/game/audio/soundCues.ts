@@ -20,6 +20,7 @@ export const SOUND_CUES = [
   'gem',
   'checkpoint',
   'levelComplete',
+  'finish',
   'bounce',
   'boxHit',
   'boxBreak',
@@ -218,6 +219,37 @@ export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
     detuneJitter: 0,
     spatial: false,
     maxVoices: 1,
+  }),
+  /** Race: someone reached the trophy (a short rising fanfare, an octave above the checkpoint). */
+  finish: cue({
+    recipe: {
+      layers: [
+        {
+          wave: 'triangle',
+          freq: 784,
+          attack: 0.004,
+          sustain: 0.35,
+          decay: 0.35,
+          arpeggio: [{ at: 0.07, mult: 1.26 }, { at: 0.14, mult: 1.5 }, { at: 0.21, mult: 2 }],
+          gain: 0.5,
+        },
+        {
+          wave: 'square',
+          duty: 0.25,
+          freq: 392,
+          attack: 0.004,
+          sustain: 0.35,
+          decay: 0.3,
+          arpeggio: [{ at: 0.07, mult: 1.26 }, { at: 0.14, mult: 1.5 }, { at: 0.21, mult: 2 }],
+          lowpass: 4000,
+          gain: 0.18,
+        },
+      ],
+    },
+    volume: 0.5,
+    detuneJitter: 0,
+    spatial: false,
+    maxVoices: 2,
   }),
   levelComplete: cue({
     recipe: {

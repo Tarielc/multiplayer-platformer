@@ -1,10 +1,19 @@
 'use client';
 
-import { LEVELS, PLAYER_SLOTS, type RoomInfo } from '@platformer/shared';
+import { LEVELS, PLAYER_SLOTS, ordinal, type LevelResult, type RoomInfo } from '@platformer/shared';
 import { CharacterPortrait } from './CharacterPortrait';
+import { formatRaceTime } from './format';
 import viewStyles from './GameView.module.css';
 import styles from './Overlays.module.css';
 import { useCountdown } from './useCountdown';
+
+/** Race: placed players first (by place), then everyone else by score. */
+function byPlace(a: LevelResult, b: LevelResult): number {
+  if (a.place !== null && b.place !== null) return a.place - b.place;
+  if (a.place !== null) return -1;
+  if (b.place !== null) return 1;
+  return b.score - a.score;
+}
 
 export function LevelCompleteOverlay({
   room,
@@ -16,22 +25,32 @@ export function LevelCompleteOverlay({
   selfId: string | null;
 }) {
   const left = Math.ceil(useCountdown(room.countdownMs, receivedAt) / 1000);
-  const results = [...(room.results ?? [])].sort((a, b) => b.score - a.score);
+  const race = room.mode === 'race';
+  const results = [...(room.results ?? [])].sort(race ? byPlace : (a, b) => b.score - a.score);
   const totals = new Map(room.players.map((p) => [p.id, p.campaignScore]));
   const characters = new Map(room.players.map((p) => [p.id, p.characterId]));
   const next = room.nextLevelId ? LEVELS.get(room.nextLevelId) : undefined;
+  const winner = race ? results.find((r) => r.place === 1) : undefined;
+  const teamScore = results.reduce((sum, r) => sum + r.score, 0);
+  const teamTotal = results.reduce((sum, r) => sum + (totals.get(r.playerId) ?? r.score), 0);
 
   return (
     <div className={viewStyles.overlay}>
       <div className={styles.panel}>
-        <h2>{room.level?.name} complete!</h2>
+        <h2>
+          {room.level?.name} {race ? 'finished' : 'complete'}!
+        </h2>
+        {race && <p className={styles.dim}>{winner ? `${winner.name} wins the race!` : 'Nobody reached the trophy.'}</p>}
         <table className={styles.results}>
           <thead>
             <tr>
               <th>Player</th>
+              {race && <th>Place</th>}
+              {race && <th>Time</th>}
               <th>Score</th>
               <th>Items</th>
               <th>Deaths</th>
+              {race && <th>Place pts</th>}
               <th>Total</th>
             </tr>
           </thead>
@@ -46,14 +65,28 @@ export function LevelCompleteOverlay({
                       {PLAYER_SLOTS[r.slot]?.label} {r.name}
                     </span>
                   </td>
+                  {race && <td className={styles.place}>{r.place !== null ? ordinal(r.place) : '–'}</td>}
+                  {race && <td>{r.timeMs !== null ? formatRaceTime(r.timeMs) : 'DNF'}</td>}
                   <td>{r.score}</td>
                   <td>{r.collected}</td>
                   <td>{r.deaths}</td>
-                  <td>{totals.get(r.playerId) ?? r.score}</td>
+                  {race && <td>{r.placePoints > 0 ? `+${r.placePoints}` : 0}</td>}
+                  <td>{totals.get(r.playerId) ?? r.score + r.placePoints}</td>
                 </tr>
               );
             })}
           </tbody>
+          {!race && results.length > 1 && (
+            <tfoot>
+              <tr>
+                <td>Team</td>
+                <td>{teamScore}</td>
+                <td>{results.reduce((sum, r) => sum + r.collected, 0)}</td>
+                <td>{results.reduce((sum, r) => sum + r.deaths, 0)}</td>
+                <td>{teamTotal}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
         <p className={styles.dim}>
           {next ? `Next: ${next.name} in ${left}s` : `Final level cleared! Back to the lobby in ${left}s`}

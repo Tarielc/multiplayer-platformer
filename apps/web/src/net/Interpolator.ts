@@ -10,6 +10,8 @@ export interface RemoteSample {
   grounded: boolean;
   alive: boolean;
   atExit: boolean;
+  /** Race: finishing place, 0 while racing. */
+  place: number;
   tp: number;
   /** Swing / stun timers (s) and swing counter, for the animation state machine. */
   attack: number;
@@ -112,6 +114,7 @@ export class Interpolator {
         grounded: snap || t >= 0.5 ? pb.grounded : pa.grounded,
         alive: pb.alive,
         atExit: pb.atExit,
+        place: pb.place,
         tp: pb.tp,
         attack: newSwing ? pb.attack : lerp(pa.attack, pb.attack, t),
         attackSeq: pb.attackSeq,
