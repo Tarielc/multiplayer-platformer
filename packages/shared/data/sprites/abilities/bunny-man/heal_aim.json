@@ -1,0 +1,930 @@
+{
+  "image": "heal_aim.png",
+  "animations": {
+    "aim_m90": {
+      "row": 0,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim -90 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          64,
+          40
+        ],
+        [
+          64,
+          0,
+          64,
+          40
+        ],
+        [
+          128,
+          0,
+          64,
+          40
+        ],
+        [
+          192,
+          0,
+          64,
+          40
+        ],
+        [
+          256,
+          0,
+          64,
+          40
+        ],
+        [
+          320,
+          0,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            37,
+            30
+          ],
+          "aim": -90
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -90
+        },
+        {
+          "shoulder": [
+            43,
+            30
+          ],
+          "aim": -90
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -90
+        },
+        {
+          "shoulder": [
+            34,
+            30
+          ],
+          "aim": -90
+        },
+        {
+          "shoulder": [
+            38,
+            30
+          ],
+          "aim": -90
+        }
+      ]
+    },
+    "aim_m67": {
+      "row": 1,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim -67.5 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          40,
+          64,
+          40
+        ],
+        [
+          64,
+          40,
+          64,
+          40
+        ],
+        [
+          128,
+          40,
+          64,
+          40
+        ],
+        [
+          192,
+          40,
+          64,
+          40
+        ],
+        [
+          256,
+          40,
+          64,
+          40
+        ],
+        [
+          320,
+          40,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            37,
+            30
+          ],
+          "aim": -67.5
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -67.5
+        },
+        {
+          "shoulder": [
+            43,
+            30
+          ],
+          "aim": -67.5
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -67.5
+        },
+        {
+          "shoulder": [
+            34,
+            30
+          ],
+          "aim": -67.5
+        },
+        {
+          "shoulder": [
+            38,
+            30
+          ],
+          "aim": -67.5
+        }
+      ]
+    },
+    "aim_m45": {
+      "row": 2,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim -45 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          80,
+          64,
+          40
+        ],
+        [
+          64,
+          80,
+          64,
+          40
+        ],
+        [
+          128,
+          80,
+          64,
+          40
+        ],
+        [
+          192,
+          80,
+          64,
+          40
+        ],
+        [
+          256,
+          80,
+          64,
+          40
+        ],
+        [
+          320,
+          80,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            37,
+            30
+          ],
+          "aim": -45
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -45
+        },
+        {
+          "shoulder": [
+            43,
+            31
+          ],
+          "aim": -45
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -45
+        },
+        {
+          "shoulder": [
+            34,
+            31
+          ],
+          "aim": -45
+        },
+        {
+          "shoulder": [
+            38,
+            30
+          ],
+          "aim": -45
+        }
+      ]
+    },
+    "aim_m22": {
+      "row": 3,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim -22.5 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          120,
+          64,
+          40
+        ],
+        [
+          64,
+          120,
+          64,
+          40
+        ],
+        [
+          128,
+          120,
+          64,
+          40
+        ],
+        [
+          192,
+          120,
+          64,
+          40
+        ],
+        [
+          256,
+          120,
+          64,
+          40
+        ],
+        [
+          320,
+          120,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            37,
+            30
+          ],
+          "aim": -22.5
+        },
+        {
+          "shoulder": [
+            35,
+            30
+          ],
+          "aim": -22.5
+        },
+        {
+          "shoulder": [
+            43,
+            31
+          ],
+          "aim": -22.5
+        },
+        {
+          "shoulder": [
+            35,
+            31
+          ],
+          "aim": -22.5
+        },
+        {
+          "shoulder": [
+            34,
+            31
+          ],
+          "aim": -22.5
+        },
+        {
+          "shoulder": [
+            39,
+            30
+          ],
+          "aim": -22.5
+        }
+      ]
+    },
+    "aim_0": {
+      "row": 4,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim 0 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          160,
+          64,
+          40
+        ],
+        [
+          64,
+          160,
+          64,
+          40
+        ],
+        [
+          128,
+          160,
+          64,
+          40
+        ],
+        [
+          192,
+          160,
+          64,
+          40
+        ],
+        [
+          256,
+          160,
+          64,
+          40
+        ],
+        [
+          320,
+          160,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            38,
+            31
+          ],
+          "aim": 0
+        },
+        {
+          "shoulder": [
+            35,
+            31
+          ],
+          "aim": 0
+        },
+        {
+          "shoulder": [
+            43,
+            32
+          ],
+          "aim": 0
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 0
+        },
+        {
+          "shoulder": [
+            34,
+            31
+          ],
+          "aim": 0
+        },
+        {
+          "shoulder": [
+            39,
+            31
+          ],
+          "aim": 0
+        }
+      ]
+    },
+    "aim_p22": {
+      "row": 5,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim 22.5 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          200,
+          64,
+          40
+        ],
+        [
+          64,
+          200,
+          64,
+          40
+        ],
+        [
+          128,
+          200,
+          64,
+          40
+        ],
+        [
+          192,
+          200,
+          64,
+          40
+        ],
+        [
+          256,
+          200,
+          64,
+          40
+        ],
+        [
+          320,
+          200,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            38,
+            31
+          ],
+          "aim": 22.5
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 22.5
+        },
+        {
+          "shoulder": [
+            43,
+            32
+          ],
+          "aim": 22.5
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 22.5
+        },
+        {
+          "shoulder": [
+            35,
+            31
+          ],
+          "aim": 22.5
+        },
+        {
+          "shoulder": [
+            39,
+            31
+          ],
+          "aim": 22.5
+        }
+      ]
+    },
+    "aim_p45": {
+      "row": 6,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim 45 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          240,
+          64,
+          40
+        ],
+        [
+          64,
+          240,
+          64,
+          40
+        ],
+        [
+          128,
+          240,
+          64,
+          40
+        ],
+        [
+          192,
+          240,
+          64,
+          40
+        ],
+        [
+          256,
+          240,
+          64,
+          40
+        ],
+        [
+          320,
+          240,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            38,
+            31
+          ],
+          "aim": 45
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 45
+        },
+        {
+          "shoulder": [
+            44,
+            33
+          ],
+          "aim": 45
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 45
+        },
+        {
+          "shoulder": [
+            35,
+            31
+          ],
+          "aim": 45
+        },
+        {
+          "shoulder": [
+            39,
+            31
+          ],
+          "aim": 45
+        }
+      ]
+    },
+    "aim_p67": {
+      "row": 7,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim 67.5 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          280,
+          64,
+          40
+        ],
+        [
+          64,
+          280,
+          64,
+          40
+        ],
+        [
+          128,
+          280,
+          64,
+          40
+        ],
+        [
+          192,
+          280,
+          64,
+          40
+        ],
+        [
+          256,
+          280,
+          64,
+          40
+        ],
+        [
+          320,
+          280,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            38,
+            31
+          ],
+          "aim": 67.5
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 67.5
+        },
+        {
+          "shoulder": [
+            44,
+            33
+          ],
+          "aim": 67.5
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 67.5
+        },
+        {
+          "shoulder": [
+            35,
+            31
+          ],
+          "aim": 67.5
+        },
+        {
+          "shoulder": [
+            39,
+            32
+          ],
+          "aim": 67.5
+        }
+      ]
+    },
+    "aim_p90": {
+      "row": 8,
+      "frameWidth": 64,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": false,
+      "note": "aim 90 deg (0 = forward, -90 = up, 90 = down). Frames: windup 0-1, reach 2, pull 3-4 (loop), retract 5",
+      "durationsMs": [
+        110,
+        80,
+        60,
+        90,
+        90,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          320,
+          64,
+          40
+        ],
+        [
+          64,
+          320,
+          64,
+          40
+        ],
+        [
+          128,
+          320,
+          64,
+          40
+        ],
+        [
+          192,
+          320,
+          64,
+          40
+        ],
+        [
+          256,
+          320,
+          64,
+          40
+        ],
+        [
+          320,
+          320,
+          64,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "shoulder": [
+            38,
+            32
+          ],
+          "aim": 90
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 90
+        },
+        {
+          "shoulder": [
+            44,
+            34
+          ],
+          "aim": 90
+        },
+        {
+          "shoulder": [
+            36,
+            31
+          ],
+          "aim": 90
+        },
+        {
+          "shoulder": [
+            35,
+            31
+          ],
+          "aim": 90
+        },
+        {
+          "shoulder": [
+            40,
+            32
+          ],
+          "aim": 90
+        }
+      ]
+    }
+  },
+  "pivot": {
+    "x": 32,
+    "y": 39
+  },
+  "facing": "right",
+  "aimAngles": {
+    "aim_m90": -90,
+    "aim_m67": -67.5,
+    "aim_m45": -45,
+    "aim_m22": -22.5,
+    "aim_0": 0,
+    "aim_p22": 22.5,
+    "aim_p45": 45,
+    "aim_p67": 67.5,
+    "aim_p90": 90
+  },
+  "frameRoles": {
+    "windup": [
+      0,
+      1
+    ],
+    "reach": [
+      2
+    ],
+    "pull": [
+      3,
+      4
+    ],
+    "retract": [
+      5
+    ]
+  },
+  "armColors": {
+    "outline": "#211f30",
+    "sleeve": "#f89cc0",
+    "shade": "#da89a8",
+    "hand": "#f2bc7e"
+  },
+  "howTo": [
+    "Angles are degrees from facing forward: 0 forward, -90 up, 90 down. Aiming behind: flip the sprite and mirror the angle.",
+    "Pick the row nearest to the aim angle; the arms use the exact angle.",
+    "Arms: two parallel lines (2px apart) from the frame's 'shoulder' to the hands, 4px outline then 2px sleeve; the back arm in the shade colour. heal_aim_parts 'hand_open' / 'hand_grab' at each end. Draw over the target."
+  ]
+}

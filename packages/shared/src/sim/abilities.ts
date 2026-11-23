@@ -39,6 +39,10 @@ export function isDronePhase(phase: number): boolean {
   return phase >= Phase.DRONE_DEPLOY && phase <= Phase.DRONE_STAND;
 }
 
+export function isHealPhase(phase: number): boolean {
+  return phase >= Phase.HEAL_HUG && phase <= Phase.HEAL_RETRACT;
+}
+
 export function isTonguePhase(phase: number): boolean {
   return phase >= Phase.TONGUE_WINDUP && phase <= Phase.TONGUE_SPIT_RECOVER;
 }
@@ -71,6 +75,65 @@ export function tongueTip(
 ): Vec2 {
   const o = tongueOrigin(body, hitbox, c);
   return { x: o.x + Math.cos(body.aim) * body.reach, y: o.y + Math.sin(body.aim) * body.reach };
+}
+
+/** World position Bunny Man's arms leave from. */
+export function healShoulder(
+  body: Pick<MovementBody, 'x' | 'y' | 'facing'>,
+  hitbox: HitboxSize,
+  c: Readonly<CompiledAbilities> = ABILITIES,
+): Vec2 {
+  const feet = feetOf(body, hitbox);
+  return { x: feet.x + body.facing * c.heal.shoulder.x, y: feet.y + c.heal.shoulder.y };
+}
+
+/** World position of Bunny Man's hands (the shoulder when the arms are in). */
+export function healHands(
+  body: Pick<MovementBody, 'x' | 'y' | 'facing' | 'aim' | 'reach'>,
+  hitbox: HitboxSize,
+  c: Readonly<CompiledAbilities> = ABILITIES,
+): Vec2 {
+  const o = healShoulder(body, hitbox, c);
+  return { x: o.x + Math.cos(body.aim) * body.reach, y: o.y + Math.sin(body.aim) * body.reach };
+}
+
+/** The heal's hug spot at hug time `t` (s): where the hugged player's feet go, in world px. */
+export function healHugFeet(
+  body: Pick<MovementBody, 'x' | 'y' | 'facing'>,
+  hitbox: HitboxSize,
+  t: number,
+  c: Readonly<CompiledAbilities> = ABILITIES,
+): Vec2 {
+  const track = c.heal.hugTrack;
+  let spot = track[0] ?? [0, 0, 0];
+  for (const entry of track) {
+    if (entry[0] <= t) spot = entry;
+    else break;
+  }
+  const feet = feetOf(body, hitbox);
+  return { x: feet.x + body.facing * spot[1], y: feet.y + spot[2] };
+}
+
+/**
+ * Where the pulled player's centre is while the arms yank them in: in the hands, gliding onto
+ * the hug spot over the last `pullBlend` px so the hug starts without a jump.
+ */
+export function healPullCenter(
+  body: Pick<MovementBody, 'x' | 'y' | 'facing' | 'aim' | 'reach'>,
+  hitbox: HitboxSize,
+  c: Readonly<CompiledAbilities> = ABILITIES,
+): Vec2 {
+  const h = c.heal;
+  const hands = healHands(body, hitbox, c);
+  const hug = healHugFeet(body, hitbox, 0, c);
+  const hugCenter = { x: hug.x, y: hug.y - hitbox.height / 2 };
+  const k = smoothstep(1 - (body.reach - h.hugReach) / Math.max(1, h.pullBlend));
+  return { x: hands.x + (hugCenter.x - hands.x) * k, y: hands.y + (hugCenter.y - hands.y) * k };
+}
+
+function smoothstep(k: number): number {
+  const t = Math.min(1, Math.max(0, k));
+  return t * t * (3 - 2 * t);
 }
 
 /** Facing that looks along `angle` (keeps `facing` for straight up/down). */
@@ -144,8 +207,16 @@ export function interruptAbility(body: MovementBody, c: Readonly<CompiledAbiliti
       enter(body, Phase.NONE);
       body.giant = c.giant.duration;
       return;
-    case Phase.HEAL:
+    case Phase.HEAL_RETRACT:
+      return;
+    case Phase.HEAL_HUG:
       finish(body, c.heal.cooldown);
+      return;
+    case Phase.HEAL_WINDUP:
+    case Phase.HEAL_REACH:
+    case Phase.HEAL_PULL:
+      if (body.reach > 0) enter(body, Phase.HEAL_RETRACT);
+      else finish(body, c.heal.missCooldown);
       return;
     case Phase.DRONE_DEPLOY:
     case Phase.DRONE_SIT:
@@ -204,8 +275,30 @@ export function stepAbility(
 
   const t = body.phaseTime;
   switch (body.phase) {
-    case Phase.HEAL:
-      if (t >= c.heal.duration) finish(body, c.heal.cooldown);
+    case Phase.HEAL_WINDUP:
+      if (t >= c.heal.windup) enter(body, Phase.HEAL_REACH);
+      break;
+    case Phase.HEAL_REACH: {
+      body.reach = Math.min(c.heal.maxLength, body.reach + c.heal.reachSpeed * dt);
+      const hands = healHands(body, ctx.hitbox, c);
+      const ts = ctx.level.tileSize;
+      const blocked = isSolidCell(ctx.level, Math.floor(hands.x / ts), Math.floor(hands.y / ts));
+      if (blocked || body.reach >= c.heal.maxLength) enter(body, Phase.HEAL_RETRACT);
+      break;
+    }
+    case Phase.HEAL_PULL:
+      body.reach = Math.max(0, body.reach - c.heal.pullSpeed * dt);
+      if (body.reach <= c.heal.hugReach) {
+        body.reach = 0;
+        enter(body, Phase.HEAL_HUG);
+      }
+      break;
+    case Phase.HEAL_HUG:
+      if (t >= c.heal.hug) finish(body, c.heal.cooldown);
+      break;
+    case Phase.HEAL_RETRACT:
+      body.reach = Math.max(0, body.reach - c.heal.retractSpeed * dt);
+      if (body.reach <= 0) finish(body, c.heal.missCooldown);
       break;
 
     case Phase.DRONE_DEPLOY:
@@ -309,7 +402,10 @@ function start(body: MovementBody, buttons: number): void {
   switch (body.ability) {
     case Ability.HEAL:
       if (!body.grounded) return;
-      enter(body, Phase.HEAL);
+      body.aim = aimFromButtons(buttons, body.facing);
+      body.facing = facingForAim(body.aim, body.facing);
+      body.reach = 0;
+      enter(body, Phase.HEAL_WINDUP);
       break;
     case Ability.DRONE:
       if (!body.grounded) return;

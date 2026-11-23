@@ -6,6 +6,7 @@ import {
   Held,
   Phase,
   isDroneOut,
+  isHealPhase,
   type CharacterId,
 } from '@platformer/shared';
 import type * as Phaser from 'phaser';
@@ -16,6 +17,7 @@ import type { AbilityCueName } from '../presentation';
 import { abilityAnim, abilitySheet } from './abilityAnimations';
 import {
   ABILITY_SHEETS,
+  ARM_COLORS,
   TONGUE_COLORS,
   animLengthMs,
   frameAt,
@@ -38,7 +40,7 @@ export interface AbilityFrame extends AbilitySignals {
   /** The base animation state and how long it has lasted (ms), for the giant clips. */
   state: PlayerState;
   timeInState: number;
-  /** Where the local frog's next tongue would go (world angle); null hides the reticle. */
+  /** Where the local frog's tongue / Bunny Man's arms would go (world angle); null hides the reticle. */
   aimPreview: number | null;
   /** Alpha of the base sprite (hurt blink), copied onto ability poses. */
   alpha: number;
@@ -66,7 +68,7 @@ const GIANT_CLIPS: Readonly<Record<PlayerState, string>> = {
 };
 /** Cues played when the owner enters a phase. */
 const PHASE_CUES: Partial<Record<number, AbilityCueName>> = {
-  [Phase.HEAL]: 'healStart',
+  [Phase.HEAL_REACH]: 'healStart',
   [Phase.DRONE_DEPLOY]: 'drone',
   [Phase.GIANT_GROW]: 'grow',
   [Phase.GIANT_SHRINK]: 'shrink',
@@ -80,6 +82,11 @@ const PHASE_CUES: Partial<Record<number, AbilityCueName>> = {
  */
 const LUNGE = { dropMs: 80, closeMs: 190, emptyAt: 200, riseMs: 160, depth: 12 } as const;
 const LUNGE_MS = LUNGE.dropMs + LUNGE.closeMs + LUNGE.riseMs;
+
+/** Frames of a heal aim row: windup 0-1, reach 2, pull 3-4, retract 5. */
+const ARMS_OUT_PHASES: ReadonlySet<number> = new Set([Phase.HEAL_REACH, Phase.HEAL_PULL, Phase.HEAL_RETRACT]);
+/** The two arms run this far (px) either side of the aim line. */
+const ARM_SPREAD = 2.5;
 
 /** Frames of a tongue aim row: windup 0-1, shoot 2, hold 3-4, retract 5, spit 6-7. */
 const TONGUE_OUT_PHASES: ReadonlySet<number> = new Set([Phase.TONGUE_SHOOT, Phase.TONGUE_PULL, Phase.TONGUE_RETRACT]);
@@ -106,6 +113,8 @@ export class AbilityView {
   private readonly tongue: Phaser.GameObjects.Graphics;
   private readonly tip: Phaser.GameObjects.Sprite;
   private readonly reticle: Phaser.GameObjects.Sprite;
+  private readonly arms: Phaser.GameObjects.Graphics;
+  private readonly hands: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite];
   private characterId: CharacterId;
   private clock = 0;
   private lastPhase: number = Phase.NONE;
@@ -136,6 +145,10 @@ export class AbilityView {
     this.tongue = scene.add.graphics().setDepth(DEPTH - 0.5);
     this.tip = scene.add.sprite(0, 0, blank(ABILITY_SHEETS.tongueParts.key)).setVisible(false).setDepth(DEPTH - 0.4);
     this.reticle = scene.add.sprite(0, 0, blank(ABILITY_SHEETS.tongueParts.key)).setVisible(false).setDepth(VIEW_CONFIG.depth.effects);
+    // Bunny Man's arms reach over whoever they grab.
+    this.arms = scene.add.graphics().setDepth(DEPTH + 1);
+    const hand = () => scene.add.sprite(0, 0, blank(ABILITY_SHEETS.healParts.key)).setVisible(false).setDepth(DEPTH + 1.1);
+    this.hands = [hand(), hand()];
   }
 
   setCharacter(id: CharacterId): void {
@@ -209,7 +222,7 @@ export class AbilityView {
     const ms = f.phaseTime * 1000;
     switch (ability) {
       case Ability.HEAL:
-        if (f.phase === Phase.HEAL) look.hideBase = this.heal(f, ms);
+        look.hideBase = this.bunny(f, ms);
         break;
       case Ability.DRONE:
         look.hideBase = this.pilot(f, ms);
@@ -229,7 +242,7 @@ export class AbilityView {
   }
 
   destroy(): void {
-    for (const o of [this.sprite, this.front, this.drone, this.claw, this.cable, this.tongue, this.tip, this.reticle]) o.destroy();
+    for (const o of [this.sprite, this.front, this.drone, this.claw, this.cable, this.tongue, this.tip, this.reticle, this.arms, ...this.hands]) o.destroy();
   }
 
   // --- poses -----------------------------------------------------------------------------------
@@ -261,16 +274,86 @@ export class AbilityView {
     return { x: f.feetX + (point[0] + 0.5 - pivot.x) * f.facing, y: f.feetY - (pivot.y + 0.5 - point[1]) };
   }
 
-  private heal(f: AbilityFrame, ms: number): boolean {
+  /** Bunny Man: aim reticle, wind-up / reach / pull / retract poses with stretchy arms, the hug. */
+  private bunny(f: AbilityFrame, ms: number): boolean {
+    const parts = ABILITY_SHEETS.healParts.key;
+    const sx = f.feetX + f.facing * C.heal.shoulder.x;
+    const sy = f.feetY + C.heal.shoulder.y;
+    if (f.aimPreview !== null && f.phase === Phase.NONE) {
+      const reticle = abilityAnim(parts, 'reticle');
+      if (reticle) {
+        this.reticle
+          .setTexture(parts, frameName('reticle', frameAt(reticle, this.clock)))
+          .setPosition(sx + Math.cos(f.aimPreview) * C.heal.maxLength, sy + Math.sin(f.aimPreview) * C.heal.maxLength)
+          .setAlpha(f.specialCooldown > 0 ? 0.35 : 0.9)
+          .setVisible(true);
+      }
+    }
+    if (f.phase === Phase.HEAL_HUG) return this.hug(f, ms);
+    if (!isHealPhase(f.phase)) return false;
+    const key = ABILITY_SHEETS.healAim.key;
+    const row = nearestAimRow(relativeAimDeg(f.aim, f.facing));
+    let i: number;
+    switch (f.phase) {
+      case Phase.HEAL_WINDUP:
+        i = ms < 110 ? 0 : 1;
+        break;
+      case Phase.HEAL_REACH:
+        i = 2;
+        break;
+      case Phase.HEAL_PULL:
+        i = 3 + (Math.floor(this.clock / 90) % 2);
+        break;
+      default:
+        i = 5;
+    }
+    if (!this.pose(key, row, 0, f, i)) return false;
+    if (ARMS_OUT_PHASES.has(f.phase) && f.reach > 0) this.drawArms(f, key, row, i, sx, sy);
+    return true;
+  }
+
+  /** Two parallel stretchy arms from the frame's shoulder to the hands (at the simulated reach). */
+  private drawArms(f: AbilityFrame, key: string, row: string, i: number, sx: number, sy: number): void {
+    const shoulder = framePoint(abilityAnim(key, row)!, i, 'shoulder');
+    const from = shoulder ? this.worldPoint(key, shoulder, f) : { x: sx, y: sy };
+    const dx = Math.cos(f.aim);
+    const dy = Math.sin(f.aim);
+    const tipX = sx + dx * f.reach;
+    const tipY = sy + dy * f.reach;
+    const parts = ABILITY_SHEETS.healParts.key;
+    const handAnim = f.phase === Phase.HEAL_PULL ? 'hand_grab' : 'hand_open';
+    const hasHand = abilityAnim(parts, handAnim) !== undefined;
+    // Back arm first (shaded), then the front one.
+    [-ARM_SPREAD, ARM_SPREAD].forEach((off, k) => {
+      const nx = -dy * off;
+      const ny = dx * off;
+      const ax = from.x + nx;
+      const ay = from.y + ny;
+      const bx = tipX + nx;
+      const by = tipY + ny;
+      this.arms.lineStyle(4, ARM_COLORS.outline, f.alpha).lineBetween(ax, ay, bx, by);
+      this.arms.lineStyle(2, k === 0 ? ARM_COLORS.shade : ARM_COLORS.sleeve, f.alpha).lineBetween(ax, ay, bx, by);
+      if (hasHand) {
+        this.hands[k]!
+          .setTexture(parts, frameName(handAnim, 0))
+          .setOrigin(0.5, 0.5)
+          .setPosition(Math.round(bx), Math.round(by))
+          .setAlpha(f.alpha)
+          .setVisible(true);
+      }
+    });
+  }
+
+  private hug(f: AbilityFrame, ms: number): boolean {
     const key = ABILITY_SHEETS.heal.key;
-    const def = abilityAnim(key, 'heal');
+    const def = abilityAnim(key, 'hug');
     if (!def) return false;
     const i = frameAt(def, ms);
-    this.pose(key, 'heal', ms, f, i);
+    this.pose(key, 'hug', ms, f, i);
     // The arm that wraps around the hugged player is drawn over them.
-    const frontDef = abilityAnim(key, 'heal_front');
+    const frontDef = abilityAnim(key, 'hug_front');
     if (frontDef) {
-      this.place(this.front, key, 'heal_front', frontDef, Math.min(i, frontDef.rects.length - 1), f.facing);
+      this.place(this.front, key, 'hug_front', frontDef, Math.min(i, frontDef.rects.length - 1), f.facing);
       this.front.setPosition(f.feetX, f.feetY).setAlpha(f.alpha).setVisible(true);
     }
     if (i !== this.lastHealFrame) {
@@ -484,5 +567,7 @@ export class AbilityView {
     this.tongue.clear();
     this.tip.setVisible(false);
     this.reticle.setVisible(false);
+    this.arms.clear();
+    for (const h of this.hands) h.setVisible(false);
   }
 }

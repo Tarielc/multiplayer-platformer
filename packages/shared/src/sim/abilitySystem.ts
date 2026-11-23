@@ -11,6 +11,9 @@ import {
   interruptAbility,
   isTonguePhase,
   giantActive,
+  healHands,
+  healHugFeet,
+  healPullCenter,
   rectHitsSolid,
   tongueOrigin,
   tongueTip,
@@ -70,8 +73,6 @@ export interface AbilityHost {
 /** Fields the ability rules keep on each world player (server-only, not replicated). */
 export interface AbilityPlayerState {
   grab: Grab | null;
-  /** Feet of the grabbed player when the heal grabbed them (start of the pull). */
-  grabFrom: Vec2;
   /** `body.specialSeq` already handled. */
   specialSeen: number;
   /** The current heal already landed. */
@@ -84,11 +85,11 @@ export interface AbilityPlayerState {
 }
 
 export function newAbilityPlayerState(): AbilityPlayerState {
-  return { grab: null, grabFrom: { x: 0, y: 0 }, specialSeen: 0, healed: false, thrownBy: null, flightHits: 0, flightBoxes: new Set() };
+  return { grab: null, specialSeen: 0, healed: false, thrownBy: null, flightHits: 0, flightBoxes: new Set() };
 }
 
 export function cloneAbilityPlayerState(s: AbilityPlayerState): AbilityPlayerState {
-  return { ...s, grabFrom: { ...s.grabFrom }, flightBoxes: new Set(s.flightBoxes) };
+  return { ...s, flightBoxes: new Set(s.flightBoxes) };
 }
 
 /** Distance (px) in front of the mouth where spat things appear. */
@@ -169,8 +170,8 @@ export class AbilitySystem {
   private onPress(p: WorldPlayer): void {
     const b = p.body;
     switch (b.phase) {
-      case Phase.HEAL:
-        this.startHeal(p);
+      case Phase.HEAL_WINDUP:
+        p.ability.healed = false;
         this.host.emit({ type: 'special', playerId: p.id, ability: Ability.HEAL });
         break;
       case Phase.DRONE_DEPLOY:
@@ -200,8 +201,14 @@ export class AbilitySystem {
     if (grab && !this.grabValid(p, grab)) this.lostGrab(p);
 
     switch (b.phase) {
-      case Phase.HEAL:
-        this.updateHeal(p);
+      case Phase.HEAL_REACH:
+        if (!p.ability.grab) this.healGrab(p);
+        return;
+      case Phase.HEAL_PULL:
+        if (p.ability.grab) this.placeInArms(p);
+        return;
+      case Phase.HEAL_HUG:
+        this.updateHug(p);
         return;
       case Phase.DRONE_PILOT:
         if (p.ability.grab) this.placeCargo(p);
@@ -239,7 +246,7 @@ export class AbilitySystem {
     p.ability.grab = null;
     const b = p.body;
     b.cargo = Cargo.NONE;
-    if (b.phase === Phase.TONGUE_PULL || b.phase === Phase.TONGUE_GULP || b.phase === Phase.TONGUE_HOLD || b.phase === Phase.TONGUE_SPIT) {
+    if (b.phase === Phase.HEAL_PULL || b.phase === Phase.TONGUE_PULL || b.phase === Phase.TONGUE_GULP || b.phase === Phase.TONGUE_HOLD || b.phase === Phase.TONGUE_SPIT) {
       interruptAbility(b, this.c);
     }
   }
@@ -314,60 +321,52 @@ export class AbilitySystem {
 
   // --- heal ------------------------------------------------------------------------------------
 
-  private startHeal(p: WorldPlayer): void {
-    const c = this.c.heal;
+  /** The stretching hands touch a player: catch them and start yanking them in. */
+  private healGrab(p: WorldPlayer): void {
     const b = p.body;
+    const c = this.c.heal;
     const hitbox = this.host.ctx.hitbox;
-    const me = feetOf(b, hitbox);
-    p.ability.healed = false;
-    let best: WorldPlayer | null = null;
-    let bestDist = Infinity;
+    const hands = healHands(b, hitbox, this.c);
+    let target: WorldPlayer | null = null;
     for (const other of this.host.listPlayers()) {
       const o = other.body;
-      if (other === p || !o.alive || o.held !== Held.NONE || o.flight > 0) continue;
-      const f = feetOf(o, hitbox);
-      const dx = f.x - me.x;
-      const dy = f.y - me.y;
-      if (Math.abs(dx) > c.rangeX || Math.abs(dy) > c.rangeY) continue;
-      const dist = Math.hypot(dx, dy);
-      if (dist < bestDist) {
-        best = other;
-        bestDist = dist;
+      if (other === p || !this.grabbable(other)) continue;
+      if (circleOverlapsRect(hands.x, hands.y, c.handRadius, { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height })) {
+        target = other;
+        break;
       }
     }
-    if (!best) return;
-    const f = feetOf(best.body, hitbox);
-    if (f.x !== me.x) b.facing = f.x > me.x ? 1 : -1;
-    this.seize(best, Held.PULLED);
-    best.body.facing = b.facing > 0 ? -1 : 1;
-    p.ability.grab = { kind: 'player', id: best.id };
-    p.ability.grabFrom = f;
-    this.host.emit({ type: 'grab', playerId: p.id, targetId: best.id, boxId: null });
+    if (!target) return;
+    this.seize(target, Held.PULLED);
+    target.body.facing = b.facing > 0 ? -1 : 1;
+    p.ability.grab = { kind: 'player', id: target.id };
+    p.ability.healed = false;
+    b.phase = Phase.HEAL_PULL;
+    b.phaseTime = 0;
+    this.placeInArms(p);
+    this.host.emit({ type: 'grab', playerId: p.id, targetId: target.id, boxId: null });
   }
 
-  private updateHeal(p: WorldPlayer): void {
+  private placeInArms(p: WorldPlayer): void {
+    const b = p.body;
+    const grab = p.ability.grab!;
+    this.placeCenter(grab, healPullCenter(b, this.host.ctx.hitbox, this.c), 'held');
+    const target = grab.kind === 'player' ? this.host.getPlayer(grab.id) : undefined;
+    if (target) target.body.facing = b.facing > 0 ? -1 : 1;
+  }
+
+  private updateHug(p: WorldPlayer): void {
     const c = this.c.heal;
     const b = p.body;
-    const t = b.phaseTime;
     const hitbox = this.host.ctx.hitbox;
     const grab = p.ability.grab;
     const target = grab?.kind === 'player' ? this.host.getPlayer(grab.id) : undefined;
     if (target) {
-      const me = feetOf(b, hitbox);
-      const spot = healSpot(c.track, Math.max(t, c.pullTo));
-      const goal = { x: me.x + b.facing * spot.dx, y: me.y + spot.dy };
-      let feet: Vec2;
-      if (t < c.pullFrom) feet = p.ability.grabFrom;
-      else if (t < c.pullTo) {
-        const k = smoothstep((t - c.pullFrom) / (c.pullTo - c.pullFrom));
-        const from = p.ability.grabFrom;
-        feet = { x: from.x + (goal.x - from.x) * k, y: from.y + (goal.y - from.y) * k - 10 * Math.sin(Math.PI * k) };
-      } else feet = goal;
-      this.placeFeet(target.body, feet, true);
-      target.body.held = t < c.pullTo ? Held.PULLED : Held.HUGGED;
+      this.placeFeet(target.body, healHugFeet(b, hitbox, b.phaseTime, this.c), true);
+      target.body.held = Held.HUGGED;
       target.body.facing = b.facing > 0 ? -1 : 1;
     }
-    if (!p.ability.healed && t >= c.healAt) {
+    if (!p.ability.healed && b.phaseTime >= c.healAt) {
       p.ability.healed = true;
       if (target) target.hp = Math.min(this.host.maxHp(target), target.hp + c.amount);
       p.hp = Math.min(this.host.maxHp(p), p.hp + c.selfAmount);
@@ -763,21 +762,6 @@ export class AbilitySystem {
     body.x = x;
     body.y = y;
   }
-}
-
-function smoothstep(k: number): number {
-  const t = Math.min(1, Math.max(0, k));
-  return t * t * (3 - 2 * t);
-}
-
-/** The heal track's hug spot at time `t` (relative to the healer's feet, facing right). */
-export function healSpot(track: readonly (readonly [number, number, number])[], t: number): { dx: number; dy: number } {
-  let spot = track[0] ?? [0, 0, 0];
-  for (const entry of track) {
-    if (entry[0] <= t) spot = entry;
-    else break;
-  }
-  return { dx: spot[1], dy: spot[2] };
 }
 
 /** Whether a phase can hold something with a tongue (for the renderer). */

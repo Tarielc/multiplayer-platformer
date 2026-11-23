@@ -37,6 +37,8 @@ const dir = 'sprites/abilities';
 export const ABILITY_SHEETS = {
   heal: { key: 'ab:heal', path: `${dir}/bunny-man/heal_caster` },
   healFx: { key: 'ab:healFx', path: `${dir}/bunny-man/heal_fx` },
+  healAim: { key: 'ab:healAim', path: `${dir}/bunny-man/heal_aim` },
+  healParts: { key: 'ab:healParts', path: `${dir}/bunny-man/heal_aim_parts` },
   pilot: { key: 'ab:pilot', path: `${dir}/virtual-guy/pilot` },
   drone: { key: 'ab:drone', path: `${dir}/virtual-guy/drone` },
   claw: { key: 'ab:claw', path: `${dir}/virtual-guy/claw` },
@@ -129,6 +131,9 @@ export function relativeAimDeg(angle: number, facing: 1 | -1): number {
   const y = Math.sin(angle);
   return (Math.atan2(y, Math.max(0, x)) * 180) / Math.PI;
 }
+
+/** Bunny Man's stretchy arms (`heal_aim.json` armColors): outline, front sleeve, back sleeve. */
+export const ARM_COLORS = { outline: 0x211f30, sleeve: 0xf89cc0, shade: 0xda89a8 } as const;
 
 /** Tongue colours of the generated parts sheet (outline, flesh). */
 export const TONGUE_COLORS = { outline: 0x211f30, fill: 0xf89cc0 } as const;

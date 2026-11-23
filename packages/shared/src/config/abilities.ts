@@ -45,7 +45,15 @@ export const CHARACTER_ABILITY: Readonly<Record<CharacterId, AbilityId>> = {
  */
 export const Phase = {
   NONE: 0,
-  HEAL: 1,
+  /** Bunny Man: hugging (and kissing) the player his arms pulled in. */
+  HEAL_HUG: 1,
+  HEAL_WINDUP: 2,
+  /** The arms stretch out along the aim. */
+  HEAL_REACH: 3,
+  /** The hands caught someone and yank them in (set by the server). */
+  HEAL_PULL: 4,
+  /** Missed: the arms snap back. */
+  HEAL_RETRACT: 5,
   DRONE_DEPLOY: 10,
   DRONE_SIT: 11,
   DRONE_PILOT: 12,
@@ -83,23 +91,37 @@ export const Cargo = { NONE: 0, PLAYER: 1, BOX: 2 } as const;
 
 export interface AbilityTuning {
   heal: {
-    durationMs: number;
-    cooldownMs: number;
-    /** Teammates whose feet are within this distance can be pulled in. */
-    rangeX: number;
-    rangeY: number;
-    /** The target is dragged from where it stood to the hug spot between these times. */
-    pullFromMs: number;
-    pullToMs: number;
-    /** Hearts restored (target, and the healer). */
+    /** Squash and wind up before the arms fly out. */
+    windupMs: number;
+    /** Arms stretch out along the aim at this speed (px/s), up to `maxLength`. */
+    reachSpeed: number;
+    maxLength: number;
+    /** Empty arms snap back at this speed. */
+    retractSpeed: number;
+    /** A caught player is yanked in at this speed. */
+    pullSpeed: number;
+    /** Arm root relative to the healer's feet (facing right). */
+    shoulder: { x: number; y: number };
+    /** The hands catch a player within this radius of the arm tip. */
+    handRadius: number;
+    /** The pull ends (and the hug starts) when the arms are this short. */
+    hugReach: number;
+    /** Over the last this many px of the pull the target glides onto the hug spot. */
+    pullBlend: number;
+    /** Length of the hug (and kiss) once someone was pulled in. */
+    hugMs: number;
+    /** Hearts restored (target, and the healer) this far into the hug. */
     healAtMs: number;
     amount: number;
     selfAmount: number;
     /**
-     * Where the target's feet are, relative to the healer's feet (healer facing right), from
-     * the given time on. Matches the `target` points of `heal_caster.json`.
+     * Where the target's feet are during the hug, relative to the healer's feet (healer facing
+     * right), from the given time on. Matches the `target` points of `heal_caster.json` `hug`.
      */
-    track: readonly (readonly [ms: number, dx: number, dy: number])[];
+    hugTrack: readonly (readonly [ms: number, dx: number, dy: number])[];
+    cooldownMs: number;
+    /** Cooldown after the arms caught nobody. */
+    missCooldownMs: number;
     /** Trap immunity after being released. */
     afterglowMs: number;
   };
@@ -173,23 +195,28 @@ export interface AbilityTuning {
 
 export const ABILITY_TUNING: Readonly<AbilityTuning> = {
   heal: {
-    durationMs: 1700,
-    cooldownMs: 6000,
-    rangeX: 96,
-    rangeY: 40,
-    pullFromMs: 400,
-    pullToMs: 610,
-    healAtMs: 1200,
+    windupMs: 190,
+    reachSpeed: 520,
+    maxLength: 112,
+    retractSpeed: 640,
+    pullSpeed: 420,
+    shoulder: { x: 10, y: -7 },
+    handRadius: 10,
+    hugReach: 10,
+    pullBlend: 40,
+    hugMs: 1200,
+    healAtMs: 700,
     amount: 2,
     selfAmount: 1,
-    track: [
-      [0, 48, 0],
-      [610, 14, 0],
-      [740, 14, -4],
-      [860, 14, 0],
-      [1200, 15, 0],
-      [1370, 20, 0],
+    hugTrack: [
+      [0, 14, 0],
+      [240, 14, -4],
+      [360, 14, 0],
+      [700, 15, 0],
+      [870, 20, 0],
     ],
+    cooldownMs: 6000,
+    missCooldownMs: 1500,
     afterglowMs: 600,
   },
   drone: {
@@ -248,13 +275,16 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
 
 /** Ability values in simulation units (seconds, px, px/s). */
 export interface CompiledAbilities {
-  heal: Omit<AbilityTuning['heal'], 'durationMs' | 'cooldownMs' | 'pullFromMs' | 'pullToMs' | 'healAtMs' | 'track' | 'afterglowMs'> & {
-    duration: number;
-    cooldown: number;
-    pullFrom: number;
-    pullTo: number;
+  heal: Omit<
+    AbilityTuning['heal'],
+    'windupMs' | 'hugMs' | 'healAtMs' | 'hugTrack' | 'cooldownMs' | 'missCooldownMs' | 'afterglowMs'
+  > & {
+    windup: number;
+    hug: number;
     healAt: number;
-    track: readonly (readonly [t: number, dx: number, dy: number])[];
+    hugTrack: readonly (readonly [t: number, dx: number, dy: number])[];
+    cooldown: number;
+    missCooldown: number;
     afterglow: number;
   };
   drone: Omit<
@@ -296,23 +326,28 @@ const s = (ms: number) => ms / 1000;
 
 export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities {
   const { heal, drone, giant, tongue } = t;
-  if (!(heal.pullFromMs <= heal.pullToMs && heal.pullToMs <= heal.healAtMs && heal.healAtMs <= heal.durationMs)) {
-    throw new Error('AbilityTuning: heal times must be ordered pullFrom <= pullTo <= healAt <= duration');
-  }
+  if (!(heal.healAtMs <= heal.hugMs)) throw new Error('AbilityTuning: heal.healAtMs must be <= hugMs');
+  if (heal.maxLength <= 0 || heal.reachSpeed <= 0) throw new Error('AbilityTuning: heal reach speed and length must be > 0');
   if (drone.spawnAtMs > drone.deployMs) throw new Error('AbilityTuning: drone.spawnAtMs must be <= deployMs');
   if (tongue.maxLength <= 0 || tongue.speed <= 0) throw new Error('AbilityTuning: tongue speed and length must be > 0');
   return {
     heal: {
-      rangeX: heal.rangeX,
-      rangeY: heal.rangeY,
+      reachSpeed: heal.reachSpeed,
+      maxLength: heal.maxLength,
+      retractSpeed: heal.retractSpeed,
+      pullSpeed: heal.pullSpeed,
+      shoulder: { ...heal.shoulder },
+      handRadius: heal.handRadius,
+      hugReach: heal.hugReach,
+      pullBlend: heal.pullBlend,
       amount: heal.amount,
       selfAmount: heal.selfAmount,
-      duration: s(heal.durationMs),
-      cooldown: s(heal.cooldownMs),
-      pullFrom: s(heal.pullFromMs),
-      pullTo: s(heal.pullToMs),
+      windup: s(heal.windupMs),
+      hug: s(heal.hugMs),
       healAt: s(heal.healAtMs),
-      track: heal.track.map(([ms, dx, dy]) => [s(ms), dx, dy] as const),
+      hugTrack: heal.hugTrack.map(([ms, dx, dy]) => [s(ms), dx, dy] as const),
+      cooldown: s(heal.cooldownMs),
+      missCooldown: s(heal.missCooldownMs),
       afterglow: s(heal.afterglowMs),
     },
     drone: {

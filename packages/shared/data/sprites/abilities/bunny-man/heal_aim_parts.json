@@ -1,0 +1,99 @@
+{
+  "image": "heal_aim_parts.png",
+  "animations": {
+    "hand_open": {
+      "row": 0,
+      "frameWidth": 7,
+      "frameHeight": 7,
+      "frames": 1,
+      "loop": false,
+      "note": "at the end of each arm; open while reaching, grab while pulling",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          7,
+          7
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            3,
+            3
+          ]
+        }
+      ]
+    },
+    "hand_grab": {
+      "row": 1,
+      "frameWidth": 7,
+      "frameHeight": 7,
+      "frames": 1,
+      "loop": false,
+      "note": "at the end of each arm; open while reaching, grab while pulling",
+      "durationsMs": [
+        1000
+      ],
+      "rects": [
+        [
+          0,
+          7,
+          7,
+          7
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            3,
+            3
+          ]
+        }
+      ]
+    },
+    "reticle": {
+      "row": 2,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 2,
+      "loop": true,
+      "note": "aim cursor; place at the aim point",
+      "durationsMs": [
+        220,
+        220
+      ],
+      "rects": [
+        [
+          0,
+          14,
+          16,
+          16
+        ],
+        [
+          16,
+          14,
+          16,
+          16
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            8,
+            8
+          ]
+        },
+        {
+          "center": [
+            8,
+            8
+          ]
+        }
+      ]
+    }
+  }
+}

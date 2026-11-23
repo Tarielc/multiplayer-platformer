@@ -1,20 +1,14 @@
 {
   "image": "heal_caster.png",
   "animations": {
-    "heal": {
+    "hug": {
       "row": 0,
       "frameWidth": 112,
       "frameHeight": 40,
-      "frames": 15,
+      "frames": 9,
       "loop": false,
-      "note": "'target' = where the healed player's feet go (they face char1); they are pulled through the air on frames 4-5 and lifted on 8",
+      "note": "'target' = where the hugged player's feet go (they face char1)",
       "durationsMs": [
-        140,
-        50,
-        70,
-        140,
-        50,
-        50,
         110,
         130,
         120,
@@ -79,85 +73,9 @@
           0,
           112,
           40
-        ],
-        [
-          1008,
-          0,
-          112,
-          40
-        ],
-        [
-          1120,
-          0,
-          112,
-          40
-        ],
-        [
-          1232,
-          0,
-          112,
-          40
-        ],
-        [
-          1344,
-          0,
-          112,
-          40
-        ],
-        [
-          1456,
-          0,
-          112,
-          40
-        ],
-        [
-          1568,
-          0,
-          112,
-          40
         ]
       ],
       "points": [
-        {
-          "target": [
-            80,
-            39
-          ]
-        },
-        {
-          "target": [
-            80,
-            39
-          ]
-        },
-        {
-          "target": [
-            80,
-            39
-          ],
-          "grab": [
-            70,
-            29
-          ]
-        },
-        {
-          "target": [
-            80,
-            39
-          ]
-        },
-        {
-          "target": [
-            64,
-            33
-          ]
-        },
-        {
-          "target": [
-            52,
-            36
-          ]
-        },
         {
           "target": [
             46,
@@ -222,21 +140,15 @@
         }
       ]
     },
-    "heal_front": {
+    "hug_front": {
       "row": 1,
       "frameWidth": 112,
       "frameHeight": 40,
-      "frames": 15,
+      "frames": 9,
       "loop": false,
       "note": "draw over the target: char1's arms and the kiss during the hug",
       "layer": "front",
       "durationsMs": [
-        140,
-        50,
-        70,
-        140,
-        50,
-        50,
         110,
         130,
         120,
@@ -301,42 +213,6 @@
           40,
           112,
           40
-        ],
-        [
-          1008,
-          40,
-          112,
-          40
-        ],
-        [
-          1120,
-          40,
-          112,
-          40
-        ],
-        [
-          1232,
-          40,
-          112,
-          40
-        ],
-        [
-          1344,
-          40,
-          112,
-          40
-        ],
-        [
-          1456,
-          40,
-          112,
-          40
-        ],
-        [
-          1568,
-          40,
-          112,
-          40
         ]
       ]
     }
@@ -346,5 +222,5 @@
     "y": 39
   },
   "facing": "right",
-  "drawOrder": "heal (back) -> target -> heal_front"
+  "drawOrder": "hug (back) -> target -> hug_front"
 }

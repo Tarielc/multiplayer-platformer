@@ -18,8 +18,9 @@ import {
   attackReachBox,
   defaultCharacterForSlot,
   droneGrip,
-  feetOf,
-  healSpot,
+  healHugFeet,
+  healPullCenter,
+  healShoulder,
   isAttackActive,
   levelChecksum,
   parseTiledLevel,
@@ -319,9 +320,10 @@ export class LevelScene extends Phaser.Scene {
       const self = body.held !== Held.NONE && selfId ? samples.get(selfId) : undefined;
       const feetX = self ? self.x + HITBOX.width / 2 : position.x + HITBOX.width / 2;
       const feetY = self ? self.y + HITBOX.height : position.y + HITBOX.height;
-      const frog = CHARACTER_ABILITY[local.characterId] === Ability.TONGUE;
+      const ability = CHARACTER_ABILITY[local.characterId];
       const ahead = body.facing > 0 ? 0 : Math.PI;
-      const preview = frog ? (aim ?? (body.phase === Phase.TONGUE_HOLD ? ahead : null)) : null;
+      const preview =
+        ability === Ability.TONGUE ? (aim ?? (body.phase === Phase.TONGUE_HOLD ? ahead : null)) : ability === Ability.HEAL ? aim : null;
       local.render(feetX, feetY, body.facing, signals, frameMs, preview);
       this.follow(local.droneTarget ?? local.container);
       if (!this.cameraSnapped) {
@@ -439,10 +441,12 @@ export class LevelScene extends Phaser.Scene {
     this.cameras.main.startFollow(target, true, lerp, lerp);
   }
 
-  /** The special ability's aim this frame (null = straight ahead), from the tongue's origin. */
+  /** The special ability's aim this frame (null = straight ahead), from where it leaves the body. */
   private sampleAim(controls: InputController, body: Readonly<MovementBody> | null): number | null {
     if (!body) return null;
-    const origin = tongueOrigin(body, HITBOX, ABILITIES);
+    const local = this.services.client.playerId ? this.views.get(this.services.client.playerId) : undefined;
+    const heal = local !== undefined && CHARACTER_ABILITY[local.characterId] === Ability.HEAL;
+    const origin = heal ? healShoulder(body, HITBOX, ABILITIES) : tongueOrigin(body, HITBOX, ABILITIES);
     return controls.aimAngle(origin.x, origin.y, body.facing);
   }
 
@@ -466,10 +470,11 @@ export class LevelScene extends Phaser.Scene {
       const tip = tongueTip(body, HITBOX, ABILITIES);
       feet = { x: tip.x, y: tip.y + HITBOX.height / 2 };
       topLeft = { x: tip.x - box.width / 2, y: tip.y - box.height / 2 };
-    } else if (body.phase === Phase.HEAL && body.phaseTime >= ABILITIES.heal.pullTo) {
-      const me = feetOf(body, HITBOX);
-      const spot = healSpot(ABILITIES.heal.track, body.phaseTime);
-      feet = { x: me.x + body.facing * spot.dx, y: me.y + spot.dy };
+    } else if (body.phase === Phase.HEAL_PULL) {
+      const center = healPullCenter(body, HITBOX, ABILITIES);
+      feet = { x: center.x, y: center.y + HITBOX.height / 2 };
+    } else if (body.phase === Phase.HEAL_HUG) {
+      feet = healHugFeet(body, HITBOX, body.phaseTime, ABILITIES);
     }
     const out = { players: new Map<string, { x: number; y: number }>(), props: new Map<number, { x: number; y: number }>() };
     if (isBox && topLeft) out.props.set(Number(id), topLeft);

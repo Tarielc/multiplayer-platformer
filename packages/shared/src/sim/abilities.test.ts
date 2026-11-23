@@ -72,62 +72,107 @@ describe('input: special + aim', () => {
 });
 
 describe('heal (Bunny Man)', () => {
-  it('pulls the nearest teammate in, hugs them and restores hearts', () => {
+  function healWorld(bX: number) {
     const world = makeWorld();
     world.addPlayer('a', 0, 'bunny-man');
     world.addPlayer('b', 1, 'virtual-guy');
     ticks(world, 5);
     place(world, 'a', 100);
-    place(world, 'b', 170);
+    place(world, 'b', bX);
     ticks(world, 5);
-    world.getPlayer('b')!.hp = 1;
+    return { world, a: world.getPlayer('a')!, b: world.getPlayer('b')! };
+  }
 
-    const events = press(world, 'a');
+  /** Ticks until `done` holds (at most `max` ticks), collecting events. */
+  function until(world: GameWorld, done: () => boolean, max = 300): GameEvent[] {
+    const events: GameEvent[] = [];
+    for (let i = 0; i < max && !done(); i++) events.push(...tick(world));
+    return events;
+  }
+
+  it('stretches the arms along the aim, yanks the player in, hugs them and restores hearts', () => {
+    const { world, a, b } = healWorld(170);
+    b.hp = 1;
+    a.hp = 1;
+    const events = press(world, 'a', withAim(Button.SPECIAL, 0));
+    expect(a.body.phase).toBe(Phase.HEAL_WINDUP);
+    events.push(...until(world, () => a.body.phase !== Phase.HEAL_WINDUP && a.body.phase !== Phase.HEAL_REACH));
     expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null });
-    const b = world.getPlayer('b')!;
+    expect(a.body.phase).toBe(Phase.HEAL_PULL);
     expect(b.body.held).toBe(Held.PULLED);
     // Inputs are ignored while held.
     const x0 = b.body.x;
-    ticks(world, 3, { b: Button.LEFT | Button.JUMP });
-    expect(b.body.x).toBe(x0);
+    tick(world, { b: Button.RIGHT | Button.JUMP });
+    expect(b.body.x).toBeLessThan(x0);
 
-    ticks(world, seconds(ABILITIES.heal.pullTo) + 2);
+    until(world, () => a.body.phase === Phase.HEAL_HUG);
+    tick(world);
     expect(b.body.held).toBe(Held.HUGGED);
-    const a = world.getPlayer('a')!;
-    expect(b.body.x + HITBOX.width / 2).toBeCloseTo(a.body.x + HITBOX.width / 2 + ABILITIES.heal.track[1]![1], 5);
+    expect(b.body.x + HITBOX.width / 2).toBeCloseTo(a.body.x + HITBOX.width / 2 + ABILITIES.heal.hugTrack[0]![1], 5);
 
-    const rest = ticks(world, seconds(ABILITIES.heal.duration));
+    const rest = ticks(world, seconds(ABILITIES.heal.hug) + 2);
     expect(rest.some((e) => e.type === 'heal' && e.targetId === 'b')).toBe(true);
     expect(b.hp).toBe(Math.min(PLAYER_CONFIG.maxHp, 1 + ABILITIES.heal.amount));
+    expect(a.hp).toBe(1 + ABILITIES.heal.selfAmount);
     expect(b.body.held).toBe(Held.NONE);
     expect(a.body.phase).toBe(Phase.NONE);
-    expect(a.body.specialCooldown).toBeGreaterThan(0);
+    expect(a.body.specialCooldown).toBeCloseTo(ABILITIES.heal.cooldown - 1 / 60, 1);
   });
 
-  it('heals only the healer when nobody is close enough', () => {
-    const world = makeWorld();
+  it('turns around to aim behind', () => {
+    const { world, a, b } = healWorld(40);
+    const events = [...press(world, 'a', withAim(Button.SPECIAL, Math.PI)), ...ticks(world, 30)];
+    expect(a.body.facing).toBe(-1);
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null });
+    expect(b.body.held).not.toBe(Held.NONE);
+  });
+
+  it('misses when aimed away: the arms snap back, nobody is healed, and the cooldown is short', () => {
+    const { world, a, b } = healWorld(170);
+    a.hp = 1;
+    const events = [...press(world, 'a', withAim(Button.SPECIAL, -Math.PI / 2))];
+    events.push(...until(world, () => a.body.phase === Phase.HEAL_RETRACT));
+    expect(a.body.reach).toBeGreaterThan(ABILITIES.heal.maxLength - 20);
+    events.push(...until(world, () => a.body.phase === Phase.NONE));
+    expect(events.some((e) => e.type === 'grab' || e.type === 'heal')).toBe(false);
+    expect(b.body.held).toBe(Held.NONE);
+    expect(a.hp).toBe(1);
+    expect(a.body.specialCooldown).toBeGreaterThan(0);
+    expect(a.body.specialCooldown).toBeLessThanOrEqual(ABILITIES.heal.missCooldown);
+  });
+
+  it('stops the arms at walls', () => {
+    const world = new GameWorld({
+      level: asciiToLevel({ rows: ['        ', '        ', '        ', '        ', ' 1  #   ', '########'], objects: [] }),
+      movement: resolveMovement(),
+    });
     world.addPlayer('a', 0, 'bunny-man');
-    world.addPlayer('b', 1);
     ticks(world, 5);
     place(world, 'a', 100);
-    place(world, 'b', 500);
     ticks(world, 5);
-    world.getPlayer('a')!.hp = 1;
-    const events = [...press(world, 'a'), ...ticks(world, seconds(ABILITIES.heal.duration))];
-    expect(events).toContainEqual(expect.objectContaining({ type: 'heal', playerId: 'a', targetId: null }));
-    expect(world.getPlayer('a')!.hp).toBe(2);
-    expect(world.getPlayer('b')!.body.held).toBe(Held.NONE);
+    const a = world.getPlayer('a')!.body;
+    press(world, 'a', withAim(Button.SPECIAL, 0));
+    until(world, () => a.phase === Phase.HEAL_RETRACT);
+    // The wall starts at x = 128; the shoulder sits 5 px in front of the feet.
+    expect(a.reach).toBeLessThan(128 - 100 - ABILITIES.heal.shoulder.x + 10);
   });
 
   it('needs the ground and respects the cooldown', () => {
     const world = makeWorld();
     world.addPlayer('a', 0, 'bunny-man');
     ticks(world, 5);
+    const a = world.getPlayer('a')!.body;
+    tick(world, { a: Button.JUMP });
+    ticks(world, 3);
     press(world, 'a');
-    expect(world.getPlayer('a')!.body.phase).toBe(Phase.HEAL);
-    ticks(world, seconds(ABILITIES.heal.duration) + 2);
+    expect(a.phase).toBe(Phase.NONE);
+    ticks(world, 60);
     press(world, 'a');
-    expect(world.getPlayer('a')!.body.phase).toBe(Phase.NONE);
+    expect(a.phase).toBe(Phase.HEAL_WINDUP);
+    ticks(world, 120);
+    expect(a.phase).toBe(Phase.NONE);
+    press(world, 'a');
+    expect(a.phase).toBe(Phase.NONE);
   });
 });
 
