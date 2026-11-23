@@ -144,7 +144,7 @@ Players have **3 hearts** (`PLAYER_CONFIG.maxHp`), shown in the HUD. Spikes, saw
 | Fan | Blows players up while it is on (frame 0 = off). | `fan.png` 24×8 × N (placeholder art; drop your own over it) |
 | Rock-head | Solid block that slides between two walls on one axis and slams into them. You can ride it; get pinned against a wall and you are crushed. | `rock-head.png` 42×42, rows: blink, side impact, top/bottom impact |
 | Spike-head | Solid block with spikes on every side; touching it costs a heart. | `spike-head.png` 54×52, same rows |
-| Box | Solid; breaks after 1/2/3 hits (box1/2/3) from an attack or a stomp (which bounces you), then bursts into debris. | `box1..3.png` 28×24, rows: idle, hit, debris |
+| Box | Solid, and you can stand on it; breaks after 1/2/3 hits (box1/2/3) from an attack, then bursts into debris. | `box1..3.png` 28×24, rows: idle, hit, debris |
 
 Traps are Tiled objects; [docs/level-authoring.md](docs/level-authoring.md#traps) lists their classes and properties. Every trap moves as a pure function of the server tick, so the client predicts them exactly (you collide with what you see); only box hits and falling-platform triggers are replicated. Tuning is in `packages/shared/src/config/traps.ts`; the client views are in `apps/web/src/game/traps/`.
 

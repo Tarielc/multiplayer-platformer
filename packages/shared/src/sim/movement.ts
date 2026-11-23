@@ -106,14 +106,12 @@ export interface StepContacts {
   ground: number;
   /** Trampoline that launched the body. */
   bounced: number;
-  /** Box the body landed on (and bounced off). */
-  stomped: number;
   /** A moving solid pushed the body into something solid. */
   crushed: boolean;
 }
 
 export function noContacts(): StepContacts {
-  return { ground: -1, bounced: -1, stomped: -1, crushed: false };
+  return { ground: -1, bounced: -1, crushed: false };
 }
 
 const EPS = 1e-6;
@@ -421,13 +419,12 @@ function moveY(
     if (stop === Infinity) return false;
     body.y = stop - h;
     if (landedOn && landedOn.bounce > 0) {
-      // Trampolines and boxes throw the body back up (no jump cut: it isn't a jump).
+      // Trampolines throw the body back up (no jump cut: it isn't a jump).
       body.vy = -landedOn.bounce;
       body.jumping = false;
       body.coyote = 0;
       body.airJumpsLeft = ctx.movement.airJumps;
-      if (landedOn.kind === 'box') contacts.stomped = landedOn.id;
-      else contacts.bounced = landedOn.id;
+      contacts.bounced = landedOn.id;
       return true;
     }
     body.vy = 0;

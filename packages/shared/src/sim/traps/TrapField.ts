@@ -241,7 +241,7 @@ export class TrapField {
       case 'box': {
         const rect = this.boxRect(trap.id);
         if (!rect) return null;
-        return { ...base, ...rect, oneWay: false, bounce: this.config.box.stompBounce };
+        return { ...base, ...rect, oneWay: false, bounce: 0 };
       }
       default:
         return null;

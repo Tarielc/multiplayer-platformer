@@ -89,7 +89,7 @@ Times are in milliseconds, distances in pixels. Every property is optional.
 | `fan` | 24×8 (8×24 sideways) | Point on the floor, or rect | `dir` (`up` default), `range` (px, default 112), `onMs` (2000), `offMs` (1500, `0` = always on), `phaseMs` | Blows players along `dir` in a 32 px wide stream `range` long while on. Going up, it lifts you to about the top of the stream. |
 | `rockHead` | 32×32 | Point or rect | `axis` (`x` default, `y`), `dir` (first move: `right`/`down` default, or `left`/`up`), `waitMs` (900), `phaseMs` | Solid. Scans the tiles for the walls it hits on its axis, then waits, accelerates, slams into a wall, waits, and goes back. You can ride it. Pinned between it and a wall: crushed (instant death). Needs walls on its axis: map edges count horizontally, but a vertical one needs a real floor and ceiling. |
 | `spikeHead` | 42×42 | Point or rect | – | Solid and static; touching any side costs a heart. |
-| `box` | 20×20 | Point on the floor, or rect | `variant` (1–3: hits to break, and the art) | Solid. An attack or a stomp hits it (a stomp bounces you; one hit per swing, 200 ms apart). On the last hit it bursts. Broken boxes stay broken for the rest of the run. |
+| `box` | 20×20 | Point on the floor, or rect | `variant` (1–3: hits to break, and the art) | Solid; players can stand on it. An attack hits it (one hit per swing, 200 ms apart). On the last hit it bursts. Broken boxes stay broken for the rest of the run. |
 
 Damage, knockback, invulnerability, speeds and the falling and fan timings are in `TRAP_TUNING` (`config/traps.ts`). An object that can't work fails the level with a message naming it: a rock-head with no wall on its axis or placed inside one, an unknown `dir`, `axis` or `variant`, a saw with `speed` 0, a non-number property.
 
@@ -174,7 +174,7 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | Player hitbox | 20×28 px. Needs 2×2 tiles of clearance (1×1 at 32 px). |
 | Full jump height | 112 px = **7 tiles** (3.5) (a held jump peaks at exactly this height after 0.4 s). Ledges up to 96 px (6 tiles) high are comfortable. |
 | Short hop | Releasing jump while rising multiplies the remaining upward speed by 0.45, once. |
-| Double jump | One extra jump in mid-air (`airJumps`) that rises 80 px = **5 tiles** (2.5) from wherever it starts. Jumping again at the apex reaches 192 px = **12 tiles** (6). Landing, trampolines and box stomps give it back. |
+| Double jump | One extra jump in mid-air (`airJumps`) that rises 80 px = **5 tiles** (2.5) from wherever it starts. Jumping again at the apex reaches 192 px = **12 tiles** (6). Landing (boxes included) and trampolines give it back. |
 | Run speed | 220 px/s (≈ 13.8 tiles/s, or 6.9), reached in 0.1 s from standstill |
 | Running jump distance | ≈ 160 px = 10 tiles (5) of horizontal travel, back to the same height. Gaps up to 128 px (8 tiles) are comfortable; 160 px is an expert jump. With the double jump: ≈ 260 px = 16 tiles (8). |
 | Coyote time | 100 ms after walking off a ledge (after that, a press spends the air jump) |

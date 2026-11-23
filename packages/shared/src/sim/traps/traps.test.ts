@@ -240,19 +240,17 @@ describe('traps: bouncing and boxes', () => {
     expect(body.airJumpsLeft).toBe(MOVEMENT_TUNING.airJumps);
   });
 
-  it('breaks boxes by stomping, bouncing each time, after their number of hits', () => {
-    const world = worldWith([trap('box', 320, 160, 0, 0, { variant: 3 })]);
+  it('lets players land and stand on boxes without hitting them', () => {
+    const world = worldWith([trap('box', 320, 160, 0, 0, { variant: 1 })]);
     const id = world.level.traps[0]!.id;
     place(world, 320, 100);
-    const hits = ticks(world, 240).filter((e) => e.type === 'boxHit');
-    expect(hits).toEqual([
-      { type: 'boxHit', playerId: 'a', boxId: id, hits: 1, broken: false },
-      { type: 'boxHit', playerId: 'a', boxId: id, hits: 2, broken: false },
-      { type: 'boxHit', playerId: 'a', boxId: id, hits: 3, broken: true },
-    ]);
-    // Broken: the player fell through to the floor.
-    expect(world.getPlayer('a')!.body.y + HITBOX.height).toBe(160);
-    expect(world.toNetState(() => 0).traps).toEqual([{ id, hits: 3 }]);
+    const events = ticks(world, 120);
+    expect(events.filter((e) => e.type === 'boxHit' || e.type === 'bounce')).toEqual([]);
+    const body = world.getPlayer('a')!.body;
+    expect(body.y + HITBOX.height).toBe(world.trapField.colliderRect(id, world.tick)!.y); // on the box, not the floor
+    expect(body.grounded).toBe(true);
+    expect(body.vy).toBe(0);
+    expect(world.toNetState(() => 0).traps).toEqual([]);
   });
 
   it('breaks boxes with an attack, once per swing', () => {
@@ -329,8 +327,9 @@ describe('traps: moving platforms', () => {
 describe('traps: replication', () => {
   it('rebuilds identical trap colliders on a client from the net state', () => {
     const world = worldWith([trap('box', 320, 160), trap('fallingPlatform', 500, 100)]);
-    place(world, 320, 100);
-    ticks(world, 40);
+    place(world, 296, 160); // beside the box: one swing breaks it
+    ticks(world, 5);
+    ticks(world, 20, Button.ATTACK);
     const state = world.toNetState(() => 0);
     expect(state.traps.length).toBeGreaterThan(0);
     const client = TrapField.forLevel(world.level);
@@ -340,12 +339,14 @@ describe('traps: replication', () => {
 
   it('clones worlds independently', () => {
     const world = worldWith([trap('box', 320, 160)]);
-    place(world, 320, 100);
+    place(world, 296, 160); // beside the box: one swing breaks it
     const copy = world.clone();
-    ticks(copy, 60);
+    ticks(copy, 5);
+    ticks(copy, 20, Button.ATTACK);
     expect(copy.trapField.isBroken(copy.level.traps[0]!.id)).toBe(true);
     expect(world.trapField.isBroken(world.level.traps[0]!.id)).toBe(false);
-    expect(world.getPlayer('a')!.body.y).not.toBe(copy.getPlayer('a')!.body.y);
+    expect(copy.getPlayer('a')!.body.attackSeq).toBe(1);
+    expect(world.getPlayer('a')!.body.attackSeq).toBe(0);
     expect(world.tick).toBe(0);
   });
 });

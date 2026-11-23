@@ -376,7 +376,6 @@ export class GameWorld {
       return;
     }
     if (this.ctx.traps) {
-      if (contacts.stomped >= 0) this.hitBox(player, contacts.stomped);
       if (contacts.ground >= 0) this.traps.trigger(contacts.ground, this.tick);
       if (contacts.bounced >= 0) this.events.push({ type: 'bounce', playerId: player.id, trapId: contacts.bounced });
       this.resolveTrapHazards(player, box);

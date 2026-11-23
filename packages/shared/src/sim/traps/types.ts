@@ -87,7 +87,7 @@ export interface SpikeHeadTrap extends TrapCommon, Rect {
   kind: 'spikeHead';
 }
 
-/** Solid box broken by `maxHits` attacks or stomps. */
+/** Solid box (players can stand on it) broken by `maxHits` hits: attacks or things thrown at it. */
 export interface BoxTrap extends TrapCommon, Rect {
   kind: 'box';
   variant: 1 | 2 | 3;

@@ -11,7 +11,7 @@ export type GameEvent =
   | { type: 'trapHit'; playerId: string; trapId: number; hp: number; side: 'up' | 'down' | 'left' | 'right' }
   /** A trampoline launched a player. */
   | { type: 'bounce'; playerId: string; trapId: number }
-  /** A box was hit (by a swing or a stomp); `broken` on the last hit. */
+  /** A box was hit (by a swing or something thrown at it); `broken` on the last hit. */
   | { type: 'boxHit'; playerId: string; boxId: number; hits: number; broken: boolean }
   /** A special ability got going (sound, HUD). */
   | { type: 'special'; playerId: string; ability: number }

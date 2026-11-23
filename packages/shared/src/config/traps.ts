@@ -81,10 +81,8 @@ export interface TrapTuning {
     height: number;
     /** Hits needed to break variants 1, 2 and 3. */
     hits: readonly [number, number, number];
-    /** A box ignores further hits for this long (one stomp, or a stomp plus a swing, is one hit). */
+    /** A box ignores further hits for this long (one swing is one hit). */
     hitCooldownMs: number;
-    /** Upward speed after landing on a box, px/s. */
-    stompBounce: number;
   };
 }
 
@@ -97,7 +95,7 @@ export const TRAP_TUNING: Readonly<TrapTuning> = {
   fan: { width: 24, height: 8, range: 112, streamWidth: 32, accel: 4200, maxSpeed: 260, onMs: 2000, offMs: 1500 },
   rockHead: { size: 32, accel: 1400, maxSpeed: 420, waitMs: 900 },
   spikeHead: { size: 42 },
-  box: { width: 20, height: 20, hits: [1, 2, 3], hitCooldownMs: 200, stompBounce: 360 },
+  box: { width: 20, height: 20, hits: [1, 2, 3], hitCooldownMs: 200 },
 };
 
 /** Trap tuning in simulation units: times in ticks, everything else as authored. */
@@ -127,7 +125,7 @@ export interface CompiledTraps {
   };
   rockHead: { size: number; accel: number; maxSpeed: number; waitTicks: number };
   spikeHead: TrapTuning['spikeHead'];
-  box: { width: number; height: number; hits: readonly [number, number, number]; hitCooldownTicks: number; stompBounce: number };
+  box: { width: number; height: number; hits: readonly [number, number, number]; hitCooldownTicks: number };
 }
 
 export function compileTraps(t: TrapTuning): CompiledTraps {
@@ -177,7 +175,6 @@ export function compileTraps(t: TrapTuning): CompiledTraps {
       height: t.box.height,
       hits: [...t.box.hits] as [number, number, number],
       hitCooldownTicks: Math.max(1, msToTicks(t.box.hitCooldownMs)),
-      stompBounce: t.box.stompBounce,
     },
   };
 }
