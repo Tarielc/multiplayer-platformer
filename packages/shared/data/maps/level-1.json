@@ -692,6 +692,25 @@
         {
           "rotation": 0,
           "visible": true,
+          "name": "chicken 1",
+          "type": "chicken",
+          "x": 424,
+          "y": 384,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "range",
+              "type": "int",
+              "value": 32
+            }
+          ],
+          "id": 36
+        },
+        {
+          "rotation": 0,
+          "visible": true,
           "name": "saw 1",
           "type": "saw",
           "x": 584,
@@ -705,7 +724,26 @@
               "value": 60
             }
           ],
-          "id": 36
+          "id": 37
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "mushroom 1",
+          "type": "mushroom",
+          "x": 760,
+          "y": 384,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "range",
+              "type": "int",
+              "value": 48
+            }
+          ],
+          "id": 38
         },
         {
           "rotation": 0,
@@ -717,7 +755,45 @@
           "width": 0,
           "height": 0,
           "point": true,
-          "id": 37
+          "id": 39
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "mushroom 2",
+          "type": "mushroom",
+          "x": 952,
+          "y": 384,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "range",
+              "type": "int",
+              "value": 32
+            }
+          ],
+          "id": 40
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "wasp 1",
+          "type": "wasp",
+          "x": 1096,
+          "y": 264,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "range",
+              "type": "int",
+              "value": 48
+            }
+          ],
+          "id": 41
         },
         {
           "rotation": 0,
@@ -729,7 +805,31 @@
           "width": 0,
           "height": 0,
           "point": true,
-          "id": 38
+          "id": 42
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "monkey 1",
+          "type": "monkey",
+          "x": 1656,
+          "y": 384,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "wall",
+              "type": "string",
+              "value": "right"
+            },
+            {
+              "name": "range",
+              "type": "int",
+              "value": 32
+            }
+          ],
+          "id": 43
         },
         {
           "rotation": 0,
@@ -740,7 +840,7 @@
           "y": 368,
           "width": 64,
           "height": 16,
-          "id": 39
+          "id": 44
         },
         {
           "rotation": 0,
@@ -759,7 +859,26 @@
               "value": 3
             }
           ],
-          "id": 40
+          "id": 45
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "bull 1",
+          "type": "bull",
+          "x": 1992,
+          "y": 288,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "range",
+              "type": "int",
+              "value": 32
+            }
+          ],
+          "id": 46
         }
       ],
       "opacity": 1,
@@ -770,7 +889,7 @@
     }
   ],
   "nextlayerid": 5,
-  "nextobjectid": 41,
+  "nextobjectid": 47,
   "orientation": "orthogonal",
   "renderorder": "right-down",
   "tiledversion": "1.11.2",

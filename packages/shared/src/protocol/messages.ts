@@ -1,5 +1,6 @@
 import type { CharacterId } from '../config/characters';
 import type { GameEvent } from '../sim/events';
+import type { NetFoeState, NetShotState } from '../sim/foes/types';
 import type { NetTrapState } from '../sim/traps/types';
 import type { NetPlayerPatch, NetPropState, NetWorldState } from './state';
 
@@ -119,6 +120,10 @@ export type ServerMessage =
       traps?: NetTrapState[];
       /** Only present when the props changed. */
       props?: NetPropState[];
+      /** Only present when the foes changed. */
+      foes?: NetFoeState[];
+      /** Only present when the shots changed. */
+      shots?: NetShotState[];
       events: GameEvent[];
     }
   | { t: 'pong'; id: number; at: number; serverTick: number }

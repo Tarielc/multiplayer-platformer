@@ -1,14 +1,14 @@
 import type * as Phaser from 'phaser';
-import { allAbilitySheets, frameName, type AbilityAnimDef, type AbilitySheetDef } from './abilityArt';
+import { allAbilitySheets, frameName, type AbilityAnimDef, type AbilitySheetDef, type AbilitySheetFile } from './abilityArt';
 
 const jsonKey = (key: string) => `${key}:json`;
 
 /** Loaded sheet descriptions, by texture key (global to the game, like textures). */
 const registry = new Map<string, AbilitySheetDef>();
 
-/** Queues every ability sheet (PNG + JSON) that isn't loaded yet. */
-export function queueAbilitySheets(scene: Phaser.Scene, assetBase: string): void {
-  for (const sheet of allAbilitySheets()) {
+/** Queues every ability sheet (PNG + JSON) that isn't loaded yet (or `sheets` in the same format, e.g. foes). */
+export function queueAbilitySheets(scene: Phaser.Scene, assetBase: string, sheets: readonly AbilitySheetFile[] = allAbilitySheets()): void {
+  for (const sheet of sheets) {
     if (scene.textures.exists(sheet.key)) continue;
     scene.load.image(sheet.key, `${assetBase}/${sheet.path}.png`);
     scene.load.json(jsonKey(sheet.key), `${assetBase}/${sheet.path}.json`);
@@ -20,9 +20,9 @@ export function queueAbilitySheets(scene: Phaser.Scene, assetBase: string): void
  * simply missing: ability views then fall back to the normal character clips. Returns the keys
  * that are missing.
  */
-export function registerAbilitySheets(scene: Phaser.Scene): string[] {
+export function registerAbilitySheets(scene: Phaser.Scene, sheets: readonly AbilitySheetFile[] = allAbilitySheets()): string[] {
   const missing: string[] = [];
-  for (const sheet of allAbilitySheets()) {
+  for (const sheet of sheets) {
     const def = scene.cache.json.get(jsonKey(sheet.key)) as AbilitySheetDef | undefined;
     if (!def || !scene.textures.exists(sheet.key)) {
       missing.push(sheet.path);

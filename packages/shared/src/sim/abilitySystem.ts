@@ -8,6 +8,7 @@ import {
   droneBox,
   droneGrip,
   feetOf,
+  foeCargo,
   interruptAbility,
   isTonguePhase,
   giantActive,
@@ -20,12 +21,13 @@ import {
 } from './abilities';
 import { cellAt } from './collision';
 import type { GameEvent } from './events';
+import type { Foe, FoeField } from './foes/FoeField';
 import type { MovementBody, MovementContext } from './movement';
 import type { TrapField } from './traps/TrapField';
 import type { WorldPlayer } from './world';
 
 /** What an ability is holding. */
-export type Grab = { kind: 'player'; id: string } | { kind: 'box'; id: number };
+export type Grab = { kind: 'player'; id: string } | { kind: 'box'; id: number } | { kind: 'foe'; id: number };
 
 /** A box out of the level: carried, swallowed, dropped (falling) or spat (flying). */
 interface WorldProp {
@@ -58,6 +60,7 @@ export interface AbilityHost {
   readonly tick: number;
   readonly ctx: MovementContext;
   readonly traps: TrapField;
+  readonly foes: FoeField;
   listPlayers(): WorldPlayer[];
   getPlayer(id: string): WorldPlayer | undefined;
   emit(event: GameEvent): void;
@@ -66,6 +69,8 @@ export interface AbilityHost {
   hurt(target: WorldPlayer, hit: AbilityHit): void;
   /** `count` hits on a box in the level, credited to `by` (may be null). */
   hitBox(by: WorldPlayer | null, boxId: number, count: number): void;
+  /** A spat player, box or foe hurt a foe (`dir`: the way it is knocked), credited to `by`. */
+  hurtFoe(by: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1): void;
   /** Ticks of trap immunity for `seconds`. */
   ticksFor(seconds: number): number;
 }
@@ -82,14 +87,15 @@ export interface AbilityPlayerState {
   /** Slots this flight already hit. */
   flightHits: number;
   flightBoxes: Set<number>;
+  flightFoes: Set<number>;
 }
 
 export function newAbilityPlayerState(): AbilityPlayerState {
-  return { grab: null, specialSeen: 0, healed: false, thrownBy: null, flightHits: 0, flightBoxes: new Set() };
+  return { grab: null, specialSeen: 0, healed: false, thrownBy: null, flightHits: 0, flightBoxes: new Set(), flightFoes: new Set() };
 }
 
 export function cloneAbilityPlayerState(s: AbilityPlayerState): AbilityPlayerState {
-  return { ...s, flightBoxes: new Set(s.flightBoxes) };
+  return { ...s, flightBoxes: new Set(s.flightBoxes), flightFoes: new Set(s.flightFoes) };
 }
 
 /** Distance (px) in front of the mouth where spat things appear. */
@@ -104,9 +110,10 @@ const bit = (slot: number) => 1 << slot;
  *
  *  1. reacts to accepted Special presses (`body.specialSeq`): picks the heal target, grabs or
  *     drops with the claw, adds the giant's bonus hearts;
- *  2. moves whatever each ability holds (pulled, hugged, carried, swallowed) and releases it
- *     when the owner's phase says so (a spit launches it as a projectile);
- *  3. resolves spat players and boxes flying into others, and drops / lands loose boxes.
+ *  2. moves whatever each ability holds (pulled, hugged, carried, swallowed: players, boxes,
+ *     foes) and releases it when the owner's phase says so (a spit launches it as a projectile);
+ *  3. resolves spat players, boxes and foes flying into others (foes they hit get hurt), and
+ *     drops / lands loose boxes.
  */
 export class AbilitySystem {
   private props = new Map<number, WorldProp>();
@@ -141,7 +148,9 @@ export class AbilitySystem {
       if (p.body.alive) this.updateOwner(p);
       else if (p.ability.grab) this.release(p, false);
     }
+    this.dropStrayFoes();
     this.updateFlights(players);
+    this.updateFlyingFoes(players);
     this.updateProps();
     for (const p of players) p.hp = Math.min(p.hp, this.host.maxHp(p));
   }
@@ -233,6 +242,10 @@ export class AbilitySystem {
   }
 
   private grabValid(p: WorldPlayer, grab: Grab): boolean {
+    if (grab.kind === 'foe') {
+      const foe = this.foe(grab.id);
+      return foe !== undefined && foe.owner === p.id && (foe.state === 'held' || foe.state === 'swallowed');
+    }
     if (grab.kind === 'box') {
       const prop = this.props.get(grab.id);
       return prop !== undefined && prop.owner === p.id && (prop.state === 'held' || prop.state === 'swallowed');
@@ -298,6 +311,15 @@ export class AbilitySystem {
         else if (wasHugged) target.invulnUntil = Math.max(target.invulnUntil, this.host.tick + this.host.ticksFor(c.heal.afterglow));
         at = { x: t.x + hitbox.width / 2, y: t.y + hitbox.height / 2 };
       }
+    } else if (grab.kind === 'foe') {
+      const foe = this.foe(grab.id);
+      if (foe && foe.owner === p.id && (foe.state === 'held' || foe.state === 'swallowed')) {
+        if (spit) this.launchFoe(p, foe);
+        else if (foe.state === 'swallowed') this.host.foes.release(foe, at.x, at.y, carryVx, carryVy);
+        else this.host.foes.release(foe, foe.x, foe.y, carryVx, carryVy);
+        const box = this.host.foes.hitbox(foe);
+        at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      }
     } else {
       const prop = this.props.get(grab.id);
       if (prop) {
@@ -344,7 +366,7 @@ export class AbilitySystem {
     b.phase = Phase.HEAL_PULL;
     b.phaseTime = 0;
     this.placeInArms(p);
-    this.host.emit({ type: 'grab', playerId: p.id, targetId: target.id, boxId: null });
+    this.host.emit({ type: 'grab', playerId: p.id, targetId: target.id, boxId: null, foeId: null });
   }
 
   private placeInArms(p: WorldPlayer): void {
@@ -390,26 +412,34 @@ export class AbilitySystem {
     const grip = droneGrip(b, this.c);
     const zone: Rect = { x: grip.x - c.grab.width / 2, y: grip.y - 4, width: c.grab.width, height: c.grab.height + 4 };
     const dist = (r: Rect) => Math.hypot(r.x + r.width / 2 - grip.x, r.y - grip.y);
-    let best: { target: WorldPlayer | null; box: number | null; d: number } | null = null;
+    let best: { target: WorldPlayer | null; box: number | null; foe: Foe | null; d: number } | null = null;
     for (const other of this.host.listPlayers()) {
       const o = other.body;
       if (other === p || !this.grabbable(other)) continue;
       const r = { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height };
       if (!rectsOverlap(zone, r)) continue;
       const d = dist(r);
-      if (!best || d < best.d) best = { target: other, box: null, d };
+      if (!best || d < best.d) best = { target: other, box: null, foe: null, d };
     }
     if (!best) {
+      const field = this.host.foes;
+      for (const foe of field.foes) {
+        if (!field.grabbable(foe)) continue;
+        const r = field.hitbox(foe);
+        if (!rectsOverlap(zone, r)) continue;
+        const d = dist(r);
+        if (!best || d < best.d) best = { target: null, box: null, foe, d };
+      }
       for (const box of this.host.traps.boxes()) {
         if (!rectsOverlap(zone, box.rect)) continue;
         const d = dist(box.rect);
-        if (!best || d < best.d) best = { target: null, box: box.id, d };
+        if (!best || d < best.d) best = { target: null, box: box.id, foe: null, d };
       }
     }
     if (!best) return;
     // The cargo has to fit where it will hang: the drone hops up a little to lift it off the
     // ground, and the grab fails if there is no room.
-    const cargo = best.target ? Cargo.PLAYER : Cargo.BOX;
+    const cargo = best.target ? Cargo.PLAYER : best.foe ? foeCargo(best.foe.kind) : Cargo.BOX;
     const lift = this.liftFor(b.droneX, b.droneY, cargo);
     if (lift === null) return;
     b.droneY -= lift;
@@ -418,6 +448,9 @@ export class AbilitySystem {
     if (best.target) {
       this.seize(best.target, Held.CARRIED);
       p.ability.grab = { kind: 'player', id: best.target.id };
+    } else if (best.foe) {
+      this.host.foes.seize(best.foe, p.id);
+      p.ability.grab = { kind: 'foe', id: best.foe.id };
     } else {
       const prop = this.takeBox(best.box!, p.id);
       if (!prop) return;
@@ -425,7 +458,7 @@ export class AbilitySystem {
     }
     b.cargo = cargo;
     this.placeCargo(p);
-    this.host.emit({ type: 'grab', playerId: p.id, targetId: best.target?.id ?? null, boxId: best.box });
+    this.host.emit({ type: 'grab', playerId: p.id, targetId: best.target?.id ?? null, boxId: best.box, foeId: best.foe?.id ?? null });
   }
 
   /** Smallest upward shift (px) that makes the drone with `cargo` fit, or null. */
@@ -444,6 +477,10 @@ export class AbilitySystem {
     if (grab.kind === 'player') {
       const target = this.host.getPlayer(grab.id);
       if (target) this.placeFeet(target.body, { x: grip.x, y: grip.y + CARRIED_FEET_BELOW_GRIP }, false);
+    } else if (grab.kind === 'foe') {
+      // Hangs from the claw by its top.
+      const foe = this.foe(grab.id);
+      if (foe) this.host.foes.carry(foe, grip.x, grip.y + this.host.foes.config[foe.kind].height, b.droneVx, b.droneVy, 'held');
     } else {
       const prop = this.props.get(grab.id);
       if (prop) {
@@ -471,11 +508,17 @@ export class AbilitySystem {
         break;
       }
     }
+    const field = this.host.foes;
+    const foe = target ? undefined : field.foes.find((f) => field.grabbable(f) && circleOverlapsRect(tip.x, tip.y, c.tipRadius, field.hitbox(f)));
     let boxId: number | null = null;
     if (target) {
       this.seize(target, Held.PULLED);
       target.body.facing = b.facing > 0 ? -1 : 1;
       p.ability.grab = { kind: 'player', id: target.id };
+    } else if (foe) {
+      field.seize(foe, p.id);
+      foe.facing = b.facing > 0 ? -1 : 1;
+      p.ability.grab = { kind: 'foe', id: foe.id };
     } else {
       const box = this.host.traps.boxes().find((bx) => circleOverlapsRect(tip.x, tip.y, c.tipRadius, bx.rect));
       if (!box) return;
@@ -487,7 +530,7 @@ export class AbilitySystem {
     b.phase = Phase.TONGUE_PULL;
     b.phaseTime = 0;
     this.placeOnTongue(p);
-    this.host.emit({ type: 'grab', playerId: p.id, targetId: target?.id ?? null, boxId });
+    this.host.emit({ type: 'grab', playerId: p.id, targetId: target?.id ?? null, boxId, foeId: foe?.id ?? null });
   }
 
   private placeOnTongue(p: WorldPlayer): void {
@@ -546,6 +589,14 @@ export class AbilitySystem {
     target.ability.thrownBy = p.id;
     target.ability.flightHits = bit(target.slot) | bit(p.slot);
     target.ability.flightBoxes.clear();
+    target.ability.flightFoes.clear();
+  }
+
+  private launchFoe(p: WorldPlayer, foe: Foe): void {
+    const c = this.c.tongue;
+    const size = this.host.foes.config[foe.kind];
+    const s = this.spitStart(p, size.width, size.height);
+    this.host.foes.launch(foe, s.x + size.width / 2, s.y + size.height, s.dx * c.spitSpeed, s.dy * c.spitSpeed, c.flight, p.id);
   }
 
   private launchProp(p: WorldPlayer, prop: WorldProp): void {
@@ -584,11 +635,65 @@ export class AbilitySystem {
         this.host.hurt(other, { damage: c.damage, dirX, knockbackX: c.knockbackX, knockbackY: c.knockbackY, by: state.thrownBy });
       }
       const grown = { x: rect.x - 2, y: rect.y - 2, width: rect.width + 4, height: rect.height + 4 };
+      const thrower = this.host.getPlayer(state.thrownBy) ?? null;
       for (const box of this.host.traps.boxes()) {
         if (state.flightBoxes.has(box.id) || !rectsOverlap(grown, box.rect)) continue;
         state.flightBoxes.add(box.id);
-        this.host.hitBox(this.host.getPlayer(state.thrownBy) ?? null, box.id, 99);
+        this.host.hitBox(thrower, box.id, 99);
       }
+      for (const foe of this.host.foes.live()) {
+        if (state.flightFoes.has(foe.id) || !rectsOverlap(rect, this.host.foes.hitbox(foe))) continue;
+        state.flightFoes.add(foe.id);
+        this.host.hurtFoe(thrower, foe, c.damage, dirX > 0 ? 1 : -1);
+      }
+    }
+  }
+
+  /**
+   * Spat foes fly straight until they hit a wall, a player (not the frog), another foe or a box:
+   * whatever they hit gets the projectile's damage, and so do they, when the flight ends.
+   */
+  private updateFlyingFoes(players: WorldPlayer[]): void {
+    const field = this.host.foes;
+    const c = this.c.tongue;
+    const hitbox = this.host.ctx.hitbox;
+    for (const foe of field.foes) {
+      if (foe.state !== 'flying') continue;
+      const thrower = this.host.getPlayer(foe.owner) ?? null;
+      const dir: 1 | -1 = foe.vx > 0 ? 1 : foe.vx < 0 ? -1 : foe.facing;
+      let hit = field.fly(foe);
+      const rect = field.hitbox(foe);
+      for (const other of players) {
+        const o = other.body;
+        if (other === thrower || !o.alive || o.held !== Held.NONE) continue;
+        if (!rectsOverlap(rect, { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height })) continue;
+        this.host.hurt(other, { damage: c.damage, dirX: dir, knockbackX: c.knockbackX, knockbackY: c.knockbackY, by: foe.owner });
+        hit = true;
+      }
+      for (const other of field.live()) {
+        if (other === foe || !rectsOverlap(rect, field.hitbox(other))) continue;
+        this.host.hurtFoe(thrower, other, c.damage, dir);
+        hit = true;
+      }
+      for (const box of this.host.traps.boxes()) {
+        if (!rectsOverlap(rect, box.rect)) continue;
+        this.host.hitBox(thrower, box.id, 99);
+        hit = true;
+      }
+      if (!hit && foe.flight > 0) continue;
+      // It slams into what it hit (or runs out of steam): it bounces back, hurt.
+      field.land(foe);
+      this.host.hurtFoe(thrower, foe, c.damage, dir > 0 ? -1 : 1);
+    }
+  }
+
+  /** A foe whose captor no longer holds it (left, lost it) is let go. */
+  private dropStrayFoes(): void {
+    const field = this.host.foes;
+    for (const foe of field.foes) {
+      if (foe.state !== 'held' && foe.state !== 'swallowed') continue;
+      const grab = this.host.getPlayer(foe.owner)?.ability.grab;
+      if (grab?.kind !== 'foe' || grab.id !== foe.id) field.release(foe, foe.x, foe.y, 0, 0);
     }
   }
 
@@ -616,6 +721,14 @@ export class AbilitySystem {
 
   private placeCenter(grab: Grab, center: Vec2, propState: PropState): void {
     const hitbox = this.host.ctx.hitbox;
+    if (grab.kind === 'foe') {
+      const foe = this.foe(grab.id);
+      if (foe) {
+        const half = this.host.foes.config[foe.kind].height / 2;
+        this.host.foes.carry(foe, center.x, center.y + half, 0, 0, propState === 'swallowed' ? 'swallowed' : 'held');
+      }
+      return;
+    }
     if (grab.kind === 'player') {
       const target = this.host.getPlayer(grab.id);
       if (target) {
@@ -694,6 +807,11 @@ export class AbilitySystem {
       this.host.hitBox(thrower, box.id, 99);
       hit = true;
     }
+    for (const foe of this.host.foes.live()) {
+      if (!rectsOverlap(prop, this.host.foes.hitbox(foe))) continue;
+      this.host.hurtFoe(thrower, foe, c.damage, prop.vx < 0 ? -1 : 1);
+      hit = true;
+    }
     if (hit) {
       this.host.traps.destroyBox(prop.id);
       this.props.delete(prop.id);
@@ -742,6 +860,10 @@ export class AbilitySystem {
   }
 
   // --- helpers ---------------------------------------------------------------------------------
+
+  private foe(id: number): Foe | undefined {
+    return this.host.foes.foes.find((f) => f.id === id);
+  }
 
   /** Players a claw or tongue can catch: free, alive, and not a giant (too heavy). */
   private grabbable(p: WorldPlayer): boolean {

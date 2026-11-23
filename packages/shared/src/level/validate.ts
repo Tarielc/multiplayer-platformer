@@ -36,6 +36,9 @@ export function validateLevel(level: LevelData): LevelIssue[] {
   for (const c of level.collectibles) {
     if (outside(c.x, c.y)) warn(`Collectible #${c.id} is outside the map.`);
   }
+  for (const foe of level.foes) {
+    if (outside(foe.x, foe.y)) warn(`Foe #${foe.id} (${foe.kind}) is outside the map.`);
+  }
   for (const obj of level.extraObjects) {
     warn(`Object #${obj.id} has unknown class "${obj.kind || '(none)'}" and is ignored by the engine.`);
   }

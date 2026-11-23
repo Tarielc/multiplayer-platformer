@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import {
   Button,
   GameWorld,
+  isBoss,
   LEVELS,
   MOVEMENT_TUNING,
   PLAYER_CONFIG,
@@ -167,7 +168,11 @@ function stateKey(world: GameWorld, timed: boolean): string {
 
 function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): boolean {
   const started = Date.now();
-  const start = new GameWorld({ level, movement });
+  // A boss keeps the exit shut until it is beaten, which the search can't plan for: with one in
+  // the level, foes are left out and only the layout is checked.
+  const boss = level.foes.some((f) => isBoss(f.kind));
+  if (boss) console.log('  (boss level: foes left out, checking the layout only)');
+  const start = new GameWorld({ level, movement, ...(boss ? { foes: null } : {}) });
   start.addPlayer('solo', 0);
   // Moving traps make the same spot safe or deadly depending on when you get there.
   const timed = level.traps.some((t) => t.kind !== 'spikes' && t.kind !== 'box' && t.kind !== 'trampoline');

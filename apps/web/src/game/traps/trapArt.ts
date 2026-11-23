@@ -22,7 +22,16 @@ export type TrapSheetName =
   | 'box3'
   | 'start'
   | 'checkpoint'
-  | 'finish';
+  | 'finish'
+  | FruitKind;
+
+/** Animated fruit pickups (collectible kinds with a sheet in `sprites/fruits/`). */
+export const FRUIT_KINDS = ['apple', 'strawberry', 'pineapple', 'melon'] as const;
+export type FruitKind = (typeof FRUIT_KINDS)[number];
+
+export function isFruitKind(kind: string): kind is FruitKind {
+  return (FRUIT_KINDS as readonly string[]).includes(kind);
+}
 
 export interface TrapSheet {
   key: string;
@@ -48,6 +57,10 @@ const sheet = (name: string, def: Omit<TrapSheet, 'key' | 'path'> & { file?: str
 /** Level markers: 64×64 frames drawn with their bottom on the ground (no collision body). */
 const marker = (name: string, rowFrames: number[], placeholderColor: number): TrapSheet =>
   sheet(name, { dir: 'markers', frameWidth: 64, frameHeight: 64, columns: Math.max(...rowFrames), rowFrames, bodyX: 0, bodyY: 0, placeholderColor });
+
+/** Fruit: 17 frames of 32×32, drawn centred on the pickup. */
+const fruit = (name: FruitKind, placeholderColor: number): TrapSheet =>
+  sheet(name, { dir: 'fruits', frameWidth: 32, frameHeight: 32, columns: 17, rowFrames: [17], bodyX: 16, bodyY: 16, placeholderColor });
 
 const box = (file: string, hitFrames: number): TrapSheet =>
   sheet(file, { frameWidth: 28, frameHeight: 24, columns: 4, rowFrames: [1, hitFrames, 4], bodyX: 4, bodyY: 2, placeholderColor: 0xb5713c });
@@ -97,6 +110,10 @@ export const TRAP_SHEETS: Readonly<Record<TrapSheetName, TrapSheet>> = {
   checkpoint: marker('checkpoint', [1, 26, 10], 0x9aa0c3),
   // Rows: idle, pressed (a player reached the exit).
   finish: marker('finish', [1, 8], 0xffd23f),
+  apple: fruit('apple', 0xe5484d),
+  strawberry: fruit('strawberry', 0xf0566b),
+  pineapple: fruit('pineapple', 0xf2a03d),
+  melon: fruit('melon', 0x6cc04a),
 };
 
 /**
@@ -148,6 +165,10 @@ export const TRAP_CLIPS = {
   'checkpoint:flagOut': { sheet: 'checkpoint', row: 1, from: 0, frames: 26, frameRate: 24, loop: false },
   'checkpoint:flagIdle': { sheet: 'checkpoint', row: 2, from: 0, frames: 10, frameRate: 14, loop: true },
   'finish:pressed': { sheet: 'finish', row: 1, from: 0, frames: 8, frameRate: 14, loop: false },
+  'apple:idle': { sheet: 'apple', row: 0, from: 0, frames: 17, frameRate: 20, loop: true },
+  'strawberry:idle': { sheet: 'strawberry', row: 0, from: 0, frames: 17, frameRate: 20, loop: true },
+  'pineapple:idle': { sheet: 'pineapple', row: 0, from: 0, frames: 17, frameRate: 20, loop: true },
+  'melon:idle': { sheet: 'melon', row: 0, from: 0, frames: 17, frameRate: 20, loop: true },
 } as const satisfies Record<string, TrapClip>;
 
 export type TrapClipName = keyof typeof TRAP_CLIPS;

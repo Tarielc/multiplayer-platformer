@@ -2,7 +2,7 @@ import { PLAYER_CONFIG, type LevelData, type LevelZone, type NetWorldState } fro
 import * as Phaser from 'phaser';
 import { TEXTURES } from '../art/textures';
 import { VIEW_CONFIG } from '../config';
-import { FINISH_ART_HEIGHT, MARKER_ORIGIN, TRAP_SHEETS, trapAnimKey } from '../traps/trapArt';
+import { FINISH_ART_HEIGHT, MARKER_ORIGIN, TRAP_CLIPS, TRAP_SHEETS, isFruitKind, trapAnimKey } from '../traps/trapArt';
 
 interface ExitView {
   zone: LevelZone;
@@ -84,8 +84,18 @@ export class EntityViews {
     }
 
     for (const item of level.collectibles) {
-      const key = scene.textures.exists(item.kind) ? item.kind : TEXTURES.coin;
-      const image = scene.add.image(item.x, item.y, key).setDepth(depth.entities);
+      let image: Phaser.GameObjects.Image;
+      if (isFruitKind(item.kind)) {
+        // Fruit spins through its sheet, each one starting on a different frame.
+        const frames = TRAP_CLIPS[`${item.kind}:idle`].frames;
+        image = scene.add
+          .sprite(item.x, item.y, TRAP_SHEETS[item.kind].key, 0)
+          .play({ key: trapAnimKey(`${item.kind}:idle`), startFrame: (item.id * 5) % frames })
+          .setDepth(depth.entities);
+      } else {
+        const key = scene.textures.exists(item.kind) ? item.kind : TEXTURES.coin;
+        image = scene.add.image(item.x, item.y, key).setDepth(depth.entities);
+      }
       scene.tweens.add({
         targets: image,
         y: item.y - collectible.bobPx,

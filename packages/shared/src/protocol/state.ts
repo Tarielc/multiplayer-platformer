@@ -1,4 +1,5 @@
 import type { MovementBody } from '../sim/movement';
+import type { NetFoeState, NetShotState } from '../sim/foes/types';
 import type { NetTrapState } from '../sim/traps/types';
 
 /**
@@ -95,6 +96,10 @@ export interface NetWorldState {
   traps: NetTrapState[];
   /** Boxes moved by abilities (sorted by id). */
   props: NetPropState[];
+  /** Foes still in the level (sorted by id). */
+  foes: NetFoeState[];
+  /** Stingers and bananas in flight or hitting something (in the order they were fired). */
+  shots: NetShotState[];
 }
 
 export type NetPlayerPatch = Partial<NetPlayerState> & { id: string };

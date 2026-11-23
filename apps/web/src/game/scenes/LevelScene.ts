@@ -55,6 +55,7 @@ import { fallbackTilesetCanvas } from '../art/tilesetFallback';
 import { SoundController } from '../audio/SoundController';
 import { VIEW_CONFIG } from '../config';
 import { DebugDraw, type DebugBox } from '../debug/DebugDraw';
+import { FoeViews, type FoeAnchor } from '../foes/FoeViews';
 import { InputController } from '../input/InputController';
 import { signalsFromBody, signalsFromSample } from '../player/playerSignals';
 import type { PlayerCueEvent, PresentationEvents, WorldCueEvent } from '../presentation';
@@ -70,12 +71,13 @@ import { SCENE_KEYS } from './keys';
 const INTERPOLATION_DELAY_TICKS = NET_CONFIG.interpolationDelayMs / TICK_MS;
 const HEAL_AFTERGLOW_MS = ABILITIES.heal.afterglow * 1000;
 
-/** Positions of what the local player's ability holds (players: feet; boxes: top-left). */
+/** Positions of what the local player's ability holds (players: feet; boxes: top-left; foes: see `FoeAnchor`). */
 interface Attachments {
   players: ReadonlyMap<string, { x: number; y: number }>;
   props: ReadonlyMap<number, { x: number; y: number }>;
+  foes: ReadonlyMap<number, FoeAnchor>;
 }
-const NO_ATTACHMENTS: Attachments = { players: new Map(), props: new Map() };
+const NO_ATTACHMENTS: Attachments = { players: new Map(), props: new Map(), foes: new Map() };
 const HITBOX = PLAYER_CONFIG.hitbox;
 
 const tilesetKey = (def: TiledTileset) => `tileset:${def.name ?? 'tileset'}:${def.image ?? ''}`;
@@ -110,6 +112,7 @@ export class LevelScene extends Phaser.Scene {
   private traps: TrapField | null = null;
   private trapViews: TrapViews | null = null;
   private propViews: PropViews | null = null;
+  private foeViews: FoeViews | null = null;
   private followTarget: Phaser.GameObjects.GameObject | null = null;
   private backdrop: Backdrop | null = null;
   private debugDraw: DebugDraw | null = null;
@@ -142,6 +145,7 @@ export class LevelScene extends Phaser.Scene {
     this.traps = null;
     this.trapViews = null;
     this.propViews = null;
+    this.foeViews = null;
     this.followTarget = null;
     this.backdrop = null;
     this.debugDraw = null;
@@ -226,6 +230,7 @@ export class LevelScene extends Phaser.Scene {
     this.entityViews = new EntityViews(this, level);
     this.trapViews = new TrapViews(this, traps, (event) => this.presentation.emit('world', event));
     this.propViews = new PropViews(this, traps.config.box);
+    this.foeViews = new FoeViews(this, (event) => this.presentation.emit('world', event));
     this.debugDraw = new DebugDraw(this, level, HITBOX);
     this.debugDraw.setVisible(bridge.debug);
     this.controls = new InputController(this, () => bridge.emit('input:menu'), bridge.touch);
@@ -251,6 +256,8 @@ export class LevelScene extends Phaser.Scene {
       this.trapViews = null;
       this.propViews?.destroy();
       this.propViews = null;
+      this.foeViews?.destroy();
+      this.foeViews = null;
       this.presentation.removeAllListeners();
       sound.destroy();
       this.sfx = null;
@@ -358,6 +365,9 @@ export class LevelScene extends Phaser.Scene {
     // Traps are drawn at the local player's predicted tick: where they are when you meet them.
     trapViews.update(predictor.renderTick(alpha) ?? renderTick, frameMs);
     if (debug) trapViews.debugBoxes(boxes);
+    // Foes and their shots: server-only, drawn where the other players are (100 ms behind).
+    this.foeViews?.update(this.interpolator.sampleFoes(renderTick), this.interpolator.sampleShots(renderTick), attached.foes, frameMs);
+    if (debug) this.foeViews?.debugBoxes(boxes);
     entityViews.update(frameMs);
     this.backdrop?.update(frameMs);
     this.debugDraw?.draw(boxes);
@@ -452,34 +462,48 @@ export class LevelScene extends Phaser.Scene {
   }
 
   /**
-   * Where the local player's ability holds its catch (players by feet, boxes by top-left), from
-   * the predicted body: the claw's grip, the tongue tip, the hug spot.
+   * Where the local player's ability holds its catch (players by feet, boxes by top-left, foes
+   * by the grip or tongue tip), from the predicted body: the claw's grip, the tongue tip, the hug spot.
    */
   private localAttachments(body: Readonly<MovementBody>): Attachments {
     const grab = this.predictor?.lastServer?.grab ?? '';
     if (!grab) return NO_ATTACHMENTS;
-    const isBox = grab.startsWith('b:');
+    const kind = grab.slice(0, 2);
     const id = grab.slice(2);
     const box = this.traps?.config.box ?? { width: 20, height: 20 };
     let feet: { x: number; y: number } | null = null;
     let topLeft: { x: number; y: number } | null = null;
+    let foe: FoeAnchor | null = null;
     if (body.phase === Phase.DRONE_PILOT && body.cargo !== Cargo.NONE) {
       const grip = droneGrip(body, ABILITIES);
       feet = { x: grip.x, y: grip.y + CARRIED_FEET_BELOW_GRIP };
       topLeft = { x: grip.x - box.width / 2, y: grip.y };
+      foe = { at: 'claw', ...grip };
     } else if (body.phase === Phase.TONGUE_PULL) {
       const tip = tongueTip(body, HITBOX, ABILITIES);
       feet = { x: tip.x, y: tip.y + HITBOX.height / 2 };
       topLeft = { x: tip.x - box.width / 2, y: tip.y - box.height / 2 };
+      foe = { at: 'tongue', ...tip };
+    } else if (body.phase === Phase.TONGUE_GULP || body.phase === Phase.TONGUE_HOLD || body.phase === Phase.TONGUE_SPIT) {
+      foe = { at: 'mouth', x: 0, y: 0 };
     } else if (body.phase === Phase.HEAL_PULL) {
       const center = healPullCenter(body, HITBOX, ABILITIES);
       feet = { x: center.x, y: center.y + HITBOX.height / 2 };
     } else if (body.phase === Phase.HEAL_HUG) {
       feet = healHugFeet(body, HITBOX, body.phaseTime, ABILITIES);
     }
-    const out = { players: new Map<string, { x: number; y: number }>(), props: new Map<number, { x: number; y: number }>() };
-    if (isBox && topLeft) out.props.set(Number(id), topLeft);
-    else if (!isBox && feet) out.players.set(id, feet);
+    const out = {
+      players: new Map<string, { x: number; y: number }>(),
+      props: new Map<number, { x: number; y: number }>(),
+      foes: new Map<number, FoeAnchor>(),
+    };
+    if (kind === 'b:') {
+      if (topLeft) out.props.set(Number(id), topLeft);
+    } else if (kind === 'f:') {
+      if (foe) out.foes.set(Number(id), foe);
+    } else if (feet) {
+      out.players.set(id, feet);
+    }
     return out;
   }
 
@@ -493,7 +517,7 @@ export class LevelScene extends Phaser.Scene {
         if (position) {
           floatText(this, position.x, position.y - 8, `+${event.value}`, this.slotCss(event.playerId));
           this.presentation.emit('world', {
-            cue: event.kind === 'gem' ? 'gem' : 'coin',
+            cue: event.kind === 'gem' || event.kind === 'melon' ? 'gem' : 'coin',
             x: position.x,
             y: position.y,
             isSelf: event.playerId === selfId,
@@ -544,7 +568,7 @@ export class LevelScene extends Phaser.Scene {
         break;
       }
       case 'grab': {
-        if (event.targetId === null && event.boxId === null) break;
+        if (event.targetId === null && event.boxId === null && event.foeId === null) break;
         const captor = state.players.find((p) => p.id === event.playerId);
         if (captor) this.presentation.emit('world', { cue: 'grab', x: captor.x, y: captor.y, isSelf: event.playerId === selfId });
         break;
@@ -563,6 +587,33 @@ export class LevelScene extends Phaser.Scene {
       }
       case 'propBreak':
         this.trapViews?.burstAt(event.boxId, event.variant, event.x, event.y, false);
+        break;
+      case 'foeHit':
+        // The heart lost shows on the player view (Hurt, blink); a puff marks the blow.
+        puff(this, event.x, event.y, 0xffffff, 6);
+        break;
+      case 'foeHurt': {
+        const isSelf = event.playerId === selfId;
+        if (event.blocked) {
+          // Glanced off armour (the rhino): a spark and a clang, nothing more.
+          puff(this, event.x, event.y, 0xc9d3e0, 5);
+          this.presentation.emit('world', { cue: 'clang', x: event.x, y: event.y, isSelf });
+          if (event.stomp) this.presentation.emit('world', { cue: 'stomp', x: event.x, y: event.y, isSelf });
+          break;
+        }
+        const beaten = event.hp <= 0;
+        // Something the frog spat splats like any spit hit; swings and stomps puff.
+        if (event.spit) playFx(this, ABILITY_SHEETS.spitFx.key, 'impact', event.x, event.y, { depth: VIEW_CONFIG.depth.effects });
+        else puff(this, event.x, event.y, beaten ? 0xfff1c1 : 0xffffff, beaten ? 12 : 7);
+        if (event.stomp) this.presentation.emit('world', { cue: 'stomp', x: event.x, y: event.y, isSelf });
+        this.presentation.emit('world', { cue: beaten ? 'foeDefeat' : event.spit ? 'splat' : 'hit', x: event.x, y: event.y, isSelf });
+        if (beaten && event.score > 0) floatText(this, event.x, event.y - 12, `+${event.score}`, this.slotCss(event.playerId));
+        if (isSelf) this.cameras.main.shake(80, beaten ? 0.003 : 0.002);
+        break;
+      }
+      case 'parry':
+        puff(this, event.x, event.y, 0xfff1c1, 8);
+        this.presentation.emit('world', { cue: 'parry', x: event.x, y: event.y, isSelf: event.playerId === selfId });
         break;
       case 'levelComplete': {
         // React shows the results overlay.

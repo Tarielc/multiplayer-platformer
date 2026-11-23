@@ -87,7 +87,7 @@ function netPlayer(id: string, overrides: Partial<NetPlayerState> = {}): NetPlay
   };
 }
 
-const world = (tick: number, players: NetPlayerState[], collected: number[] = []): NetWorldState => ({ tick, players, collected, traps: [], props: [] });
+const world = (tick: number, players: NetPlayerState[], collected: number[] = []): NetWorldState => ({ tick, players, collected, traps: [], props: [], foes: [], shots: [] });
 
 describe('LocalPredictor', () => {
   it('predicts moving traps exactly: riding, pushes, launches, wind, falling platforms', () => {

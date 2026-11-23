@@ -1,3 +1,4 @@
+import type { FoeDef } from '../sim/foes/types';
 import type { TrapDef } from '../sim/traps/types';
 import type { Rect } from '../util/math';
 import type { PropertyValue } from './tiled';
@@ -63,6 +64,8 @@ export interface LevelData {
   collectibles: LevelCollectible[];
   /** Traps and interactive entities (sorted by id). See `sim/traps`. */
   traps: TrapDef[];
+  /** Foes, where they start (sorted by id). See `sim/foes`. */
+  foes: FoeDef[];
   extraObjects: LevelObject[];
   backgroundColor: string | null;
   properties: Record<string, PropertyValue>;

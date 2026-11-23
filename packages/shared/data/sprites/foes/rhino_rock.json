@@ -1,0 +1,130 @@
+{
+  "image": "rhino_rock.png",
+  "pivot": {
+    "x": 12,
+    "y": 12,
+    "note": "centre of the falling rock ('warn' hangs from the frame top)"
+  },
+  "animations": {
+    "fall": {
+      "row": 0,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 4,
+      "loop": true,
+      "note": "centre of the rock = frame centre; ~12x12 hitbox; falls with gravity",
+      "durationsMs": [
+        80,
+        80,
+        80,
+        80
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          24,
+          24
+        ],
+        [
+          24,
+          0,
+          24,
+          24
+        ],
+        [
+          48,
+          0,
+          24,
+          24
+        ],
+        [
+          72,
+          0,
+          24,
+          24
+        ]
+      ]
+    },
+    "shatter": {
+      "row": 1,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 5,
+      "loop": false,
+      "note": "lands on the ground (rock bottom at y 18 of the frame) and breaks; ends empty",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          24,
+          24,
+          24
+        ],
+        [
+          24,
+          24,
+          24,
+          24
+        ],
+        [
+          48,
+          24,
+          24,
+          24
+        ],
+        [
+          72,
+          24,
+          24,
+          24
+        ],
+        [
+          96,
+          24,
+          24,
+          24
+        ]
+      ]
+    },
+    "warn": {
+      "row": 2,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 3,
+      "loop": true,
+      "note": "hangs from the ceiling (frame top on the ceiling) ~0.6 s before a rock drops there",
+      "durationsMs": [
+        90,
+        90,
+        90
+      ],
+      "rects": [
+        [
+          0,
+          48,
+          24,
+          24
+        ],
+        [
+          24,
+          48,
+          24,
+          24
+        ],
+        [
+          48,
+          48,
+          24,
+          24
+        ]
+      ]
+    }
+  }
+}

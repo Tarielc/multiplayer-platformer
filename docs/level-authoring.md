@@ -61,7 +61,7 @@ Put objects on any object layer (hidden layers count too). The engine reads each
 | `collectible` | Point, rect or tile object | `kind` (`coin`, `gem`), `value` (int, optional) | Picked up once per level, by the first player to touch it. Its score is `value` if set, else the kind's value (coin 10, gem 50). It sits at the object's center. |
 | `hazard` | Rect, or point | `style` (`lava`, optional) | Kills on any overlap with the player's hitbox. `style = "lava"` draws animated lava; anything else draws a generic danger pattern. |
 
-Trap classes (`spikes`, `saw`, `trampoline`, …) are listed under [Traps](#traps). Objects with any other class are kept in `LevelData.extraObjects`, with position, size and properties. The validator warns that they are ignored. That is the hook for your own entities: enemies, signs and so on.
+Trap classes (`spikes`, `saw`, `trampoline`, …) are listed under [Traps](#traps), and foes (`mushroom`, `chicken`, …) under [Foes](#foes). Objects with any other class are kept in `LevelData.extraObjects`, with position, size and properties. The validator warns that they are ignored. That is the hook for your own entities: signs, NPCs and so on.
 
 To add a new collectible kind, add it to `ENTITY_CONFIG.collectibles` in `packages/shared/src/config/entities.ts`. Then add a texture whose key is the kind's name; the procedural `coin` and `gem` textures are in `apps/web/src/game/art/textures.ts`. A kind without a texture is drawn as a coin.
 
@@ -94,6 +94,43 @@ Times are in milliseconds, distances in pixels. Every property is optional.
 Damage, knockback, invulnerability, speeds and the falling and fan timings are in `TRAP_TUNING` (`config/traps.ts`). An object that can't work fails the level with a message naming it: a rock-head with no wall on its axis or placed inside one, an unknown `dir`, `axis` or `variant`, a saw with `speed` 0, a non-number property.
 
 Traps move as a function of the level clock, so a level is the same every time it runs. Use `phaseMs` to offset saws, fans and rock-heads that would otherwise move in step.
+
+## Foes
+
+Foes are objects too: class `mushroom`, `chicken`, `wasp`, `monkey`, `bull` or `rhino` (or class `foe` with a `kind` property naming one). Where it stands:
+
+- a **point** marks the foe's feet (a wasp's: the middle of its body), so put it on the floor;
+- a **rect** stands the foe on its bottom edge, centred (a wasp hovers in its middle).
+
+| Class | Body | HP | Behaviour |
+|---|---|---|---|
+| `mushroom` | 18×18 | 1 | Patrols, turning at walls, drops and hazards. Touching it costs a heart. |
+| `chicken` | 16×20 | 2 | Wanders; on seeing a player at about its height it squawks, chases and pecks. Harmless to touch, only the beak hurts. |
+| `wasp` | 16×14 | 1 | Flies its beat, keeps its distance from a player it sees and fires stingers at them. Touching it costs a heart; it can't be stomped. |
+| `monkey` | 16×22 | 2 | Clings to a wall, climbs it and throws bananas in an arc; swipes at players who come close. Off a wall, it walks, throws and punches. It can't be stomped. |
+| `bull` | 34×22 | 3 | Paws the ground when it sees a player at its height, then charges; the horns hurt and knock you far. It crashes into walls and stands dazed: that's the time to hit it. Hits don't stop a charge. |
+| `rhino` | 60×46 | 12 | **The boss** (see below). |
+
+| Property | Applies to | Meaning |
+|---|---|---|
+| `facing` | all | `left` (default) or `right`. |
+| `range` | all | Pixels it strays from where it starts before turning back (patrol, wasp beat, monkey climb). `0` = no limit. Defaults: mushroom 48, chicken 40, wasp 40, monkey 32, bull 64. |
+| `wall` | monkey | `left`, `right` or `none`. By default it clings to a solid wall within a tile of it; a monkey with `wall` set but no wall there fails the level. |
+
+Players beat foes with attacks (one hit per swing) or, for mushrooms, chickens and bulls, by landing on them (stomp: one damage and a bounce). An attack also knocks a stinger or banana out of the air. Ninja Frog's tongue catches any foe; spat out, it flies until it hits something, and both it and whatever it hits take a hit (a spat player or box hurts the foes it hits too). The drone's claw picks foes up and drops them, into lava for instance. A caught foe can't act or hurt anyone. Beating a foe scores 10–30 (the rhino: 200). Foes sleep until a player is within 600×400 px (a woken boss never does), collide with the tiles only (they pass through traps and players), and avoid hazards, spikes and spike-heads; they die in them if pushed in.
+
+### The rhino boss
+
+The rhino sleeps until a player comes within 320 px of it in plain sight (or hits it), roars, and from then on fights anywhere in the level. It walks at the nearest player and swipes its horn at anyone right in front of it. Every second or two it either charges, if its target is about level with it and at least 6 tiles away, or stomps.
+
+- **Charge:** it charges until it hits a wall. The crash shakes rocks loose from the ceiling (a short warning first), one over each player and a few more around the floor. Then it stands dazed for about 3 seconds.
+- **Stomp:** a shockwave runs along the floor both ways until it meets a wall or a ledge; jump it. Anyone up on a ledge gets a rock over their head instead.
+
+It is armoured: swings, stomps and spat things only hurt it while it is dazed. Otherwise they glance off, though you still bounce off its back. At half health it flies into a rage: it walks and charges faster, drops more rocks, and stays dazed for less time. Tongues and claws can't catch it.
+
+While a boss is alive, **the level's exit stays shut** (players in it don't count). Give it a closed hall: walls either side for it to crash into, a solid ceiling for the rocks, and one-way ledges low enough to jump onto, to dodge its charges. Level 8, *Rhino's Den*, is the example. The level solver (`npm run levels:solve`) leaves the foes out of levels with a boss, so it only checks the layout.
+
+Sizes, speeds, sight, timings and damage are in `FOE_TUNING` (`packages/shared/src/config/foes.ts`). Foes run on the server only; clients draw them from snapshots, like the other players. The sprites are in `packages/shared/data/sprites/foes/`.
 
 ## Validation
 

@@ -1,0 +1,211 @@
+{
+  "image": "monkey_banana.png",
+  "pivot": {
+    "x": 7,
+    "y": 7,
+    "note": "centre"
+  },
+  "hitbox": {
+    "width": 10,
+    "height": 8
+  },
+  "animations": {
+    "spin": {
+      "row": 0,
+      "frameWidth": 14,
+      "frameHeight": 14,
+      "frames": 8,
+      "loop": true,
+      "note": "thrown banana, spinning; ~150 px/s with gravity (a lob)",
+      "durationsMs": [
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          14,
+          14
+        ],
+        [
+          14,
+          0,
+          14,
+          14
+        ],
+        [
+          28,
+          0,
+          14,
+          14
+        ],
+        [
+          42,
+          0,
+          14,
+          14
+        ],
+        [
+          56,
+          0,
+          14,
+          14
+        ],
+        [
+          70,
+          0,
+          14,
+          14
+        ],
+        [
+          84,
+          0,
+          14,
+          14
+        ],
+        [
+          98,
+          0,
+          14,
+          14
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        },
+        {
+          "center": [
+            7,
+            7
+          ]
+        }
+      ]
+    },
+    "splat": {
+      "row": 1,
+      "frameWidth": 14,
+      "frameHeight": 14,
+      "frames": 5,
+      "loop": false,
+      "note": "where the banana lands / hits a player",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          14,
+          14,
+          14
+        ],
+        [
+          14,
+          14,
+          14,
+          14
+        ],
+        [
+          28,
+          14,
+          14,
+          14
+        ],
+        [
+          42,
+          14,
+          14,
+          14
+        ],
+        [
+          56,
+          14,
+          14,
+          14
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            7,
+            10
+          ]
+        },
+        {
+          "center": [
+            7,
+            10
+          ]
+        },
+        {
+          "center": [
+            7,
+            10
+          ]
+        },
+        {
+          "center": [
+            7,
+            10
+          ]
+        },
+        {
+          "center": [
+            7,
+            10
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -86,8 +86,8 @@ export const Held = {
 } as const;
 export type HeldId = (typeof Held)[keyof typeof Held];
 
-/** What the drone's claw holds (`MovementBody.cargo`; drives its collision box). */
-export const Cargo = { NONE: 0, PLAYER: 1, BOX: 2 } as const;
+/** What the drone's claw holds (`MovementBody.cargo`; drives its collision box): a player, a box or a foe (by kind). */
+export const Cargo = { NONE: 0, PLAYER: 1, BOX: 2, MUSHROOM: 3, CHICKEN: 4, WASP: 5, MONKEY: 6, BULL: 7, RHINO: 8 } as const;
 
 export interface AbilityTuning {
   heal: {

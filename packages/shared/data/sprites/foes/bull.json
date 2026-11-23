@@ -1,0 +1,493 @@
+{
+  "image": "bull.png",
+  "pivot": {
+    "x": 26,
+    "y": 39,
+    "note": "bottom-centre of the hooves"
+  },
+  "facing": "right",
+  "hitbox": {
+    "width": 34,
+    "height": 22,
+    "note": "bottom-centred on the pivot"
+  },
+  "behaviour": "patrols ('walk'); on seeing a player plays 'windup', then 'charge' straight ahead until it hits a wall ('crash' -> 'stunned') or runs out of steam; the horns hurt and knock back",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": true,
+      "note": "snorts a little steam",
+      "durationsMs": [
+        160,
+        160,
+        160,
+        160,
+        160,
+        160
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          52,
+          40
+        ],
+        [
+          52,
+          0,
+          52,
+          40
+        ],
+        [
+          104,
+          0,
+          52,
+          40
+        ],
+        [
+          156,
+          0,
+          52,
+          40
+        ],
+        [
+          208,
+          0,
+          52,
+          40
+        ],
+        [
+          260,
+          0,
+          52,
+          40
+        ]
+      ]
+    },
+    "walk": {
+      "row": 1,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 8,
+      "loop": true,
+      "note": "patrol ~30 px/s",
+      "durationsMs": [
+        110,
+        110,
+        110,
+        110,
+        110,
+        110,
+        110,
+        110
+      ],
+      "rects": [
+        [
+          0,
+          40,
+          52,
+          40
+        ],
+        [
+          52,
+          40,
+          52,
+          40
+        ],
+        [
+          104,
+          40,
+          52,
+          40
+        ],
+        [
+          156,
+          40,
+          52,
+          40
+        ],
+        [
+          208,
+          40,
+          52,
+          40
+        ],
+        [
+          260,
+          40,
+          52,
+          40
+        ],
+        [
+          312,
+          40,
+          52,
+          40
+        ],
+        [
+          364,
+          40,
+          52,
+          40
+        ]
+      ]
+    },
+    "windup": {
+      "row": 2,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 8,
+      "loop": false,
+      "note": "about 0.9 s before the charge: paws the ground twice",
+      "durationsMs": [
+        100,
+        100,
+        120,
+        120,
+        120,
+        120,
+        100,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          80,
+          52,
+          40
+        ],
+        [
+          52,
+          80,
+          52,
+          40
+        ],
+        [
+          104,
+          80,
+          52,
+          40
+        ],
+        [
+          156,
+          80,
+          52,
+          40
+        ],
+        [
+          208,
+          80,
+          52,
+          40
+        ],
+        [
+          260,
+          80,
+          52,
+          40
+        ],
+        [
+          312,
+          80,
+          52,
+          40
+        ],
+        [
+          364,
+          80,
+          52,
+          40
+        ]
+      ]
+    },
+    "charge": {
+      "row": 3,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": true,
+      "note": "~200 px/s; 'horns' = the horn tip, the dangerous point",
+      "durationsMs": [
+        60,
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      "rects": [
+        [
+          0,
+          120,
+          52,
+          40
+        ],
+        [
+          52,
+          120,
+          52,
+          40
+        ],
+        [
+          104,
+          120,
+          52,
+          40
+        ],
+        [
+          156,
+          120,
+          52,
+          40
+        ],
+        [
+          208,
+          120,
+          52,
+          40
+        ],
+        [
+          260,
+          120,
+          52,
+          40
+        ]
+      ],
+      "points": [
+        {
+          "horns": [
+            52,
+            18
+          ]
+        },
+        {
+          "horns": [
+            52,
+            17
+          ]
+        },
+        {
+          "horns": [
+            52,
+            17
+          ]
+        },
+        {
+          "horns": [
+            52,
+            18
+          ]
+        },
+        {
+          "horns": [
+            52,
+            17
+          ]
+        },
+        {
+          "horns": [
+            52,
+            17
+          ]
+        }
+      ]
+    },
+    "crash": {
+      "row": 4,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 4,
+      "loop": false,
+      "note": "hits a wall (or a giant) at the end of a charge; then 'stunned'",
+      "durationsMs": [
+        60,
+        90,
+        100,
+        100
+      ],
+      "rects": [
+        [
+          0,
+          160,
+          52,
+          40
+        ],
+        [
+          52,
+          160,
+          52,
+          40
+        ],
+        [
+          104,
+          160,
+          52,
+          40
+        ],
+        [
+          156,
+          160,
+          52,
+          40
+        ]
+      ]
+    },
+    "stunned": {
+      "row": 5,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 6,
+      "loop": true,
+      "note": "a second or two after a crash: the window to hit it",
+      "durationsMs": [
+        110,
+        110,
+        110,
+        110,
+        110,
+        110
+      ],
+      "rects": [
+        [
+          0,
+          200,
+          52,
+          40
+        ],
+        [
+          52,
+          200,
+          52,
+          40
+        ],
+        [
+          104,
+          200,
+          52,
+          40
+        ],
+        [
+          156,
+          200,
+          52,
+          40
+        ],
+        [
+          208,
+          200,
+          52,
+          40
+        ],
+        [
+          260,
+          200,
+          52,
+          40
+        ]
+      ]
+    },
+    "hurt": {
+      "row": 6,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 4,
+      "loop": false,
+      "durationsMs": [
+        60,
+        90,
+        90,
+        90
+      ],
+      "rects": [
+        [
+          0,
+          240,
+          52,
+          40
+        ],
+        [
+          52,
+          240,
+          52,
+          40
+        ],
+        [
+          104,
+          240,
+          52,
+          40
+        ],
+        [
+          156,
+          240,
+          52,
+          40
+        ]
+      ]
+    },
+    "death": {
+      "row": 7,
+      "frameWidth": 52,
+      "frameHeight": 40,
+      "frames": 7,
+      "loop": false,
+      "note": "ends empty; remove the foe after the last frame",
+      "durationsMs": [
+        60,
+        110,
+        140,
+        90,
+        90,
+        90,
+        90
+      ],
+      "rects": [
+        [
+          0,
+          280,
+          52,
+          40
+        ],
+        [
+          52,
+          280,
+          52,
+          40
+        ],
+        [
+          104,
+          280,
+          52,
+          40
+        ],
+        [
+          156,
+          280,
+          52,
+          40
+        ],
+        [
+          208,
+          280,
+          52,
+          40
+        ],
+        [
+          260,
+          280,
+          52,
+          40
+        ],
+        [
+          312,
+          280,
+          52,
+          40
+        ]
+      ]
+    }
+  }
+}

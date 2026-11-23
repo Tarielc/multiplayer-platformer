@@ -1,4 +1,6 @@
-export type DeathCause = 'hazard' | 'fall' | 'dev' | 'trap' | 'crush' | 'ability';
+import type { FoeKind } from '../config/foes';
+
+export type DeathCause = 'hazard' | 'fall' | 'dev' | 'trap' | 'crush' | 'ability' | 'foe';
 
 /** Discrete things that happened during simulation; broadcast with snapshots for FX/HUD. */
 export type GameEvent =
@@ -17,11 +19,33 @@ export type GameEvent =
   | { type: 'special'; playerId: string; ability: number }
   /** Bunny Man's kiss landed: `targetId` (or nobody) and the healer got hearts back. */
   | { type: 'heal'; playerId: string; targetId: string | null; x: number; y: number }
-  /** A claw or tongue caught a player (`targetId`) or a box (`boxId`). */
-  | { type: 'grab'; playerId: string; targetId: string | null; boxId: number | null }
+  /** A claw or tongue caught a player (`targetId`), a box (`boxId`) or a foe (`foeId`). */
+  | { type: 'grab'; playerId: string; targetId: string | null; boxId: number | null; foeId: number | null }
   /** The claw let go / the frog spat (`spit`) what it held. */
   | { type: 'release'; playerId: string; spit: boolean; x: number; y: number }
   /** An ability hurt a player: giant swing or a spat projectile. */
   | { type: 'abilityHit'; playerId: string; by: string; hp: number; x: number; y: number }
   /** A carried or spat box shattered. */
-  | { type: 'propBreak'; boxId: number; variant: 1 | 2 | 3; x: number; y: number };
+  | { type: 'propBreak'; boxId: number; variant: 1 | 2 | 3; x: number; y: number }
+  /** A foe (or its stinger / banana) cost a player a heart (`hp` left). */
+  | { type: 'foeHit'; playerId: string; foeId: number; hp: number; x: number; y: number }
+  /**
+   * A player hurt a foe: a swing, a stomp (`stomp`), or something the frog spat (`spit`; the
+   * frog is `playerId`, '' if they left). `hp` 0: it is beaten, and `score` points went to that player.
+   * `blocked`: its armour took the hit (the rhino boss, unless dazed), `hp` unchanged.
+   */
+  | {
+      type: 'foeHurt';
+      playerId: string;
+      foeId: number;
+      kind: FoeKind;
+      hp: number;
+      blocked: boolean;
+      stomp: boolean;
+      spit: boolean;
+      score: number;
+      x: number;
+      y: number;
+    }
+  /** A swing knocked a stinger or a banana out of the air. */
+  | { type: 'parry'; playerId: string; x: number; y: number };

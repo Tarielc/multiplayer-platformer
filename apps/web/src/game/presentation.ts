@@ -18,7 +18,30 @@ export interface PlayerCueEvent {
 }
 
 /** World-level moments from server game events and trap views. */
-export type WorldCueName = 'coin' | 'gem' | 'checkpoint' | 'levelComplete' | 'bounce' | 'boxHit' | 'boxBreak' | 'thud' | 'shake' | 'heal' | 'grab' | 'drop' | 'splat';
+export type WorldCueName =
+  | 'coin'
+  | 'gem'
+  | 'checkpoint'
+  | 'levelComplete'
+  | 'bounce'
+  | 'boxHit'
+  | 'boxBreak'
+  | 'thud'
+  | 'shake'
+  | 'heal'
+  | 'grab'
+  | 'drop'
+  | 'splat'
+  | 'hit'
+  | 'stomp'
+  | 'foeDefeat'
+  | 'sting'
+  | 'toss'
+  | 'snort'
+  | 'squawk'
+  | 'parry'
+  | 'roar'
+  | 'clang';
 
 export interface WorldCueEvent {
   cue: WorldCueName;

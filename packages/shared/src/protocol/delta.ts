@@ -1,3 +1,4 @@
+import type { NetFoeState, NetShotState } from '../sim/foes/types';
 import type { NetTrapState } from '../sim/traps/types';
 import type { NetPlayerPatch, NetPlayerState, NetPropState, NetWorldState } from './state';
 
@@ -69,6 +70,10 @@ export interface WorldDelta {
   traps?: NetTrapState[];
   /** The complete prop list, only when it changed since the base state. */
   props?: NetPropState[];
+  /** The complete foe list, only when it changed since the base state. */
+  foes?: NetFoeState[];
+  /** The complete shot list, only when it changed since the base state. */
+  shots?: NetShotState[];
 }
 
 /**
@@ -103,6 +108,8 @@ export function diffWorld(prev: NetWorldState, next: NetWorldState): WorldDelta 
   };
   if (!sameTraps(prev.traps, next.traps)) delta.traps = next.traps;
   if (!sameProps(prev.props, next.props)) delta.props = next.props;
+  if (!sameFoes(prev.foes, next.foes)) delta.foes = next.foes;
+  if (!sameShots(prev.shots, next.shots)) delta.shots = next.shots;
   return delta;
 }
 
@@ -130,9 +137,48 @@ function sameProps(a: readonly NetPropState[], b: readonly NetPropState[]): bool
   return true;
 }
 
+function sameFoes(a: readonly NetFoeState[], b: readonly NetFoeState[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (
+      x.id !== y.id ||
+      x.x !== y.x ||
+      x.y !== y.y ||
+      x.vx !== y.vx ||
+      x.vy !== y.vy ||
+      x.facing !== y.facing ||
+      x.state !== y.state ||
+      x.t !== y.t ||
+      x.hp !== y.hp ||
+      x.wall !== y.wall
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sameShots(a: readonly NetShotState[], b: readonly NetShotState[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x.id !== y.id || x.x !== y.x || x.y !== y.y || x.vx !== y.vx || x.vy !== y.vy || x.hit !== y.hit || x.t !== y.t) return false;
+  }
+  return true;
+}
+
 export function isDeltaEmpty(delta: WorldDelta): boolean {
   return (
-    delta.upserts.length === 0 && delta.removed.length === 0 && delta.collected.length === 0 && !delta.traps && !delta.props
+    delta.upserts.length === 0 &&
+    delta.removed.length === 0 &&
+    delta.collected.length === 0 &&
+    !delta.traps &&
+    !delta.props &&
+    !delta.foes &&
+    !delta.shots
   );
 }
 
@@ -147,5 +193,13 @@ export function applyWorldDelta(base: NetWorldState, tick: number, delta: WorldD
   const collected = delta.collected.length
     ? [...base.collected, ...delta.collected].sort((a, b) => a - b)
     : base.collected;
-  return { tick, players: [...players.values()], collected, traps: delta.traps ?? base.traps, props: delta.props ?? base.props };
+  return {
+    tick,
+    players: [...players.values()],
+    collected,
+    traps: delta.traps ?? base.traps,
+    props: delta.props ?? base.props,
+    foes: delta.foes ?? base.foes,
+    shots: delta.shots ?? base.shots,
+  };
 }

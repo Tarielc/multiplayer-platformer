@@ -246,7 +246,7 @@ describe('GameClient: world state', () => {
     client.events.on('world', (u) => updates.push({ keyframe: u.keyframe, tick: u.state.tick }));
     const socket = await connected(client);
     socket.receive({ t: 'room', room: roomInfo({ phase: 'countdown', level }) });
-    socket.receive({ t: 'snapshot', run: 1, tick: 3, state: { tick: 3, players: [player], collected: [], traps: [], props: [] }, events: [] });
+    socket.receive({ t: 'snapshot', run: 1, tick: 3, state: { tick: 3, players: [player], collected: [], traps: [], props: [], foes: [], shots: [] }, events: [] });
     socket.receive({ t: 'delta', run: 1, tick: 6, baseTick: 3, upserts: [{ id: ME, x: 5 }], removed: [], collected: [], events: [] });
     expect(updates).toEqual([
       { keyframe: true, tick: 3 },
@@ -263,7 +263,7 @@ describe('GameClient: world state', () => {
     const client = createClient();
     const socket = await connected(client);
     socket.receive({ t: 'room', room: roomInfo({ phase: 'countdown', level: { ...level, run: 2 } }) });
-    socket.receive({ t: 'snapshot', run: 1, tick: 3, state: { tick: 3, players: [player], collected: [], traps: [], props: [] }, events: [] });
+    socket.receive({ t: 'snapshot', run: 1, tick: 3, state: { tick: 3, players: [player], collected: [], traps: [], props: [], foes: [], shots: [] }, events: [] });
     expect(client.latestWorld).toBeNull();
   });
 });

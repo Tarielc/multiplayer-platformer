@@ -38,6 +38,15 @@ export const SOUND_CUES = [
   'gulp',
   'spit',
   'splat',
+  'stomp',
+  'foeDefeat',
+  'sting',
+  'toss',
+  'snort',
+  'squawk',
+  'parry',
+  'roar',
+  'clang',
 ] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
 
@@ -439,6 +448,101 @@ export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
       ],
     },
     volume: 0.6,
+  }),
+  // --- foes ---
+  /** Landing on a foe's head: a springy squish. */
+  stomp: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.25, freq: 140, freqEnd: 520, attack: 0.001, sustain: 0.03, decay: 0.1, lowpass: 2600, gain: 0.5 },
+        { wave: 'noise', freq: 1800, freqEnd: 400, attack: 0.001, sustain: 0.02, decay: 0.08, lowpass: 1500, gain: 0.5 },
+      ],
+    },
+    volume: 0.55,
+  }),
+  /** A foe beaten: a soft poof and a little rising chime. */
+  foeDefeat: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 2600, freqEnd: 500, attack: 0.002, sustain: 0.04, decay: 0.22, lowpass: 2000, gain: 0.7 },
+        { wave: 'square', duty: 0.125, freq: 660, attack: 0.002, sustain: 0.05, decay: 0.14, arpeggio: [{ at: 0.06, mult: 1.5 }], lowpass: 4200, gain: 0.3, delay: 0.04 },
+      ],
+    },
+    volume: 0.55,
+  }),
+  /** A wasp fires a stinger: a thin zip. */
+  sting: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.125, freq: 1400, freqEnd: 2600, attack: 0.001, sustain: 0.02, decay: 0.07, lowpass: 5000, gain: 0.3 },
+        { wave: 'noise', freq: 8000, freqEnd: 4000, attack: 0.001, sustain: 0.01, decay: 0.05, lowpass: 7000, gain: 0.3 },
+      ],
+    },
+    volume: 0.4,
+  }),
+  /** A monkey throws a banana: a quick whoosh. */
+  toss: cue({
+    recipe: {
+      layers: [{ wave: 'noise', freq: 1200, freqEnd: 3800, attack: 0.02, sustain: 0.03, decay: 0.12, lowpass: 3200, gain: 0.6 }],
+    },
+    volume: 0.4,
+  }),
+  /** A bull paws the ground before it charges: a low snort. */
+  snort: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 700, freqEnd: 250, attack: 0.01, sustain: 0.08, decay: 0.2, lowpass: 900, gain: 0.9 },
+        { wave: 'saw', freq: 70, freqEnd: 55, attack: 0.01, sustain: 0.06, decay: 0.16, lowpass: 600, gain: 0.35 },
+      ],
+    },
+    volume: 0.6,
+    minIntervalMs: 300,
+  }),
+  /** A chicken spots someone: a two-note squawk. */
+  squawk: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.25, freq: 900, freqEnd: 1300, attack: 0.002, sustain: 0.04, decay: 0.05, vibrato: { depth: 1, rate: 40 }, lowpass: 3600, gain: 0.35 },
+        { wave: 'square', duty: 0.25, freq: 1200, freqEnd: 800, attack: 0.002, sustain: 0.03, decay: 0.08, vibrato: { depth: 1, rate: 40 }, lowpass: 3600, gain: 0.35, delay: 0.1 },
+      ],
+    },
+    volume: 0.45,
+    minIntervalMs: 300,
+  }),
+  /** The rhino boss wakes up / flies into a rage: a long, growling bellow. */
+  roar: cue({
+    recipe: {
+      layers: [
+        { wave: 'saw', freq: 95, freqEnd: 62, attack: 0.08, sustain: 0.55, decay: 0.35, vibrato: { depth: 0.6, rate: 18 }, lowpass: 900, gain: 0.7 },
+        { wave: 'square', duty: 0.3, freq: 140, freqEnd: 90, attack: 0.1, sustain: 0.45, decay: 0.3, vibrato: { depth: 0.8, rate: 22 }, lowpass: 700, gain: 0.35 },
+        { wave: 'noise', freq: 600, freqEnd: 200, attack: 0.05, sustain: 0.5, decay: 0.4, lowpass: 800, gain: 0.5 },
+      ],
+    },
+    volume: 0.75,
+    minIntervalMs: 800,
+  }),
+  /** A hit glances off the rhino's armour: a dull metallic clang. */
+  clang: cue({
+    recipe: {
+      layers: [
+        { wave: 'square', duty: 0.2, freq: 620, freqEnd: 540, attack: 0.001, sustain: 0.01, decay: 0.18, lowpass: 2400, gain: 0.35 },
+        { wave: 'triangle', freq: 930, freqEnd: 880, attack: 0.001, sustain: 0.01, decay: 0.24, gain: 0.35 },
+        { wave: 'noise', freq: 3000, attack: 0.001, sustain: 0.005, decay: 0.04, lowpass: 4000, gain: 0.3 },
+      ],
+    },
+    volume: 0.5,
+    detuneJitter: 50,
+    minIntervalMs: 80,
+  }),
+  /** A swing knocks a shot out of the air: a bright tink. */
+  parry: cue({
+    recipe: {
+      layers: [
+        { wave: 'triangle', freq: 1800, freqEnd: 1500, attack: 0.001, sustain: 0.02, decay: 0.16, gain: 0.5 },
+        { wave: 'square', duty: 0.125, freq: 2700, freqEnd: 2200, attack: 0.001, sustain: 0.005, decay: 0.06, lowpass: 6000, gain: 0.2 },
+      ],
+    },
+    volume: 0.5,
   }),
 };
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ABILITIES, Ability, Cargo, Held, Phase } from '../config/abilities';
+import { FOE_TUNING } from '../config/foes';
 import { resolveMovement } from '../config/movement';
 import { msToTicks } from '../config/net';
 import { PLAYER_CONFIG } from '../config/players';
@@ -97,7 +98,7 @@ describe('heal (Bunny Man)', () => {
     const events = press(world, 'a', withAim(Button.SPECIAL, 0));
     expect(a.body.phase).toBe(Phase.HEAL_WINDUP);
     events.push(...until(world, () => a.body.phase !== Phase.HEAL_WINDUP && a.body.phase !== Phase.HEAL_REACH));
-    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null });
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null, foeId: null });
     expect(a.body.phase).toBe(Phase.HEAL_PULL);
     expect(b.body.held).toBe(Held.PULLED);
     // Inputs are ignored while held.
@@ -123,7 +124,7 @@ describe('heal (Bunny Man)', () => {
     const { world, a, b } = healWorld(40);
     const events = [...press(world, 'a', withAim(Button.SPECIAL, Math.PI)), ...ticks(world, 30)];
     expect(a.body.facing).toBe(-1);
-    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null });
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null, foeId: null });
     expect(b.body.held).not.toBe(Held.NONE);
   });
 
@@ -230,7 +231,7 @@ describe('drone (Virtual Guy)', () => {
     const b = world.getPlayer('b')!.body;
     flyTo(world, 400, GROUND - HITBOX.height + 4);
     const events = press(world, 'a');
-    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null });
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null, foeId: null });
     expect(b.held).toBe(Held.CARRIED);
     expect(a.cargo).toBe(Cargo.PLAYER);
     ticks(world, 30, { a: Button.JUMP | Button.LEFT });
@@ -328,7 +329,7 @@ describe('tongue (Ninja Frog)', () => {
     const c = world.getPlayer('c')!;
     const shoot = withAim(Button.SPECIAL, 0);
     const events = [...tick(world, { a: shoot }), ...ticks(world, 30)];
-    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null });
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: 'b', boxId: null, foeId: null });
     expect([Phase.TONGUE_GULP, Phase.TONGUE_HOLD]).toContain(a.body.phase);
     expect(b.body.held).toBe(Held.SWALLOWED);
 
@@ -377,7 +378,7 @@ describe('tongue (Ninja Frog)', () => {
     // Aim at the box's centre from the mouth.
     tick(world, { a: withAim(Button.SPECIAL, 0.25) });
     const grabbed = ticks(world, 40);
-    expect(grabbed).toContainEqual({ type: 'grab', playerId: 'a', targetId: null, boxId });
+    expect(grabbed).toContainEqual({ type: 'grab', playerId: 'a', targetId: null, boxId, foeId: null });
     expect(world.toNetState(() => 0).props[0]).toMatchObject({ id: boxId, state: 'swallowed' });
 
     const out = [...tick(world, { a: withAim(Button.SPECIAL, 0) }), ...ticks(world, 60)];
@@ -386,6 +387,145 @@ describe('tongue (Ninja Frog)', () => {
     expect(world.trapField.isBroken(boxId)).toBe(true);
     expect(world.toNetState(() => 0).props).toEqual([]);
     expect(a.body.phase).toBe(Phase.NONE);
+  });
+});
+
+describe('abilities and foes', () => {
+  /** A foe standing on the floor at `x` (a point at its feet), pacing at most `range` px. */
+  function foe(kind: string, x: number, range = 4): Omit<TiledObject, 'id'> {
+    return { name: kind, type: kind, x, y: GROUND, width: 0, height: 0, point: true, properties: [{ name: 'range', type: 'int', value: range }] };
+  }
+
+  function frogAlone(objects: Array<Omit<TiledObject, 'id'>>) {
+    const world = makeWorld(objects);
+    world.addPlayer('a', 0, 'ninja-frog');
+    ticks(world, 5);
+    place(world, 'a', 100);
+    ticks(world, 3);
+    return world;
+  }
+
+  const foeHurts = (events: GameEvent[]) => events.filter((e): e is Extract<GameEvent, { type: 'foeHurt' }> => e.type === 'foeHurt');
+
+  it('the frog catches a foe, swallows it and spits it into another: both are hurt', () => {
+    const world = frogAlone([foe('mushroom', 170), foe('mushroom', 300)]);
+    const [near, far] = world.foeField.foes;
+    const a = world.getPlayer('a')!;
+    const events = [...tick(world, { a: withAim(Button.SPECIAL, 0) }), ...ticks(world, 30)];
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: null, boxId: null, foeId: near!.id });
+    expect(near!.state).toBe('swallowed');
+    expect(world.toNetState(() => 0).players[0]!.grab).toBe(`f:${near!.id}`);
+    // A swallowed foe can't be hit or stomped, and hurts nobody.
+    expect(world.foeField.live()).toEqual([far]);
+
+    ticks(world, seconds(ABILITIES.tongue.gulp) + 2);
+    const out = [...tick(world, { a: withAim(Button.SPECIAL, 0) }), ...ticks(world, 60)];
+    const hurt = foeHurts(out);
+    expect(hurt).toContainEqual(expect.objectContaining({ foeId: far!.id, playerId: 'a', spit: true, hp: 0 }));
+    expect(hurt).toContainEqual(expect.objectContaining({ foeId: near!.id, playerId: 'a', spit: true, hp: 0 }));
+    expect(a.score).toBe(2 * FOE_TUNING.mushroom.score);
+    expect(a.hp).toBe(PLAYER_CONFIG.maxHp);
+    expect(world.toNetState(() => 0).players[0]!.grab).toBe('');
+  });
+
+  it('a spat foe that hits nothing still takes the hit when it lands', () => {
+    const world = frogAlone([foe('chicken', 170)]);
+    const chicken = world.foeField.foes[0]!;
+    tick(world, { a: withAim(Button.SPECIAL, 0) });
+    ticks(world, 30 + seconds(ABILITIES.tongue.gulp));
+    expect(chicken.state).toBe('swallowed');
+    tick(world, { a: withAim(Button.SPECIAL, -Math.PI / 2) });
+    ticks(world, seconds(ABILITIES.tongue.spit) + 2);
+    expect(chicken.state).toBe('flying');
+    const out = ticks(world, 90);
+    expect(foeHurts(out)).toContainEqual(expect.objectContaining({ foeId: chicken.id, spit: true, hp: FOE_TUNING.chicken.hp - 1 }));
+    expect(chicken.grounded).toBe(true);
+    expect(chicken.y).toBeCloseTo(GROUND, 5);
+  });
+
+  it('a spat box breaks on a foe and hurts it', () => {
+    const world = frogAlone([box(160), foe('bull', 330)]);
+    const boxId = world.level.traps[0]!.id;
+    const bull = world.foeField.foes[0]!;
+    tick(world, { a: withAim(Button.SPECIAL, 0.25) });
+    expect(ticks(world, 40)).toContainEqual({ type: 'grab', playerId: 'a', targetId: null, boxId, foeId: null });
+    const out = [...tick(world, { a: withAim(Button.SPECIAL, 0) }), ...ticks(world, 40)];
+    expect(out).toContainEqual(expect.objectContaining({ type: 'propBreak', boxId }));
+    expect(foeHurts(out)).toContainEqual(expect.objectContaining({ foeId: bull.id, playerId: 'a', spit: true }));
+    expect(bull.hp).toBe(FOE_TUNING.bull.hp - ABILITIES.tongue.damage);
+  });
+
+  it('a spat player hurts the foes they fly through', () => {
+    const world = frogAlone([foe('mushroom', 330)]);
+    world.addPlayer('b', 1);
+    ticks(world, 3);
+    place(world, 'b', 190);
+    ticks(world, 3);
+    tick(world, { a: withAim(Button.SPECIAL, 0) });
+    ticks(world, 30 + seconds(ABILITIES.tongue.gulp));
+    expect(world.getPlayer('b')!.body.held).toBe(Held.SWALLOWED);
+    const out = [...tick(world, { a: withAim(Button.SPECIAL, 0) }), ...ticks(world, 60)];
+    expect(foeHurts(out)).toContainEqual(expect.objectContaining({ playerId: 'a', spit: true, hp: 0 }));
+    // Beaten by the spat player before it could touch them.
+    expect(out.some((e) => e.type === 'foeHit')).toBe(false);
+  });
+
+  it('lets a foe go when the frog dies with it in its mouth', () => {
+    const world = frogAlone([foe('mushroom', 170)]);
+    const mushroom = world.foeField.foes[0]!;
+    tick(world, { a: withAim(Button.SPECIAL, 0) });
+    ticks(world, 30);
+    expect(mushroom.state).toBe('swallowed');
+    world.killPlayer('a');
+    ticks(world, 60);
+    expect(world.foeField.catchable(mushroom)).toBe(true);
+    expect(mushroom.y).toBeCloseTo(GROUND, 5);
+  });
+
+  it('the drone picks up a foe, carries it and drops it', () => {
+    const world = makeWorld([foe('chicken', 300, 0)]);
+    world.addPlayer('a', 0, 'virtual-guy');
+    ticks(world, 5);
+    place(world, 'a', 100);
+    ticks(world, 5);
+    press(world, 'a');
+    ticks(world, seconds(ABILITIES.drone.deploy + ABILITIES.drone.sit) + 2);
+    const a = world.getPlayer('a')!.body;
+    expect(a.phase).toBe(Phase.DRONE_PILOT);
+    const chicken = world.foeField.foes[0]!;
+    const { height } = FOE_TUNING.chicken;
+
+    // Hover over it and grab.
+    for (let i = 0; i < 600; i++) {
+      const grip = droneGrip(a);
+      const dx = chicken.x - grip.x;
+      const dy = chicken.y - height + 4 - grip.y;
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) break;
+      let buttons = 0;
+      if (dx > 2) buttons |= Button.RIGHT;
+      if (dx < -2) buttons |= Button.LEFT;
+      if (dy > 2) buttons |= Button.DOWN;
+      if (dy < -2) buttons |= Button.JUMP;
+      tick(world, { a: buttons });
+    }
+    const events = press(world, 'a');
+    expect(events).toContainEqual({ type: 'grab', playerId: 'a', targetId: null, boxId: null, foeId: chicken.id });
+    expect(a.cargo).toBe(Cargo.CHICKEN);
+    expect(chicken.state).toBe('held');
+
+    ticks(world, 30, { a: Button.JUMP | Button.LEFT });
+    expect(chicken.y).toBeCloseTo(droneGrip(a).y + height, 5);
+    expect(chicken.y).toBeLessThan(GROUND - 20);
+    expect(world.toNetState(() => 0).foes[0]).toMatchObject({ id: chicken.id, state: 'held' });
+
+    const dropped = press(world, 'a');
+    expect(dropped.some((e) => e.type === 'release' && !e.spit)).toBe(true);
+    expect(a.cargo).toBe(Cargo.NONE);
+    expect(chicken.state).toBe('hurt');
+    ticks(world, 90);
+    expect(chicken.grounded).toBe(true);
+    expect(chicken.hp).toBe(FOE_TUNING.chicken.hp);
+    expect(world.foeField.catchable(chicken)).toBe(true);
   });
 });
 

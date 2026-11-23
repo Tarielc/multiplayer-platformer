@@ -1,4 +1,5 @@
 import { ABILITIES, Ability, Cargo, Phase, type CompiledAbilities } from '../config/abilities';
+import { FOE_TUNING, type FoeKind } from '../config/foes';
 import { clamp, approach, type Rect, type Vec2 } from '../util/math';
 import { cellAt, isSolidCell } from './collision';
 import { CellFlag } from '../level/types';
@@ -142,11 +143,39 @@ export function facingForAim(angle: number, facing: 1 | -1): 1 | -1 {
   return cos > 1e-3 ? 1 : cos < -1e-3 ? -1 : facing;
 }
 
+const FOE_CARGO: Readonly<Record<FoeKind, number>> = {
+  mushroom: Cargo.MUSHROOM,
+  chicken: Cargo.CHICKEN,
+  wasp: Cargo.WASP,
+  monkey: Cargo.MONKEY,
+  bull: Cargo.BULL,
+  rhino: Cargo.RHINO, // never caught (a boss), but every kind has a cargo
+};
+const CARGO_FOE = new Map<number, FoeKind>(Object.entries(FOE_CARGO).map(([kind, cargo]) => [cargo, kind as FoeKind]));
+
+/** The claw's cargo for a foe of `kind` (a foe hangs from the claw by its top). */
+export function foeCargo(kind: FoeKind): number {
+  return FOE_CARGO[kind];
+}
+
+/** The foe kind the claw holds, or null. */
+export function cargoFoe(cargo: number): FoeKind | null {
+  return CARGO_FOE.get(cargo) ?? null;
+}
+
 /** Height of the drone's cargo below the claw grip. */
 export function cargoHeight(cargo: number, ctx: Pick<MovementContext, 'traps'>): number {
   if (cargo === Cargo.PLAYER) return CARRIED_FEET_BELOW_GRIP;
   if (cargo === Cargo.BOX) return ctx.traps?.config.box.height ?? DEFAULT_BOX;
-  return 0;
+  const foe = cargoFoe(cargo);
+  return foe ? FOE_TUNING[foe].height : 0;
+}
+
+function cargoWidth(cargo: number, ctx: Pick<MovementContext, 'traps' | 'hitbox'>): number {
+  if (cargo === Cargo.PLAYER) return ctx.hitbox.width;
+  if (cargo === Cargo.BOX) return ctx.traps?.config.box.width ?? DEFAULT_BOX;
+  const foe = cargoFoe(cargo);
+  return foe ? FOE_TUNING[foe].width : 0;
 }
 
 /** The drone's collision box, cargo included (cargo can't be dragged through walls). */
@@ -155,8 +184,7 @@ export function droneBox(
   ctx: Pick<MovementContext, 'traps' | 'hitbox' | 'abilities'>,
 ): Rect {
   const d = abilityConfig(ctx).drone;
-  const cargoWidth = body.cargo === Cargo.PLAYER ? ctx.hitbox.width : body.cargo === Cargo.BOX ? (ctx.traps?.config.box.width ?? DEFAULT_BOX) : 0;
-  const width = Math.max(d.size.width, cargoWidth);
+  const width = Math.max(d.size.width, cargoWidth(body.cargo, ctx));
   const top = body.droneY - d.size.height / 2;
   const bottom = body.cargo === Cargo.NONE ? body.droneY + d.size.height / 2 : body.droneY + d.gripY + cargoHeight(body.cargo, ctx);
   return { x: body.droneX - width / 2, y: top, width, height: bottom - top };

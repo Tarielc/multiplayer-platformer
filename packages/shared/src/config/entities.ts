@@ -29,6 +29,11 @@ export const ENTITY_CONFIG: Readonly<EntityConfig> = {
   collectibles: {
     coin: { value: 10, radius: 11 },
     gem: { value: 50, radius: 12 },
+    // Fruit pickups (animated sheets in data/sprites/fruits/). The melon is the rare one.
+    apple: { value: 10, radius: 10 },
+    strawberry: { value: 10, radius: 10 },
+    pineapple: { value: 20, radius: 10 },
+    melon: { value: 50, radius: 11 },
   },
   defaultCollectibleKind: 'coin',
   hazardTileHitbox: { insetX: 4, insetTop: 14, insetBottom: 0 },

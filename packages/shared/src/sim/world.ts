@@ -2,6 +2,7 @@ import { ABILITIES, Ability, Held, abilityForCharacter, type AbilityId, type Com
 import type { CharacterId } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
+import { FOE_TUNING, type FoeTuning } from '../config/foes';
 import type { CompiledMovement } from '../config/movement';
 import { msToTicks, TICK_DT } from '../config/net';
 import { PLAYER_CONFIG, type PlayerConfig } from '../config/players';
@@ -14,6 +15,8 @@ import type { DeathCause, GameEvent } from './events';
 import { giantActive } from './abilities';
 import { AbilitySystem, cloneAbilityPlayerState, newAbilityPlayerState, type AbilityHit, type AbilityPlayerState } from './abilitySystem';
 import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
+import { FoeField, type Foe } from './foes/FoeField';
+import type { FoeStrike, FoeTarget } from './foes/types';
 import { cloneBody, createBody, resetBody, type MovementBody, type MovementContext, type StepContacts } from './movement';
 import { TrapField } from './traps/TrapField';
 import type { Dir4, TrapHazard } from './traps/types';
@@ -50,6 +53,9 @@ export interface WorldPlayer {
   /** Server-only: boxes already hit by the current swing (`boxSwingSeq`), one hit per swing. */
   boxSwingSeq: number;
   swingBoxes: Set<number>;
+  /** Server-only: foes already hit by the current swing (`foeSwingSeq`), one hit per swing. */
+  foeSwingSeq: number;
+  swingFoes: Set<number>;
   /** Server-only special ability bookkeeping (what it holds, flights, ...). */
   ability: AbilityPlayerState;
 }
@@ -67,6 +73,8 @@ export interface GameWorldOptions {
   dt?: number;
   /** Special ability tuning (defaults to `ABILITIES`). */
   abilities?: CompiledAbilities;
+  /** Foe tuning (defaults to `FOE_TUNING`; where they are comes from the level). `null`: no foes. */
+  foes?: Readonly<FoeTuning> | null;
 }
 
 /**
@@ -91,6 +99,8 @@ export class GameWorld {
   private events: GameEvent[] = [];
   private traps: TrapField;
   private abilities: AbilitySystem;
+  private foes: FoeField;
+  private readonly foeInvulnerabilityTicks: number;
 
   constructor(private readonly options: GameWorldOptions) {
     this.level = options.level;
@@ -108,6 +118,9 @@ export class GameWorld {
     };
     this.abilities = new AbilitySystem(this.abilityHost());
     this.respawnDelayTicks = Math.max(1, msToTicks(this.playerConfig.respawnDelayMs));
+    const foes = options.foes ?? FOE_TUNING;
+    this.foes = FoeField.forLevel(options.foes === null ? { ...options.level, foes: [] } : options.level, foes, this.ctx.dt);
+    this.foeInvulnerabilityTicks = msToTicks(foes.hit.invulnerabilityMs);
   }
 
   get movementContext(): Readonly<MovementContext> {
@@ -117,6 +130,11 @@ export class GameWorld {
   /** Live trap state (box hits, falling platforms). Read-only use outside the world. */
   get trapField(): TrapField {
     return this.traps;
+  }
+
+  /** Live foes and their shots. Read-only use outside the world. */
+  get foeField(): FoeField {
+    return this.foes;
   }
 
   /**
@@ -136,12 +154,14 @@ export class GameWorld {
         body: cloneBody(p.body),
         respawnPoint: { ...p.respawnPoint },
         swingBoxes: new Set(p.swingBoxes),
+        swingFoes: new Set(p.swingFoes),
         ability: cloneAbilityPlayerState(p.ability),
       });
     }
     copy.traps = this.traps.clone();
     copy.ctx.traps = copy.ctx.traps ? copy.traps : null;
     copy.abilities = this.abilities.cloneFor(copy.abilityHost());
+    copy.foes = this.foes.clone();
     return copy;
   }
 
@@ -191,6 +211,8 @@ export class GameWorld {
       invulnUntil: 0,
       boxSwingSeq: 0,
       swingBoxes: new Set(),
+      foeSwingSeq: 0,
+      swingFoes: new Set(),
       ability: newAbilityPlayerState(),
     };
     player.body.ability = character ? abilityForCharacter(character) : Ability.NONE;
@@ -237,6 +259,7 @@ export class GameWorld {
     this.abilities.update();
     if (this.ctx.combat.playerHits) this.resolveAttacks();
     this.resolveBoxAttacks();
+    this.resolveFoes();
     this.traps.expire(this.tick);
     for (const player of this.players.values()) {
       if (player.body.alive) continue;
@@ -277,6 +300,8 @@ export class GameWorld {
       collected: [...this.collected].sort((a, b) => a - b),
       traps: this.traps.toNet(),
       props: this.abilities.toNet(),
+      foes: this.foes.toNetFoes(),
+      shots: this.foes.toNetShots(),
     };
   }
 
@@ -295,6 +320,9 @@ export class GameWorld {
       get traps() {
         return world.traps;
       },
+      get foes() {
+        return world.foes;
+      },
       listPlayers: () => world.listPlayers(),
       getPlayer: (id: string) => world.players.get(id),
       emit: (event: GameEvent) => {
@@ -303,6 +331,7 @@ export class GameWorld {
       maxHp: (p: WorldPlayer) => world.maxHp(p),
       hurt: (target: WorldPlayer, hit: AbilityHit) => world.abilityHurt(target, hit),
       hitBox: (by: WorldPlayer | null, boxId: number, count: number) => world.hitBox(by, boxId, count),
+      hurtFoe: (by: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1) => world.hurtFoe(by, foe, damage, dir, 'spit'),
       ticksFor: (seconds: number) => msToTicks(seconds * 1000),
     };
   }
@@ -391,7 +420,8 @@ export class GameWorld {
     for (const zone of this.level.checkpoints) {
       if (rectsOverlap(box, zone)) this.activateCheckpoint(player, zone);
     }
-    player.atExit = this.level.exits.some((zone) => rectsOverlap(box, zone));
+    // The exit stays shut while a boss is alive.
+    player.atExit = !this.foes.bossAlive && this.level.exits.some((zone) => rectsOverlap(box, zone));
   }
 
   /**
@@ -528,6 +558,118 @@ export class GameWorld {
     }
   }
 
+  /**
+   * Foes, once per tick after everyone moved: swings and stomps hurt them, then they think,
+   * move and attack, and whoever they (or their shots) hit loses a heart.
+   */
+  private resolveFoes(): void {
+    const foes = this.foes;
+    if (foes.empty) return;
+    const combat = this.ctx.combat;
+    const hitbox = this.ctx.hitbox;
+    const tuning = foes.config;
+    const players = this.listPlayers();
+    // Swings hit each foe once per swing (giants harder) and knock shots out of the air.
+    for (const player of players) {
+      const body = player.body;
+      if (body.attackSeq !== player.foeSwingSeq) {
+        player.foeSwingSeq = body.attackSeq;
+        player.swingFoes.clear();
+      }
+      if (!body.alive || !isAttackActive(body, combat)) continue;
+      const reach = attackReachBox(body, hitbox, combat, this.reachScale(body));
+      const damage = giantActive(body) ? this.abilityTuning.giant.swingDamage : tuning.swingDamage;
+      for (const foe of foes.live()) {
+        if (player.swingFoes.has(foe.id) || !rectsOverlap(reach, foes.hitbox(foe))) continue;
+        player.swingFoes.add(foe.id);
+        const away = foe.x - (body.x + hitbox.width / 2);
+        this.hurtFoe(player, foe, damage, away > 0 ? 1 : away < 0 ? -1 : body.facing, 'swing');
+      }
+      if (foes.parry(reach) > 0) {
+        this.events.push({ type: 'parry', playerId: player.id, x: reach.x + reach.width / 2, y: reach.y + reach.height / 2 });
+      }
+    }
+    // Stomps: landing on a foe's head hurts it and bounces the player back up (double jump restored).
+    const targets = players.map((p) => this.foeTarget(p));
+    players.forEach((player, i) => {
+      const target = targets[i]!;
+      if (!target.visible) return;
+      const foe = foes.stompVictim(target);
+      if (!foe) return;
+      const body = player.body;
+      this.hurtFoe(player, foe, tuning.stomp.damage, foe.x >= target.x + target.width / 2 ? 1 : -1, 'stomp');
+      body.vy = -tuning.stomp.bounce;
+      body.grounded = false;
+      body.jumping = false;
+      body.coyote = 0;
+      body.airJumpsLeft = this.ctx.movement.airJumps;
+      target.vy = body.vy;
+      target.vulnerable = false;
+    });
+    for (const strike of foes.step(this.tick, targets)) {
+      const player = this.players.get(strike.targetId);
+      if (player) this.foeStrike(player, strike);
+    }
+  }
+
+  /** A player as the foes see them. */
+  private foeTarget(player: WorldPlayer): FoeTarget {
+    const body = player.body;
+    const free = body.alive && body.held === Held.NONE;
+    return {
+      id: player.id,
+      x: body.x,
+      y: body.y,
+      width: this.ctx.hitbox.width,
+      height: this.ctx.hitbox.height,
+      vy: body.vy,
+      visible: free,
+      vulnerable: free && this.tick >= player.invulnUntil && body.hurt <= 0,
+    };
+  }
+
+  /**
+   * A player hurt a foe (a swing, a stomp, or something the frog spat; `player` is null when the
+   * frog already left); finishing it scores its points.
+   */
+  private hurtFoe(player: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1, how: 'swing' | 'stomp' | 'spit'): void {
+    const result = this.foes.hurt(foe, damage, dir, player?.id ?? '');
+    if (result === null) return;
+    const blocked = result === 'blocked';
+    const hp = blocked ? foe.hp : result;
+    const score = hp === 0 && player ? this.foes.config[foe.kind].score : 0;
+    if (player) player.score += score;
+    const box = this.foes.hitbox(foe);
+    this.events.push({
+      type: 'foeHurt',
+      playerId: player?.id ?? '',
+      foeId: foe.id,
+      kind: foe.kind,
+      hp,
+      blocked,
+      stomp: how === 'stomp',
+      spit: how === 'spit',
+      score,
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
+  }
+
+  /** A foe's hit, like a trap's: a heart, then death, or a shove and a moment of invulnerability. */
+  private foeStrike(player: WorldPlayer, strike: FoeStrike): void {
+    const body = player.body;
+    if (!body.alive || body.held !== Held.NONE) return;
+    player.hp = Math.max(0, player.hp - strike.damage);
+    this.events.push({ type: 'foeHit', playerId: player.id, foeId: strike.foeId, hp: player.hp, x: strike.x, y: strike.y });
+    if (player.hp <= 0) {
+      this.kill(player, 'foe');
+      return;
+    }
+    const taken = giantActive(body) ? this.abilityTuning.giant.knockbackTaken : 1;
+    this.stun(player, strike.dir, strike.knockbackX * taken, strike.knockbackY * taken);
+    player.invulnUntil = this.tick + this.foeInvulnerabilityTicks;
+  }
+
   private touchesHazardTile(box: Rect): boolean {
     const { level } = this;
     const ts = level.tileSize;
@@ -658,7 +800,7 @@ function toNetPlayer(p: WorldPlayer, ack: number, maxHp: number): NetPlayerState
 function grabKey(p: WorldPlayer): string {
   const grab = p.ability.grab;
   if (!grab) return '';
-  return grab.kind === 'player' ? `p:${grab.id}` : `b:${grab.id}`;
+  return grab.kind === 'player' ? `p:${grab.id}` : grab.kind === 'foe' ? `f:${grab.id}` : `b:${grab.id}`;
 }
 
 /** Which side of the hazard the player touched (for knockback and the spike-head squash). */

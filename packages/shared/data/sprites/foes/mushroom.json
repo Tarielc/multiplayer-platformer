@@ -1,0 +1,245 @@
+{
+  "image": "mushroom.png",
+  "pivot": {
+    "x": 16,
+    "y": 31,
+    "note": "bottom-centre of the feet"
+  },
+  "facing": "right",
+  "hitbox": {
+    "width": 18,
+    "height": 18,
+    "note": "bottom-centred on the pivot"
+  },
+  "behaviour": "walks back and forth, turns at walls and ledges; damages players on touch",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 6,
+      "loop": true,
+      "durationsMs": [
+        140,
+        140,
+        140,
+        140,
+        140,
+        140
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          32,
+          32
+        ],
+        [
+          32,
+          0,
+          32,
+          32
+        ],
+        [
+          64,
+          0,
+          32,
+          32
+        ],
+        [
+          96,
+          0,
+          32,
+          32
+        ],
+        [
+          128,
+          0,
+          32,
+          32
+        ],
+        [
+          160,
+          0,
+          32,
+          32
+        ]
+      ]
+    },
+    "walk": {
+      "row": 1,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 8,
+      "loop": true,
+      "note": "move about 30 px/s; the frames step in place",
+      "durationsMs": [
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90
+      ],
+      "rects": [
+        [
+          0,
+          32,
+          32,
+          32
+        ],
+        [
+          32,
+          32,
+          32,
+          32
+        ],
+        [
+          64,
+          32,
+          32,
+          32
+        ],
+        [
+          96,
+          32,
+          32,
+          32
+        ],
+        [
+          128,
+          32,
+          32,
+          32
+        ],
+        [
+          160,
+          32,
+          32,
+          32
+        ],
+        [
+          192,
+          32,
+          32,
+          32
+        ],
+        [
+          224,
+          32,
+          32,
+          32
+        ]
+      ]
+    },
+    "hurt": {
+      "row": 2,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 4,
+      "loop": false,
+      "durationsMs": [
+        60,
+        90,
+        90,
+        90
+      ],
+      "rects": [
+        [
+          0,
+          64,
+          32,
+          32
+        ],
+        [
+          32,
+          64,
+          32,
+          32
+        ],
+        [
+          64,
+          64,
+          32,
+          32
+        ],
+        [
+          96,
+          64,
+          32,
+          32
+        ]
+      ]
+    },
+    "death": {
+      "row": 3,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 8,
+      "loop": false,
+      "note": "ends empty; remove the foe after the last frame",
+      "durationsMs": [
+        60,
+        90,
+        120,
+        70,
+        70,
+        80,
+        80,
+        80
+      ],
+      "rects": [
+        [
+          0,
+          96,
+          32,
+          32
+        ],
+        [
+          32,
+          96,
+          32,
+          32
+        ],
+        [
+          64,
+          96,
+          32,
+          32
+        ],
+        [
+          96,
+          96,
+          32,
+          32
+        ],
+        [
+          128,
+          96,
+          32,
+          32
+        ],
+        [
+          160,
+          96,
+          32,
+          32
+        ],
+        [
+          192,
+          96,
+          32,
+          32
+        ],
+        [
+          224,
+          96,
+          32,
+          32
+        ]
+      ]
+    }
+  }
+}

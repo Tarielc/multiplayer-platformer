@@ -1,0 +1,129 @@
+{
+  "image": "wasp_stinger.png",
+  "pivot": {
+    "x": 7,
+    "y": 3,
+    "note": "centre of the dart"
+  },
+  "facing": "right",
+  "hitbox": {
+    "width": 8,
+    "height": 4
+  },
+  "animations": {
+    "fly": {
+      "row": 0,
+      "frameWidth": 14,
+      "frameHeight": 8,
+      "frames": 2,
+      "loop": true,
+      "note": "points right; rotate to the velocity. ~180 px/s",
+      "durationsMs": [
+        60,
+        60
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          14,
+          8
+        ],
+        [
+          14,
+          0,
+          14,
+          8
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            7,
+            3
+          ],
+          "tip": [
+            12,
+            3
+          ]
+        },
+        {
+          "center": [
+            7,
+            3
+          ],
+          "tip": [
+            12,
+            3
+          ]
+        }
+      ]
+    },
+    "impact": {
+      "row": 1,
+      "frameWidth": 14,
+      "frameHeight": 8,
+      "frames": 4,
+      "loop": false,
+      "note": "where the stinger hits a wall or player",
+      "durationsMs": [
+        60,
+        60,
+        60,
+        60
+      ],
+      "rects": [
+        [
+          0,
+          8,
+          14,
+          8
+        ],
+        [
+          14,
+          8,
+          14,
+          8
+        ],
+        [
+          28,
+          8,
+          14,
+          8
+        ],
+        [
+          42,
+          8,
+          14,
+          8
+        ]
+      ],
+      "points": [
+        {
+          "center": [
+            7,
+            3
+          ]
+        },
+        {
+          "center": [
+            7,
+            3
+          ]
+        },
+        {
+          "center": [
+            7,
+            3
+          ]
+        },
+        {
+          "center": [
+            7,
+            3
+          ]
+        }
+      ]
+    }
+  }
+}

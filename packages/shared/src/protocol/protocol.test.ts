@@ -63,13 +63,15 @@ function player(id: string, overrides: Partial<NetPlayerState> = {}): NetPlayerS
 }
 
 describe('world deltas', () => {
-  const prev: NetWorldState = { tick: 10, players: [player('a'), player('b'), player('c')], collected: [3], traps: [], props: [] };
+  const prev: NetWorldState = { tick: 10, players: [player('a'), player('b'), player('c')], collected: [3], traps: [], props: [], foes: [], shots: [] };
   const next: NetWorldState = {
     tick: 13,
     players: [player('a', { x: 14, vx: 220, ack: 3, hp: 2, invulnUntil: 70 }), player('c'), player('d', { x: 99 })],
     collected: [3, 7],
     traps: [{ id: 4, hits: 1 }],
     props: [],
+    foes: [],
+    shots: [],
   };
 
   it('contains only what changed', () => {

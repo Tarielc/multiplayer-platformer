@@ -1,4 +1,4 @@
-import { lerp, type NetPlayerState, type NetPropState, type NetWorldState } from '@platformer/shared';
+import { TICK_DT, lerp, type NetFoeState, type NetPlayerState, type NetPropState, type NetShotState, type NetWorldState } from '@platformer/shared';
 
 export interface RemoteSample {
   id: string;
@@ -156,6 +156,58 @@ export class Interpolator {
     const newest = this.buffer.at(-1)!;
     if (newest !== b) for (const p of newest.props) if (!out.has(p.id)) out.set(p.id, p);
     return [...out.values()];
+  }
+
+  /**
+   * Foes at `renderTick`. They glide between states while doing the same thing; when the newer
+   * state began after the render time, the older one is shown (its clock run on), so a peck or
+   * a charge starts on screen when it started on the server.
+   */
+  sampleFoes(renderTick: number): NetFoeState[] {
+    const bracket = this.bracket(renderTick);
+    if (!bracket) return [];
+    const { a, b, t } = bracket;
+    const before = new Map(a.foes.map((f) => [f.id, f]));
+    const since = (renderTick - a.tick) * TICK_DT;
+    const ahead = (b.tick - renderTick) * TICK_DT;
+    return b.foes.map((fb) => {
+      const fa = before.get(fb.id);
+      if (!fa) return fb;
+      const x = lerp(fa.x, fb.x, t);
+      const y = lerp(fa.y, fb.y, t);
+      if (fa.state === fb.state && fb.t >= fa.t) return { ...fb, x, y, t: lerp(fa.t, fb.t, t) };
+      const into = fb.t - ahead;
+      return into >= 0 ? { ...fb, x, y, t: into } : { ...fa, x, y, t: fa.t + since };
+    });
+  }
+
+  /**
+   * Stingers and bananas at `renderTick`: shots fired after the render time aren't shown yet, and
+   * a shot flies on until the moment it hit something.
+   */
+  sampleShots(renderTick: number): NetShotState[] {
+    const bracket = this.bracket(renderTick);
+    if (!bracket) return [];
+    const { a, b, t } = bracket;
+    const before = new Map(a.shots.map((s) => [s.id, s]));
+    const since = (renderTick - a.tick) * TICK_DT;
+    const ahead = (b.tick - renderTick) * TICK_DT;
+    const out: NetShotState[] = [];
+    for (const sb of b.shots) {
+      const sa = before.get(sb.id);
+      if (sa && sa.hit === sb.hit) {
+        out.push(sb.hit ? { ...sb, t: lerp(sa.t, sb.t, t) } : { ...sb, x: lerp(sa.x, sb.x, t), y: lerp(sa.y, sb.y, t), t: lerp(sa.t, sb.t, t) });
+        continue;
+      }
+      const into = sb.t - ahead;
+      if (into >= 0) {
+        // Fired (or hit) by now; a new shot is wound back along its flight.
+        out.push(sb.hit ? { ...sb, t: into } : { ...sb, x: sb.x - sb.vx * ahead, y: sb.y - sb.vy * ahead, t: into });
+      } else if (sa) {
+        out.push({ ...sa, x: sa.x + sa.vx * since, y: sa.y + sa.vy * since, t: sa.t + since });
+      }
+    }
+    return out;
   }
 
   private bracket(renderTick: number): Bracket | null {

@@ -21,6 +21,8 @@ export function levelChecksum(level: LevelData): string {
   for (const c of level.collectibles) h.int(c.id).str(c.kind).num(c.x).num(c.y).num(c.value).num(c.radius);
   h.str('trap');
   for (const trap of level.traps) hashValue(h, trap);
+  h.str('foe');
+  for (const foe of level.foes) hashValue(h, foe);
   return h.digest();
 }
 

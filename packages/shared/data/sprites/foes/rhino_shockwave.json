@@ -1,0 +1,91 @@
+{
+  "image": "rhino_shockwave.png",
+  "pivot": {
+    "x": 14,
+    "y": 17,
+    "note": "bottom-centre, on the ground"
+  },
+  "facing": "right",
+  "animations": {
+    "travel": {
+      "row": 0,
+      "frameWidth": 28,
+      "frameHeight": 18,
+      "frames": 4,
+      "loop": true,
+      "note": "runs along the ground, facing right; ~180 px/s; hitbox ~20x12 bottom-centred",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          0,
+          28,
+          18
+        ],
+        [
+          28,
+          0,
+          28,
+          18
+        ],
+        [
+          56,
+          0,
+          28,
+          18
+        ],
+        [
+          84,
+          0,
+          28,
+          18
+        ]
+      ]
+    },
+    "fade": {
+      "row": 1,
+      "frameWidth": 28,
+      "frameHeight": 18,
+      "frames": 4,
+      "loop": false,
+      "note": "dies out at a wall or after ~1.2 s",
+      "durationsMs": [
+        70,
+        70,
+        70,
+        70
+      ],
+      "rects": [
+        [
+          0,
+          18,
+          28,
+          18
+        ],
+        [
+          28,
+          18,
+          28,
+          18
+        ],
+        [
+          56,
+          18,
+          28,
+          18
+        ],
+        [
+          84,
+          18,
+          28,
+          18
+        ]
+      ]
+    }
+  }
+}

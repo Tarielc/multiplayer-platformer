@@ -249,6 +249,10 @@ const spawn = (slot: number): AsciiLegendEntry => ({
   object: { type: 'spawn', anchor: 'feet', name: `spawn-${slot + 1}`, properties: { slot } },
 });
 
+const fruit = (kind: string): AsciiLegendEntry => ({
+  object: { type: 'collectible', anchor: 'center', name: kind, properties: { kind } },
+});
+
 /**
  * Legend for 16 px maps built from the terrain tileset. Use it as `baseLegend` together with
  * `tileset: terrainTilesetDefinition()` and `tileSize: 16`. Checkpoints and exits are 2×4 tiles
@@ -267,6 +271,10 @@ export const TERRAIN_ASCII_LEGEND: Record<string, AsciiLegendEntry> = {
   '4': spawn(3),
   o: { object: { type: 'collectible', anchor: 'center', name: 'coin', properties: { kind: 'coin' } } },
   g: { object: { type: 'collectible', anchor: 'center', name: 'gem', properties: { kind: 'gem' } } },
+  a: fruit('apple'),
+  s: fruit('strawberry'),
+  p: fruit('pineapple'),
+  w: fruit('melon'),
   C: { object: { type: 'checkpoint', anchor: 'zone', name: 'checkpoint', widthTiles: 2, heightTiles: 4 } },
   E: { object: { type: 'exit', anchor: 'zone', name: 'exit', widthTiles: 2, heightTiles: 4 } },
   L: { object: { type: 'hazard', anchor: 'zone', name: 'lava', heightTiles: 2, mergeRow: true, properties: { style: 'lava' } } },

@@ -7,6 +7,7 @@ import { prepareSoundCues, queueSoundOverrides } from '../audio/SoundController'
 import { ensureCharacterSheet, registerCharacterAnimations } from '../characters/characterAnimations';
 import { CHARACTER_SHEET } from '../characters/characterArt';
 import { VIEW_CONFIG } from '../config';
+import { allFoeSheets } from '../foes/foeArt';
 import type { GameServices } from '../services';
 import { ensureTrapSheets, queueTrapSheets, registerTrapAnimations } from '../traps/trapAnimations';
 import { TRAP_SHEETS } from '../traps/trapArt';
@@ -39,6 +40,7 @@ export class BootScene extends Phaser.Scene {
     }
     queueTrapSheets(this, this.services.assetBase);
     queueAbilitySheets(this, this.services.assetBase);
+    queueAbilitySheets(this, this.services.assetBase, allFoeSheets());
     for (const name of BACKGROUND_TILES) {
       if (!this.textures.exists(backgroundKey(name))) this.load.image(backgroundKey(name), `${this.services.assetBase}/${backgroundPath(name)}`);
     }
@@ -66,6 +68,12 @@ export class BootScene extends Phaser.Scene {
     if (missingAbilities.length > 0) {
       this.services.bridge.emit('level:warning', {
         message: `Special-ability sprites (${missingAbilities.join(', ')}) could not be loaded; abilities use the normal animations. Run "npm run assets:sync".`,
+      });
+    }
+    const missingFoes = registerAbilitySheets(this, allFoeSheets());
+    if (missingFoes.length > 0) {
+      this.services.bridge.emit('level:warning', {
+        message: `Foe sprites (${missingFoes.join(', ')}) could not be loaded; those foes are invisible. Run "npm run assets:sync".`,
       });
     }
     prepareSoundCues(this);

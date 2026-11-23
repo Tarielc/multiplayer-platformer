@@ -1,5 +1,7 @@
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { TRAP_CONFIG, type CompiledTraps } from '../config/traps';
+import { FOE_TUNING, type FoeTuning } from '../config/foes';
+import { foeKindOf, parseFoes, type FoeObject } from '../sim/foes/parseFoes';
 import { parseTraps, trapKindOf, type TrapObject } from '../sim/traps/parseTraps';
 import { LevelFormatError } from './errors';
 import {
@@ -29,6 +31,8 @@ export interface ParseLevelOptions {
   entities?: Readonly<EntityConfig>;
   /** Trap defaults (sizes, timings); defaults to `TRAP_CONFIG`. */
   traps?: Readonly<CompiledTraps>;
+  /** Foe sizes and default ranges; defaults to `FOE_TUNING`. */
+  foes?: Readonly<FoeTuning>;
   /** Used when the map has no `backgroundcolor`. */
   backgroundColor?: string;
 }
@@ -125,6 +129,7 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
   const collectibles: LevelCollectible[] = [];
   const extraObjects: LevelObject[] = [];
   const trapObjects: TrapObject[] = [];
+  const foeObjects: FoeObject[] = [];
   const pendingSpawns: Array<{ slot: number | null; x: number; y: number }> = [];
 
   for (const { layer } of flattenLayers(map.layers)) {
@@ -180,6 +185,12 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
           }
           default: {
             const { x, y } = objectTopLeft(obj);
+            const foeKind = foeKindOf(kind, props, obj.id);
+            if (foeKind) {
+              const point = obj.point === true || (obj.width === 0 && obj.height === 0);
+              foeObjects.push({ id: obj.id, kind: foeKind, name: obj.name, x, y, width: obj.width, height: obj.height, point, properties: props });
+              break;
+            }
             const trapKind = trapKindOf(kind);
             if (trapKind) {
               const point = obj.point === true || (obj.width === 0 && obj.height === 0);
@@ -229,11 +240,14 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
     hazards,
     collectibles,
     traps: [],
+    foes: [],
     extraObjects,
     backgroundColor: map.backgroundcolor ?? (typeof mapProps.backgroundColor === 'string' ? mapProps.backgroundColor : null) ?? options.backgroundColor ?? null,
     properties: mapProps,
   };
   // Traps need the finished collision grid (rock-heads find the walls they slam into).
   level.traps = parseTraps(trapObjects, level, options.traps ?? TRAP_CONFIG);
+  // Monkeys find the wall they cling to.
+  level.foes = parseFoes(foeObjects, level, options.foes ?? FOE_TUNING);
   return level;
 }
