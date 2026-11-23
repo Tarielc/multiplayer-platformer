@@ -32,6 +32,19 @@ export interface InputBindings {
     aimDeadzone: number;
     menuButton: number;
   };
+  /** On-screen joysticks (see `TouchInput`). Stick positions are fractions of the stick radius. */
+  touch: {
+    /** Walk-stick deflection needed to count as left/right. */
+    walkDeadzone: number;
+    /** Walk-stick deflection needed to count as down (drop-through with Jump). */
+    downThreshold: number;
+    /** Walk-stick deflection that flies the drone up (only while piloting it). */
+    upThreshold: number;
+    /** A special stick released closer to its centre than this fires straight ahead. */
+    aimDeadzone: number;
+    /** Horizontal drag that turns an attack-stick release into a swing to that side. */
+    attackSideThreshold: number;
+  };
 }
 
 export const DEFAULT_BINDINGS: Readonly<InputBindings> = {
@@ -56,5 +69,12 @@ export const DEFAULT_BINDINGS: Readonly<InputBindings> = {
     specialButtons: [3, 5], // Y / Triangle, RB / R1
     aimDeadzone: 0.4,
     menuButton: 9, // Start / Options
+  },
+  touch: {
+    walkDeadzone: 0.3,
+    downThreshold: 0.6,
+    upThreshold: 0.5,
+    aimDeadzone: 0.3,
+    attackSideThreshold: 0.35,
   },
 };

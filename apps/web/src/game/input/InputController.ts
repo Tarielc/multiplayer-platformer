@@ -1,11 +1,13 @@
 import { Button, withAim } from '@platformer/shared';
 import * as Phaser from 'phaser';
 import { DEFAULT_BINDINGS, type InputBindings } from './bindings';
+import type { TouchInput } from './TouchInput';
 
 type Keys = Phaser.Input.Keyboard.Key[];
 
 /**
- * Turns keyboard + gamepad state into the shared `Button` bitmask, once per fixed step.
+ * Turns keyboard + gamepad + mouse + on-screen touch controls into the shared `Button` bitmask,
+ * once per fixed step.
  *
  * Jump and Attack presses are latched until a simulation step consumes them, so a quick tap
  * between two steps (high refresh rates, low frame rates) is never lost.
@@ -34,11 +36,15 @@ export class InputController {
     if (this.bindings.gamepad.attackButtons.includes(button.index)) this.latched |= Button.ATTACK;
     if (this.bindings.gamepad.specialButtons.includes(button.index)) this.latched |= Button.SPECIAL;
   };
-  private readonly onPointerMove = () => {
-    this.lastMouseMove = performance.now();
+  private readonly onPointerMove = (pointer: Phaser.Input.Pointer) => {
+    if (!pointer.wasTouch) this.lastMouseMove = performance.now();
   };
   private readonly onPointerDown = (pointer: Phaser.Input.Pointer) => {
     if (!this.enabled || !this.bindings.mouse.enabled) return;
+    // Phaser also reports presses outside the canvas (its window listeners), and a touch counts
+    // as a left click: only real clicks on the game swing, not taps on the touch controls or
+    // clicks on React overlays.
+    if (pointer.wasTouch || pointer.downElement !== this.input.manager.canvas) return;
     this.lastMouseMove = performance.now();
     if (pointer.rightButtonDown()) this.latched |= Button.SPECIAL;
     else if (pointer.leftButtonDown()) this.latched |= Button.ATTACK;
@@ -48,6 +54,8 @@ export class InputController {
   constructor(
     scene: Phaser.Scene,
     private readonly onMenu: () => void,
+    /** On-screen controls (shared with the React overlay), if any. */
+    private readonly touch: TouchInput | null = null,
     private readonly bindings: Readonly<InputBindings> = DEFAULT_BINDINGS,
   ) {
     this.keyboard = scene.input.keyboard;
@@ -92,6 +100,7 @@ export class InputController {
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     this.latched = 0;
+    if (!enabled) this.touch?.reset();
     if (!this.keyboard) return;
     if (enabled) this.keyboard.enableGlobalCapture();
     else {
@@ -102,9 +111,10 @@ export class InputController {
 
   /**
    * Current buttons (held + latched presses) with the special ability's aim when one is given
-   * (`aimAngle`); 0 while disabled. Call once per fixed step.
+   * (`aimAngle`); 0 while disabled. `piloting`: the player flies the drone (the touch walk stick
+   * then also flies it up). Call once per fixed step.
    */
-  sample(aim: number | null = null): number {
+  sample(aim: number | null = null, piloting = false): number {
     if (!this.enabled) return 0;
     let buttons = this.latched;
     const held = (keys: Keys) => keys.some((key) => key.isDown);
@@ -127,16 +137,19 @@ export class InputController {
       if (this.bindings.gamepad.specialButtons.some((i) => pad.buttons[i]?.pressed)) buttons |= Button.SPECIAL;
     }
     if (this.input.mouse && this.bindings.mouse.enabled && this.input.activePointer.rightButtonDown()) buttons |= Button.SPECIAL;
+    if (this.touch) buttons = this.touch.apply(buttons, piloting);
     return aim === null ? buttons : withAim(buttons, aim);
   }
 
   /**
    * Where the player aims (world angle, 0 = right, y down) from `origin` (world px), or null
-   * for "straight ahead": the right stick, else the mouse pointer if it moved lately, else the
-   * arrow keys (up / down, with left / right for diagonals).
+   * for "straight ahead": the touch special stick, else the right stick, else the arrow keys
+   * (up / down, with left / right for diagonals), else the mouse pointer if it moved lately.
    */
   aimAngle(originX: number, originY: number, facing: 1 | -1): number | null {
     if (!this.enabled) return null;
+    const touchAim = this.touch?.aim(facing) ?? null;
+    if (touchAim !== null) return touchAim;
     const pad = this.firstPad();
     if (pad) {
       const stick = pad.rightStick;
@@ -170,6 +183,7 @@ export class InputController {
   /** Call after a simulation step used the sampled buttons. */
   consumeLatch(): void {
     this.latched = 0;
+    this.touch?.consume();
   }
 
   /**

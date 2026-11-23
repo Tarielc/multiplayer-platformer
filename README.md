@@ -30,15 +30,18 @@ npm run bots -- --room ABCDE --attack      # …and swing at each other now and 
 
 ### Controls
 
-| Action | Keyboard | Gamepad |
-|---|---|---|
-| Move | ← → / A D | Left stick, D-pad |
-| Jump (hold for higher) | Space, ↑, W, Z, K | A / B |
-| Double jump | Jump again in mid-air | A / B again |
-| Drop through planks | ↓ + Jump | Down + A |
-| Attack (shoves other players, breaks boxes) | J, X | X / □ |
-| Pause menu | Esc | Start |
-| Debug overlay | F3 | – |
+| Action | Keyboard | Gamepad | Touch |
+|---|---|---|---|
+| Move | ← → / A D | Left stick, D-pad | Walk stick (left) |
+| Jump (hold for higher) | Space, ↑, W, Z, K | A / B | Jump button |
+| Double jump | Jump again in mid-air | A / B again | Jump again |
+| Drop through planks | ↓ + Jump | Down + A | Walk stick down + Jump |
+| Attack (shoves other players, breaks boxes) | J, X | X / □ | Attack stick (bottom right): lift to swing, drag left/right first to swing that way |
+| Special ability | L, C, right-click (aim: arrow keys / mouse) | Y / RB (aim: right stick) | Special stick (above attack): drag to aim, lift to fire |
+| Pause menu | Esc | Start | Menu button (top right) |
+| Debug overlay | F3 | – | – |
+
+Touch controls appear on touch-first devices (phones, tablets) and on any device once its screen is touched.
 
 Pausing only stops the game when **every** connected player has the menu open. Solo, Esc really pauses.
 

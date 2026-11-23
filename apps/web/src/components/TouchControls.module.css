@@ -1,0 +1,164 @@
+/* Laid over the whole game view (not just the 16:9 stage): in landscape the sticks sit in the
+   side gutters / stage corners, in portrait below the stage. Only the controls take touches. */
+.layer {
+  --pad: clamp(10px, 3vmin, 24px);
+  --gap: clamp(8px, 2.5vmin, 16px);
+  --walk: clamp(96px, 28vmin, 150px);
+  --stick: clamp(72px, 21vmin, 112px);
+  --jump: clamp(56px, 16vmin, 84px);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.layer > * {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* --- sticks --- */
+
+.base {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(10 12 23 / 32%);
+  border: 2px solid rgb(255 255 255 / 20%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 25%);
+  transition:
+    background 120ms,
+    border-color 120ms;
+}
+
+.base[data-active='true'] {
+  background: rgb(10 12 23 / 48%);
+  border-color: rgb(255 255 255 / 42%);
+}
+
+.knob {
+  display: grid;
+  place-items: center;
+  width: 54%;
+  height: 54%;
+  border-radius: 50%;
+  background: rgb(232 234 246 / 20%);
+  border: 2px solid rgb(255 255 255 / 50%);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+  color: #f4f5ff;
+  will-change: transform;
+}
+
+.base[data-active='true'] .knob {
+  background: rgb(124 140 255 / 45%);
+  border-color: rgb(255 255 255 / 80%);
+}
+
+.icon {
+  width: 62%;
+  height: 62%;
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 55%));
+}
+
+/* Walk: the zone is the bottom-left area; the base rests in its corner and floats to the thumb. */
+.walkZone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 45%;
+  height: 70%;
+}
+
+.walkZone .base {
+  width: var(--walk);
+  height: var(--walk);
+  left: calc(var(--pad) + var(--walk) / 2);
+  top: calc(100% - var(--pad) - var(--walk) / 2);
+  transform: translate(-50%, -50%);
+}
+
+/* Attack (bottom-right corner) with the special stick stacked on top of it. */
+.fixed {
+  position: absolute;
+  right: var(--pad);
+  width: var(--stick);
+  height: var(--stick);
+}
+
+.fixed .base {
+  inset: 0;
+}
+
+.attack {
+  bottom: var(--pad);
+}
+
+.special {
+  bottom: calc(var(--pad) + var(--stick) + var(--gap));
+}
+
+/* --- jump: left of the attack stick, level with it --- */
+
+.jump {
+  position: absolute;
+  right: calc(var(--pad) + var(--stick) + var(--gap));
+  bottom: calc(var(--pad) + (var(--stick) - var(--jump)) / 2);
+  display: grid;
+  place-items: center;
+  width: var(--jump);
+  height: var(--jump);
+  border-radius: 50%;
+  background: rgb(232 234 246 / 18%);
+  border: 2px solid rgb(255 255 255 / 45%);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+  color: #f4f5ff;
+}
+
+.jump[data-active='true'] {
+  background: rgb(124 140 255 / 50%);
+  border-color: rgb(255 255 255 / 85%);
+  transform: scale(0.94);
+}
+
+.jump .icon {
+  width: 50%;
+  height: 50%;
+}
+
+/* --- special: the character's ability icon --- */
+
+.ability {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62%;
+  height: 62%;
+}
+
+.ability img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.ability[data-ready='false'] img {
+  filter: grayscale(1) brightness(0.55);
+}
+
+.cooldown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: clamp(0.8rem, 3.5vmin, 1.1rem);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+}

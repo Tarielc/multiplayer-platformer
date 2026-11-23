@@ -1,13 +1,23 @@
 .view {
+  position: relative;
   display: grid;
   place-items: center;
   height: 100%;
 }
 
-/* 16:9 stage that fits the viewport below the top bar; Phaser's Scale.FIT fills it. */
+/* Touch, portrait: the stage goes to the top so the touch controls get the space below it. */
+@media (pointer: coarse) and (orientation: portrait) {
+  .view {
+    align-items: start;
+  }
+}
+
+/* 16:9 stage that fits the viewport below the top bar; Phaser's Scale.FIT fills it.
+   dvh: on phones 100vh includes the area behind the browser's address bar. */
 .stage {
   position: relative;
   width: min(100%, calc((100vh - 84px) * 16 / 9));
+  width: min(100%, calc((100dvh - 84px) * 16 / 9));
   aspect-ratio: 16 / 9;
   background: #05060d;
   border: 1px solid var(--border);
@@ -26,11 +36,16 @@
   display: block;
 }
 
+/* Scrolls when a panel is taller than the stage (pause menu on a phone in landscape); `safe`
+   keeps the top of a too-tall panel reachable instead of centring it off-screen. */
 .overlay {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  place-items: safe center;
+  overflow-y: auto;
+  padding: 0.5rem 0;
   background: rgb(5 6 13 / 55%);
   backdrop-filter: blur(2px);
 }

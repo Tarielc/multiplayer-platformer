@@ -16,6 +16,7 @@ import { GameCanvas } from './GameCanvas';
 import { Hud } from './Hud';
 import { LevelCompleteOverlay } from './LevelCompleteOverlay';
 import { PauseMenu } from './PauseMenu';
+import { TouchControls } from './TouchControls';
 import styles from './GameView.module.css';
 
 /**
@@ -83,7 +84,7 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
     <div className={styles.view}>
       <div className={styles.stage}>
         <GameCanvas services={services} />
-        <Hud view={view} stats={debug ? stats : null} />
+        <Hud view={view} stats={debug ? stats : null} onMenu={() => setMenuOpen(true)} />
         {room.phase === 'countdown' && <CountdownOverlay room={room} receivedAt={view.roomReceivedAt} />}
         {room.phase === 'levelComplete' && (
           <LevelCompleteOverlay room={room} receivedAt={view.roomReceivedAt} selfId={view.selfId} />
@@ -108,6 +109,7 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
           <div className={styles.connection}>{view.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</div>
         )}
       </div>
+      {!menuOpen && <TouchControls touch={bridge.touch} self={view.hud.find((p) => p.isSelf)} />}
     </div>
   );
 }

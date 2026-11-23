@@ -6,15 +6,20 @@ import type { NetStats } from '@/game/bridge';
 import type { HudPlayer, RoomView } from '@/net/RoomStore';
 import { abilityIconPath } from '@/game/abilities/abilityArt';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
+import { useTouchDevice } from '@/hooks/useTouchDevice';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './Hud.module.css';
 
-/** Minimal HUD: one chip per active player (slot color, name, hearts, score, status) + level info. */
-export function Hud({ view, stats }: { view: RoomView; stats: NetStats | null }) {
+/**
+ * Minimal HUD: one chip per active player (slot color, name, hearts, score, status) + level info.
+ * On touch devices it also has the menu button (a phone has no Esc key).
+ */
+export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats | null; onMenu: () => void }) {
   const room = view.room!;
   const levelIndex = room.level ? LEVELS.entries.findIndex((e) => e.id === room.level!.id) : -1;
+  const touch = useTouchDevice();
   return (
-    <div className={styles.hud}>
+    <div className={styles.hud} data-touch={touch}>
       <div className={styles.players}>
         {view.hud.map((player) => (
           <PlayerChip key={player.id} player={player} />
@@ -31,6 +36,13 @@ export function Hud({ view, stats }: { view: RoomView; stats: NetStats | null })
           <kbd>L</kbd>/<kbd>C</kbd>/right-click special · <kbd>Esc</kbd> menu
         </span>
       </div>
+      {touch && (
+        <button type="button" className={styles.menu} aria-label="Menu" onClick={onMenu}>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+            <path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+          </svg>
+        </button>
+      )}
       {stats && (
         <div className={styles.stats}>
           {stats.fps} fps · rtt {stats.rttMs ?? '–'} ms · pending {stats.pendingInputs} · corr{' '}

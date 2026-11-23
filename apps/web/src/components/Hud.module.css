@@ -117,6 +117,32 @@
   font-size: 0.85em;
 }
 
+/* Keyboard hints mean nothing on a phone (it has the touch controls). */
+@media (pointer: coarse) {
+  .hint {
+    display: none;
+  }
+}
+
+/* Touch: players | level | menu button. */
+.hud[data-touch='true'] {
+  grid-template-columns: 1fr auto auto;
+}
+
+.menu {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgb(10 12 23 / 65%);
+  border-color: rgb(255 255 255 / 30%);
+  color: var(--text);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
 .stats {
   grid-column: 1 / -1;
   justify-self: start;

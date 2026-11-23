@@ -1,5 +1,6 @@
 import { TypedEmitter } from '@platformer/shared';
 import { DEFAULT_AUDIO_SETTINGS, type AudioSettings } from './audio/audioSettings';
+import { TouchInput } from './input/TouchInput';
 
 /** Network/perf numbers the scene reports for the debug HUD. */
 export interface NetStats {
@@ -41,6 +42,8 @@ export class GameBridge extends TypedEmitter<BridgeEvents> {
   menuOpen = false;
   debug = false;
   audio: AudioSettings = { ...DEFAULT_AUDIO_SETTINGS };
+  /** On-screen touch controls: the React overlay writes them, the scene's input reads them. */
+  readonly touch = new TouchInput();
 
   setMenuOpen(open: boolean): void {
     if (this.menuOpen === open) return;

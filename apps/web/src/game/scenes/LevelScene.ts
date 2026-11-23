@@ -228,7 +228,7 @@ export class LevelScene extends Phaser.Scene {
     this.propViews = new PropViews(this, traps.config.box);
     this.debugDraw = new DebugDraw(this, level, HITBOX);
     this.debugDraw.setVisible(bridge.debug);
-    this.controls = new InputController(this, () => bridge.emit('input:menu'));
+    this.controls = new InputController(this, () => bridge.emit('input:menu'), bridge.touch);
     this.controls.setEnabled(!bridge.menuOpen);
 
     listen(this, client.events, 'world', this.onWorld);
@@ -276,6 +276,7 @@ export class LevelScene extends Phaser.Scene {
     const simulate = room?.phase === 'playing' && !room.paused && client.isOpen && predictor.ready;
     // Aim of the special ability, from the predicted body (mouse / stick / arrow keys).
     const aim = this.sampleAim(controls, predictor.current);
+    const piloting = predictor.current?.phase === Phase.DRONE_PILOT;
     if (simulate) {
       this.accumulator += frameMs;
       let steps = 0;
@@ -284,7 +285,7 @@ export class LevelScene extends Phaser.Scene {
           this.accumulator = 0;
           break;
         }
-        const buttons = bridge.menuOpen ? NEUTRAL_INPUT : controls.sample(aim) | devVirtualButtons();
+        const buttons = bridge.menuOpen ? NEUTRAL_INPUT : controls.sample(aim, piloting) | devVirtualButtons();
         const seq = client.sendInput(buttons);
         const contacts = predictor.step(seq, buttons);
         // Trampolines spring the moment you land on them (the server event is for everyone else).

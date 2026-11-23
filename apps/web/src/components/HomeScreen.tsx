@@ -167,6 +167,10 @@ export function HomeScreen() {
             <kbd>↓</kbd> + jump drops through wooden platforms · <kbd>Esc</kbd> menu · <kbd>F3</kbd> debug overlay
           </li>
           <li>Gamepad: stick / D-pad, A to jump, X to attack, Start for the menu</li>
+          <li>
+            Touch: walk stick on the left; jump button, attack stick and special stick (drag to aim, lift to fire) on
+            the right
+          </li>
         </ul>
       </section>
     </main>
