@@ -279,15 +279,17 @@ export class GameWorld {
   }
 
   /**
-   * Fruit recharges the special ability while it cools down: `value` points take
-   * `fruitRecharge.perPoint × value` of its full cooldown off. Returns the seconds taken off
-   * (0 when it was ready, or in use: giant form and the drone run with no cooldown).
+   * Fruit and beaten foes recharge the special ability while it cools down: `value` points take
+   * `perPoint × value` of its full cooldown off (`fruitRecharge` / `foeRecharge`). Returns the
+   * seconds taken off (0 when it was ready, or in use: giant form and the drone run with no
+   * cooldown).
    */
-  private rechargeSpecial(player: WorldPlayer, value: number): number {
+  private rechargeSpecial(player: WorldPlayer, value: number, source: 'fruit' | 'foe'): number {
     const body = player.body;
-    if (body.specialCooldown <= 0) return 0;
+    if (body.specialCooldown <= 0 || value <= 0) return 0;
     const c = this.abilityTuning;
-    const cut = Math.min(body.specialCooldown, c.fruitRecharge.perPoint * value * fullCooldown(body.ability, c));
+    const perPoint = source === 'fruit' ? c.fruitRecharge.perPoint : c.foeRecharge.perPoint;
+    const cut = Math.min(body.specialCooldown, perPoint * value * fullCooldown(body.ability, c));
     body.specialCooldown -= cut;
     return Math.round(cut * 1000) / 1000;
   }
@@ -517,7 +519,7 @@ export class GameWorld {
       this.collected.add(item.id);
       player.score += item.value;
       player.collected += 1;
-      const recharged = this.rechargeSpecial(player, item.value);
+      const recharged = this.rechargeSpecial(player, item.value, 'fruit');
       this.events.push({ type: 'collect', playerId: player.id, entityId: item.id, kind: item.kind, value: item.value, recharged });
     }
     for (const zone of this.level.checkpoints) {
@@ -733,7 +735,7 @@ export class GameWorld {
 
   /**
    * A player hurt a foe (a swing, a stomp, or something the frog spat; `player` is null when the
-   * frog already left); finishing it scores its points.
+   * frog already left); finishing it scores its points and recharges their special ability by them.
    */
   private hurtFoe(player: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1, how: 'swing' | 'stomp' | 'spit'): void {
     const result = this.foes.hurt(foe, damage, dir, player?.id ?? '');
@@ -742,6 +744,7 @@ export class GameWorld {
     const hp = blocked ? foe.hp : result;
     const score = hp === 0 && player ? this.foes.config[foe.kind].score : 0;
     if (player) player.score += score;
+    const recharged = hp === 0 && player ? this.rechargeSpecial(player, this.foes.config[foe.kind].score, 'foe') : 0;
     const box = this.foes.hitbox(foe);
     this.events.push({
       type: 'foeHurt',
@@ -753,6 +756,7 @@ export class GameWorld {
       stomp: how === 'stomp',
       spit: how === 'spit',
       score,
+      recharged,
       x: box.x + box.width / 2,
       y: box.y + box.height / 2,
     });

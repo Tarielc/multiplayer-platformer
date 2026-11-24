@@ -118,7 +118,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
-| `abilities.ts` | special abilities: timings, reach, damage, cooldowns, and `fruitRecharge` (see [Special abilities](#special-abilities)) |
+| `abilities.ts` | special abilities: timings, reach, damage, cooldowns, `fruitRecharge` and `foeRecharge` (see [Special abilities](#special-abilities)) |
 | `modes.ts` | game modes (co-op, race): checkpoint scope, shoves, friendly damage, the race finish window and placement points |
 | `traps.ts` | trap damage, knockback and invulnerability; per-trap sizes, speeds and timings (see [Traps and health](#traps-and-health)) |
 | `net.ts` | tick and snapshot rates, interpolation delay, input queue limits, room timers, reconnect and rate limits |
@@ -168,7 +168,7 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 | Ninja Frog | Tongue Spit: grab, hold and spit a damaging projectile | 15 s | 3 s |
 | Bunny Man | Healing Hug: heals 2 hearts, plus 1 for the healer | 12 s | 3 s |
 
-**Fruit recharges abilities.** Each point of a pickup takes 1% of the ability's full cooldown off: an apple, strawberry or coin (10 pts) 10%, a pineapple 20%, a melon or gem (50 pts) half. This works in both modes, so fruit still matters in a race. The HUD shows your ability as a large badge in the bottom-left corner, and each player's chip shows a smaller one. The ring around the icon fills as it recharges, glows when it is ready, and flashes when fruit tops it up.
+**Fruit recharges abilities.** Each point of a pickup takes 1% of the ability's full cooldown off: an apple, strawberry or coin (10 pts) 10%, a pineapple 20%, a melon or gem (50 pts) half. **Beating a foe recharges them too**, by twice its score: a mushroom (10 pts) 20%, a chicken or wasp 30%, a monkey 40%, a bull 60%, and the rhino boss refills it. Only the player who lands the final hit gets it (a frog's spit counts for the frog). Both work in both modes, so fruit and foes still matter in a race. The HUD shows your ability as a large badge in the bottom-left corner, and each player's chip shows a smaller one. The ring around the icon fills as it recharges, glows when it is ready, and flashes when fruit or a kill tops it up.
 
 ### Traps and health
 

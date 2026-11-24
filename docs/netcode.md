@@ -60,7 +60,7 @@ The world state is small: `{ tick, players[], collected[], traps[] }`. Each play
 - **Why deltas are safe:** WebSockets deliver every message, in order. All clients of a room hold the same base, so one encoded delta serves everyone.
 - **Gap detection:** the client's `WorldStateStore` applies a delta only if its `baseTick` equals the tick of the state it already holds. Otherwise it sends `resync` and waits for the keyframe.
 - **Run counter:** `run` increments with every new `GameWorld` (level start or restart) and is part of the room's level info. Snapshots and deltas from an older run are dropped, so a slow packet can never leak the previous level into the next one.
-- **Events:** `collect` (with `recharged`: the seconds the pickup took off the collector's special cooldown), `death`, `respawn`, `checkpoint`, `finish` (race), `levelComplete`, `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
+- **Events:** `collect` (with `recharged`: the seconds the pickup took off the collector's special cooldown), `foeHurt` (with `score`, and `recharged` when the hit beat the foe), `death`, `respawn`, `checkpoint`, `finish` (race), `levelComplete`, `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
 
 ## Prediction and reconciliation (own player)
 

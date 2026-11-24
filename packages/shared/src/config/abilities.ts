@@ -197,6 +197,12 @@ export interface AbilityTuning {
    * 10 pts, 10%; a melon, 50 pts, half).
    */
   fruitRecharge: { perPoint: number };
+  /**
+   * Beating a foe does the same, by the foe's `score`: each point takes `perPoint` of the full
+   * cooldown off (a mushroom, 10 pts, 20%; a bull, 30 pts, 60%; the rhino boss refills it).
+   * Only the player credited with the kill gets it (a frog's spit counts for the frog).
+   */
+  foeRecharge: { perPoint: number };
 }
 
 export const ABILITY_TUNING: Readonly<AbilityTuning> = {
@@ -282,6 +288,7 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     knockbackY: 220,
   },
   fruitRecharge: { perPoint: 0.01 },
+  foeRecharge: { perPoint: 0.02 },
 };
 
 /** Ability values in simulation units (seconds, px, px/s). */
@@ -332,6 +339,7 @@ export interface CompiledAbilities {
     spitCooldown: number;
   };
   fruitRecharge: AbilityTuning['fruitRecharge'];
+  foeRecharge: AbilityTuning['foeRecharge'];
 }
 
 const s = (ms: number) => ms / 1000;
@@ -343,6 +351,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
   if (drone.spawnAtMs > drone.deployMs) throw new Error('AbilityTuning: drone.spawnAtMs must be <= deployMs');
   if (tongue.maxLength <= 0 || tongue.speed <= 0) throw new Error('AbilityTuning: tongue speed and length must be > 0');
   if (!(t.fruitRecharge.perPoint >= 0)) throw new Error('AbilityTuning: fruitRecharge.perPoint must be >= 0');
+  if (!(t.foeRecharge.perPoint >= 0)) throw new Error('AbilityTuning: foeRecharge.perPoint must be >= 0');
   return {
     heal: {
       reachSpeed: heal.reachSpeed,
@@ -416,6 +425,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
       spitCooldown: s(tongue.spitCooldownMs),
     },
     fruitRecharge: { ...t.fruitRecharge },
+    foeRecharge: { ...t.foeRecharge },
   };
 }
 

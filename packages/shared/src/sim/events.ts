@@ -34,7 +34,8 @@ export type GameEvent =
   | { type: 'foeHit'; playerId: string; foeId: number; hp: number; x: number; y: number }
   /**
    * A player hurt a foe: a swing, a stomp (`stomp`), or something the frog spat (`spit`; the
-   * frog is `playerId`, '' if they left). `hp` 0: it is beaten, and `score` points went to that player.
+   * frog is `playerId`, '' if they left). `hp` 0: it is beaten, and `score` points went to that player;
+   * `recharged`: the seconds that took off their special cooldown (0: none).
    * `blocked`: its armour took the hit (the rhino boss, unless dazed), `hp` unchanged.
    */
   | {
@@ -47,6 +48,7 @@ export type GameEvent =
       stomp: boolean;
       spit: boolean;
       score: number;
+      recharged: number;
       x: number;
       y: number;
     }

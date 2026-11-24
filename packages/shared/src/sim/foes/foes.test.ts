@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ABILITIES, fullCooldown } from '../../config/abilities';
 import { FOE_TUNING } from '../../config/foes';
 import { resolveMovement } from '../../config/movement';
 import { msToTicks } from '../../config/net';
@@ -148,6 +149,42 @@ describe('foes', () => {
     ticks(world, msToTicks(FOE_TUNING.mushroom.deathMs));
     expect(world.foeField.foes).toEqual([]);
     expect(world.toNetState(() => 0).foes).toEqual([]);
+  });
+
+  /** A world with one foe and the player (who has a special ability) facing it, in reach. */
+  function swingAt(type: string, cooldown: number): { world: GameWorld; full: number } {
+    const world = worldWith([foe(type, 300, 160)], FLOOR, false);
+    const player = world.addPlayer('a', 0, 'mask-dude');
+    place(world, 300 - 24);
+    player.body.facing = 1;
+    player.invulnUntil = world.tick + 1000;
+    const full = fullCooldown(player.body.ability);
+    player.body.specialCooldown = cooldown < 0 ? full : cooldown;
+    return { world, full };
+  }
+
+  it("beating a foe recharges the killer's special ability by its score", () => {
+    const { world, full } = swingAt('mushroom', -1);
+    expect(full).toBeGreaterThan(0);
+    const hurts = only(ticks(world, 30, Button.ATTACK), 'foeHurt');
+    const expected = ABILITIES.foeRecharge.perPoint * FOE_TUNING.mushroom.score * full;
+    expect(hurts[0]).toMatchObject({ hp: 0 });
+    expect(hurts[0]!.recharged).toBeCloseTo(expected, 3);
+    // Half a second went by on its own, on top of the kill's share.
+    expect(world.getPlayer('a')!.body.specialCooldown).toBeCloseTo(full - expected - 0.5, 1);
+  });
+
+  it('a hit that does not beat the foe recharges nothing', () => {
+    const { world } = swingAt('chicken', -1);
+    const hurts = only(ticks(world, 30, Button.ATTACK), 'foeHurt');
+    expect(hurts[0]).toMatchObject({ hp: FOE_TUNING.chicken.hp - 1, recharged: 0 });
+  });
+
+  it('a kill with the ability ready recharges nothing', () => {
+    const { world } = swingAt('mushroom', 0);
+    const hurts = only(ticks(world, 30, Button.ATTACK), 'foeHurt');
+    expect(hurts[0]).toMatchObject({ hp: 0, recharged: 0 });
+    expect(world.getPlayer('a')!.body.specialCooldown).toBe(0);
   });
 
   it('landing on a mushroom stomps it and bounces you up, without losing a heart', () => {

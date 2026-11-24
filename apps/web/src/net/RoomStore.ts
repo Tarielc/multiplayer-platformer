@@ -48,7 +48,7 @@ export interface HudAbility {
   charge: number;
   /** In use now (giant form, drone flying, a hug or tongue under way). */
   active: boolean;
-  /** Fruit pickups that recharged it so far this level (a change replays the HUD flash). */
+  /** Fruit pickups and foe kills that recharged it so far this level (a change replays the HUD flash). */
   refills: number;
 }
 
@@ -92,7 +92,7 @@ export class RoomStore {
   private view: RoomView = INITIAL_VIEW;
   private readonly listeners = new Set<() => void>();
   private hudKey = '';
-  /** Per player: fruit pickups that recharged the special ability (reset with each level run). */
+  /** Per player: fruit pickups and foe kills that recharged the special ability (reset with each level run). */
   private readonly refills = new Map<string, number>();
   private refillRun = -1;
   private noticeId = 0;
@@ -152,7 +152,7 @@ export class RoomStore {
       this.refills.clear();
     }
     for (const event of update.events) {
-      if (event.type === 'collect' && event.recharged > 0) {
+      if ((event.type === 'collect' || event.type === 'foeHurt') && event.recharged > 0) {
         this.refills.set(event.playerId, (this.refills.get(event.playerId) ?? 0) + 1);
       }
       this.announceEvent(event);

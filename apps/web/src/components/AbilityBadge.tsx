@@ -66,7 +66,7 @@ export function AbilityButton({ self }: { self: HudPlayer | undefined }) {
       <AbilityBadge characterId={self.characterId} ability={self.ability} size="button" />
       <span className={styles.caption}>
         <span className={`${styles.state} px-outline-sm`}>
-          {state === 'active' ? 'In use' : state === 'ready' ? 'Ready' : 'Recharging · fruit helps'}
+          {state === 'active' ? 'In use' : state === 'ready' ? 'Ready' : 'Recharging · fruit & foes help'}
         </span>
         <span className={`${styles.name} px-outline`}>{name}</span>
         <span className={styles.keys}>
