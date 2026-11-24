@@ -37,12 +37,12 @@ export class BossBar {
     const y = VIEW_CONFIG.height - BOTTOM - HEIGHT / 2;
     const left = -WIDTH / 2 + PORTRAIT / 2;
     this.root = scene.add.container(x, y).setScrollFactor(0).setDepth(VIEW_CONFIG.depth.effects + 5).setAlpha(0);
-    const frame = scene.add.rectangle(left - 2, 0, WIDTH + 4, HEIGHT + 4, 0x1b1020).setOrigin(0, 0.5).setStrokeStyle(1, 0xf4e3c1);
-    const back = scene.add.rectangle(left, 0, WIDTH, HEIGHT, 0x3a2430).setOrigin(0, 0.5);
-    this.trail = scene.add.rectangle(left, 0, WIDTH, HEIGHT, 0xf4e3c1).setOrigin(0, 0.5);
-    this.fill = scene.add.rectangle(left, 0, WIDTH, HEIGHT, 0xd8483b).setOrigin(0, 0.5);
+    const frame = scene.add.rectangle(left - 2, 0, WIDTH + 4, HEIGHT + 4, 0x07110d).setOrigin(0, 0.5).setStrokeStyle(2, 0x4b5a46);
+    const back = scene.add.rectangle(left, 0, WIDTH, HEIGHT, 0x2a1a14).setOrigin(0, 0.5);
+    this.trail = scene.add.rectangle(left, 0, WIDTH, HEIGHT, 0xede6c8).setOrigin(0, 0.5);
+    this.fill = scene.add.rectangle(left, 0, WIDTH, HEIGHT, 0xe8743b).setOrigin(0, 0.5);
     this.name = scene.add
-      .text(left, -HEIGHT / 2 - 3, '', { fontFamily: VIEW_CONFIG.label.fontFamily, fontSize: '11px', color: '#f4e3c1', stroke: '#1b1020', strokeThickness: 3 })
+      .text(left, -HEIGHT / 2 - 3, '', { fontFamily: VIEW_CONFIG.label.fontFamily, fontSize: '11px', color: '#ede6c8', stroke: '#07110d', strokeThickness: 3 })
       .setOrigin(0, 1);
     const sheet = FOE_SHEETS.rhino.key;
     this.portrait = abilitySheet(sheet)?.animations.portrait
@@ -70,7 +70,7 @@ export class BossBar {
     this.fill.setSize(WIDTH * frac, HEIGHT);
     this.trail.setSize(WIDTH * this.trailFrac, HEIGHT);
     const rage = boss.kind === 'rhino' && rhinoRage(boss, tuning.rhino.hp);
-    this.fill.setFillStyle(rage ? 0xff7a2f : 0xd8483b);
+    this.fill.setFillStyle(rage ? 0xe5484d : 0xe8743b);
     this.portrait?.setFrame(frameName('portrait', rage ? 1 : 0));
   }
 

@@ -3,80 +3,91 @@
   padding: 0;
   border: 0;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.picker legend {
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* legend inside a flex row: float keeps it in normal flow. */
+.head legend {
+  float: left;
   padding: 0;
-  margin-bottom: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--text-dim);
 }
 
 .options {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-}
-
-@media (max-width: 520px) {
-  .options {
-    grid-template-columns: 1fr;
-  }
+  display: flex;
+  box-shadow: 0 0 0 4px var(--night);
 }
 
 .option {
   position: relative;
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-sunken);
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 20px;
   cursor: pointer;
-  transition:
-    border-color 120ms,
-    background 120ms;
+  background: var(--stone-lo);
+  color: var(--lichen);
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  box-shadow: inset 0 4px 0 #222b22;
 }
 
 .option input {
   position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
   opacity: 0;
   pointer-events: none;
 }
 
 .option:hover {
-  border-color: var(--accent);
+  color: var(--bone);
 }
 
 .option:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--firefly);
+  outline-offset: 5px;
+  z-index: 1;
 }
 
 .option[data-selected='true'] {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--bg-raised));
-  box-shadow: 0 0 0 1px var(--accent);
+  background: var(--moss-lit);
+  color: var(--night);
+  box-shadow:
+    inset 0 -5px 0 var(--moss),
+    inset 0 3px 0 var(--moss-pale);
+}
+
+.option[data-selected='true'][data-mode='race'] {
+  background: var(--ember);
+  box-shadow:
+    inset 0 -5px 0 var(--ember-dark),
+    inset 0 3px 0 var(--ember-pale);
 }
 
 .picker:disabled .option {
   cursor: not-allowed;
 }
 
-.picker:disabled .option:hover {
-  border-color: var(--border);
-}
-
-.picker:disabled .option[data-selected='true']:hover {
-  border-color: var(--accent);
-}
-
-.name {
-  font-weight: 700;
+.picker:disabled .option:not([data-selected='true']):hover {
+  color: var(--lichen);
 }
 
 .summary {
-  font-size: 0.78rem;
-  line-height: 1.3;
-  color: var(--text-dim);
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--bone);
 }

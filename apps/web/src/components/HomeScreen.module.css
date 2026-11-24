@@ -1,109 +1,514 @@
 .page {
   min-height: 100vh;
-  display: grid;
-  place-content: center;
-  gap: 1.25rem;
-  padding: 2rem 1rem;
+  background: var(--night);
 }
 
-.card,
-.help {
-  width: min(460px, 92vw);
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
+/* --- hero: the shrine backdrop with the quick-play panel on the dark side --- */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: min(920px, 100vh);
 }
 
-.header h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.6rem;
-  letter-spacing: -0.01em;
+.backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 72% 50%;
 }
 
-.header p {
-  margin: 0 0 1.25rem;
-  color: var(--text-dim);
-  font-size: 0.9rem;
+.scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(5 11 8 / 92%) 0%, rgb(5 11 8 / 70%) 38%, rgb(5 11 8 / 5%) 68%),
+    linear-gradient(180deg, rgb(7 17 13 / 0%) 72%, var(--night) 100%);
 }
 
-.field {
-  display: grid;
-  gap: 0.35rem;
-  margin-bottom: 1rem;
-  font-size: 0.85rem;
-  color: var(--text-dim);
+@media (max-width: 720px) {
+  .scrim {
+    background:
+      linear-gradient(180deg, rgb(5 11 8 / 70%), rgb(5 11 8 / 88%)),
+      linear-gradient(180deg, rgb(7 17 13 / 0%) 72%, var(--night) 100%);
+  }
 }
 
-.field input {
-  color: var(--text);
-  font-size: 1rem;
+.wrap {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
 }
 
-.actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-  margin-bottom: 0.6rem;
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  padding: 24px 0;
 }
 
-.join {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.6rem;
-}
-
-.join input {
-  font-family: var(--mono);
-  letter-spacing: 0.15em;
+.brand {
+  font-family: var(--display);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  color: var(--bone);
+  text-decoration: none;
 }
 
-.error {
-  color: var(--danger);
-  font-size: 0.9rem;
-  margin: 0.75rem 0 0;
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+}
+
+.links a {
+  font-family: var(--ui);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone);
+  text-decoration: none;
+}
+
+.links a:hover {
+  color: var(--firefly);
 }
 
 .status {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-
-.status code {
-  font-family: var(--mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  background: rgb(15 33 25 / 92%);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mist);
 }
 
 .dot {
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  transform: translateY(-1px);
+  background: var(--lichen);
 }
 
 .status[data-state='online'] .dot {
-  background: var(--ok);
+  background: var(--moss-lit);
+  animation: blink 1.6s steps(2) infinite;
 }
 
 .status[data-state='offline'] .dot {
-  background: var(--danger);
+  background: var(--ember);
 }
 
-.help h2 {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
 }
 
-.help ul {
+.heroBody {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 580px;
+  padding: 32px 0 96px;
+}
+
+.logo {
   margin: 0;
-  padding-left: 1.1rem;
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  line-height: 1.9;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(88px, 12vw, 168px);
+  line-height: 0.85;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--bone);
+  text-shadow:
+    5px 0 0 var(--night),
+    -5px 0 0 var(--night),
+    0 5px 0 var(--night),
+    0 -5px 0 var(--night),
+    5px 5px 0 var(--night),
+    -5px 5px 0 var(--night),
+    5px -5px 0 var(--night),
+    -5px -5px 0 var(--night),
+    0 12px 0 rgb(0 0 0 / 50%);
+}
+
+.tagline {
+  margin: 0;
+  max-width: 520px;
+  font-size: 21px;
+  line-height: 1.45;
+}
+
+.play {
+  margin-top: 14px;
+  padding: 30px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.moss {
+  position: absolute;
+  left: 0;
+  top: -6px;
+  display: block;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field input {
+  font-size: 19px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.actions button {
+  flex: 1 1 180px;
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.join {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-top: 18px;
+  box-shadow: inset 0 2px 0 var(--rule);
+}
+
+.join input {
+  flex: 1 1 150px;
+  min-width: 0;
+  font-family: var(--ui);
+  font-size: 17px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.error {
+  margin: 0;
+  color: var(--ember);
+}
+
+.offline {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--mist);
+}
+
+/* --- sections --- */
+
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 72px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionHead h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(44px, 6vw, 64px);
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+}
+
+.kicker {
+  font-family: var(--ui);
+  font-size: 13px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--moss-lit);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 28px;
+}
+
+.card {
+  padding: 16px 16px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 0.9;
+}
+
+.card p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--mist);
+}
+
+.alcove {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  background: var(--night);
+}
+
+/* Lit moss floor the character stands on. */
+.alcove::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  background: var(--moss-dark);
+  box-shadow:
+    inset 0 4px 0 var(--moss-lit),
+    inset 0 8px 0 var(--moss);
+}
+
+.alcovePortrait {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 1;
+  transform: translateX(-50%);
+}
+
+.ability {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.abilityIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: var(--fern);
+}
+
+.abilityIcon img {
+  width: 32px;
+  height: 32px;
+}
+
+.abilityName {
+  font-family: var(--ui);
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 32px;
+}
+
+.mode {
+  padding: 16px 16px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modeArt {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  box-shadow: 0 0 0 4px var(--night);
+}
+
+.modeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 8px;
+}
+
+.modeHead h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 52px;
+  line-height: 0.9;
+  color: var(--moss-lit);
+}
+
+.mode[data-mode='race'] .modeHead h3 {
+  color: var(--ember);
+}
+
+.mode p {
+  margin: 0;
+  padding: 0 8px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--mist);
+}
+
+.levels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.levels li {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 88px;
+  padding: 0 20px;
+  background: var(--canopy);
+  box-shadow:
+    inset 0 -4px 0 var(--stone-lo),
+    inset 0 4px 0 var(--rule);
+}
+
+.levels li[data-final='true'] {
+  background: #2a1a14;
+  box-shadow:
+    inset 0 -4px 0 var(--ember-dark),
+    inset 0 4px 0 #4a2a1c;
+}
+
+.levelNo {
+  width: 40px;
+  flex: none;
+  font-family: var(--display);
+  font-size: 56px;
+  line-height: 1;
+  color: var(--firefly);
+}
+
+li[data-final='true'] .levelNo {
+  color: var(--ember);
+}
+
+.levelName {
+  flex: 1;
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.levelTag {
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ember);
+}
+
+.controls {
+  padding: 26px 12px 14px;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.controls table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.controls th {
+  padding: 0 16px 12px;
+  text-align: left;
+  font-family: var(--ui);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.controls td {
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  vertical-align: top;
+  box-shadow: inset 0 2px 0 var(--rule);
+}
+
+.footer {
+  margin-top: 40px;
+  background: #0b1813;
+  box-shadow: inset 0 4px 0 var(--fern);
+}
+
+.footerRow {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  font-size: 15px;
+  color: var(--lichen);
+}
+
+.footerBrand {
+  font-family: var(--display);
+  font-size: 36px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status[data-state='online'] .dot {
+    animation: none;
+  }
 }

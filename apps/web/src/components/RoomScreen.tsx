@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useGameSession, useRoomView } from '@/hooks/useGameSession';
 import { gameServerHttpUrl } from '@/net/serverUrl';
+import { BACKDROP_URL, GAME_TITLE } from './brand';
 import { GameView } from './GameView';
 import { LobbyPanel } from './LobbyPanel';
 import { Toasts } from './Toasts';
@@ -36,30 +37,35 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
 
   return (
     <div className={styles.screen} data-ingame={inGame}>
+      <img className={`${styles.backdrop} px-sprite`} src={BACKDROP_URL} alt="" />
+      <div className={styles.scrim} aria-hidden />
+
       <header className={styles.bar}>
-        <Link href="/" className={styles.brand}>
-          Platformer
+        <Link href="/" className={`${styles.brand} px-outline-sm`}>
+          {GAME_TITLE}
         </Link>
         <div className={styles.room}>
-          Room <strong>{roomId}</strong>
+          <span className="px-label">Room</span>
+          <strong className="px-outline-sm">{roomId}</strong>
           <button className={styles.small} onClick={() => void copyInvite()}>
             {copied ? 'Copied!' : 'Copy invite link'}
           </button>
         </div>
         <div className={styles.right}>
           <span className={styles.conn} data-status={status}>
+            <span className={styles.connDot} aria-hidden />
             {status === 'open' ? (view.rttMs !== null ? `${view.rttMs} ms` : 'online') : status}
           </span>
-          <button className={`${styles.small} danger`} onClick={leave}>
-            Leave
+          <button className={styles.small} onClick={leave}>
+            Leave room
           </button>
         </div>
       </header>
 
       <main className={styles.body}>
         {fatal ? (
-          <section className={styles.panel}>
-            <h2>{fatal.code === 'UNREACHABLE' ? 'Connection lost' : "Can't join this room"}</h2>
+          <section className={`${styles.panel} px-panel`}>
+            <h2 className="px-outline">{fatal.code === 'UNREACHABLE' ? 'Connection lost' : "Can't join this room"}</h2>
             <p>{fatal.message}</p>
             {fatal.code === 'UNREACHABLE' && (
               <p className={styles.dim}>
@@ -72,18 +78,20 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
                   Retry
                 </button>
               )}
-              <Link href="/">Back to home</Link>
+              <Link href="/" className="px-button">
+                Back to home
+              </Link>
             </div>
           </section>
         ) : !room ? (
-          <section className={styles.panel}>
-            <h2>{status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</h2>
+          <section className={`${styles.panel} px-panel`}>
+            <h2 className="px-outline">{status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</h2>
             <p className={styles.dim}>Joining room {roomId}</p>
           </section>
         ) : room.phase === 'lobby' ? (
           <LobbyPanel session={session} view={view} />
         ) : (
-          <GameView session={session} view={view} />
+          <GameView session={session} view={view} onLeave={leave} />
         )}
       </main>
 

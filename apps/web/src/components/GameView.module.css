@@ -12,18 +12,23 @@
   }
 }
 
-/* 16:9 stage that fits the viewport below the top bar; Phaser's Scale.FIT fills it.
-   dvh: on phones 100vh includes the area behind the browser's address bar. */
+/* 16:9 stage that fits the viewport below the top bar (and its 4 px stone rim); Phaser's
+   Scale.FIT fills it. dvh: on phones 100vh includes the area behind the address bar.
+   It is a size container, so overlays can adapt to the stage rather than the window. */
 .stage {
   position: relative;
-  width: min(100%, calc((100vh - 84px) * 16 / 9));
-  width: min(100%, calc((100dvh - 84px) * 16 / 9));
+  width: min(100%, calc((100vh - 100px) * 16 / 9));
+  width: min(100%, calc((100dvh - 100px) * 16 / 9));
   aspect-ratio: 16 / 9;
-  background: #05060d;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--night);
+  box-shadow:
+    0 0 0 4px var(--night),
+    0 0 0 8px var(--stone-lo),
+    0 0 0 12px var(--night),
+    0 18px 0 12px rgb(0 0 0 / 35%);
   overflow: hidden;
   user-select: none;
+  container: stage / inline-size;
 }
 
 .canvasHost,
@@ -45,9 +50,8 @@
   place-items: center;
   place-items: safe center;
   overflow-y: auto;
-  padding: 0.5rem 0;
-  background: rgb(5 6 13 / 55%);
-  backdrop-filter: blur(2px);
+  padding: 14px 12px;
+  background: rgb(5 11 8 / 80%);
 }
 
 .pausedBadge,
@@ -56,16 +60,18 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  padding: 0.6rem 1.2rem;
-  border-radius: 999px;
-  background: rgb(5 6 13 / 75%);
-  border: 1px solid var(--border);
-  font-weight: 700;
+  padding: 12px 24px;
+  background: rgb(7 17 13 / 90%);
+  box-shadow: inset 0 -4px 0 var(--stone-lo);
+  font-family: var(--display);
+  font-size: clamp(28px, 6cqw, 56px);
+  line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   pointer-events: none;
 }
 
 .connection {
-  color: var(--warn);
+  color: var(--firefly);
+  box-shadow: inset 0 -4px 0 var(--gold-dark);
 }

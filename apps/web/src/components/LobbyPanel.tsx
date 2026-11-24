@@ -9,6 +9,7 @@ import { CharacterPicker } from './CharacterPicker';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './LobbyPanel.module.css';
 import { ModePicker } from './ModePicker';
+import { MossCap, PixelTrophy } from './PixelIcons';
 
 export function LobbyPanel({ session, view }: { session: GameSession; view: RoomView }) {
   const room = view.room!;
@@ -18,7 +19,9 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
   const bySlot = new Map(room.players.map((p) => [p.slot, p]));
   const connected = room.players.filter((p) => p.connected);
   const readyCount = connected.filter((p) => p.ready).length;
-  const selected = LEVELS.get(room.selectedLevelId);
+  const levels = LEVELS.entries;
+  const levelIndex = Math.max(0, levels.findIndex((e) => e.id === room.selectedLevelId));
+  const selected = levels[levelIndex];
   const finalScores = room.campaignComplete ? [...room.players].sort((a, b) => b.campaignScore - a.campaignScore) : [];
   const teamTotal = finalScores.reduce((sum, p) => sum + p.campaignScore, 0);
   const race = room.mode === 'race';
@@ -32,21 +35,33 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
     savePreferredCharacter(id);
     client.selectCharacter(id);
   };
+  const stepLevel = (delta: number) => {
+    const next = levels[(levelIndex + delta + levels.length) % levels.length];
+    if (next) client.selectLevel(next.id);
+  };
+  const hostOnly = isHost ? undefined : 'Only the host can change this';
 
   return (
     <section className={styles.lobby}>
       {room.campaignComplete && (
-        <div className={styles.banner}>
-          <h2>{race && finalScores[0] ? `Race over: ${finalScores[0].name} wins!` : 'Campaign complete!'}</h2>
-          <ol>
-            {finalScores.map((p) => (
-              <li key={p.id} style={{ color: PLAYER_SLOTS[p.slot]?.css }}>
-                {p.name} — {p.campaignScore} pts
-              </li>
-            ))}
-          </ol>
-          {!race && finalScores.length > 1 && <p className={styles.team}>Team total: {teamTotal} pts</p>}
-          <p>Ready up to play again.</p>
+        <div className={`${styles.banner} px-panel`}>
+          <MossCap className={styles.moss} />
+          <PixelTrophy scale={6} className="px-edge" />
+          <div className={styles.bannerBody}>
+            <h2 className="px-outline">
+              {race && finalScores[0] ? `${finalScores[0].name} wins the race!` : 'Campaign complete!'}
+            </h2>
+            <ol>
+              {finalScores.map((p) => (
+                <li key={p.id}>
+                  <span style={{ color: PLAYER_SLOTS[p.slot]?.css }}>{p.name}</span>
+                  <span className={styles.points}>{p.campaignScore} pts</span>
+                </li>
+              ))}
+            </ol>
+            {!race && finalScores.length > 1 && <p className={styles.team}>Team total: {teamTotal} pts</p>}
+            <p className={styles.dim}>Ready up to play again.</p>
+          </div>
         </div>
       )}
 
@@ -54,81 +69,99 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
         {Array.from({ length: MAX_PLAYERS }, (_, slot) => {
           const player = bySlot.get(slot);
           const style = PLAYER_SLOTS[slot]!;
-          return (
-            <div
-              key={slot}
-              className={styles.slot}
-              data-filled={Boolean(player)}
-              data-ready={player?.ready ?? false}
-              style={{ '--slot': style.css, '--slot-shade': style.shadeCss } as CSSProperties}
-            >
-              <div className={styles.avatar}>
-                {player ? <CharacterPortrait characterId={player.characterId} scale={2} animated /> : null}
-                <span className={styles.slotLabel}>{style.label}</span>
+          const slotVars = { '--slot': style.css, '--slot-shade': style.shadeCss } as CSSProperties;
+          if (!player) {
+            return (
+              <div key={slot} className={styles.empty} style={slotVars}>
+                <span className={`${styles.tag} px-notch`}>{style.label}</span>
+                <span className={styles.waiting}>Waiting for player…</span>
+                <span className={styles.dim}>
+                  Share code <strong className={styles.code}>{room.roomId}</strong>
+                </span>
               </div>
-              {player ? (
-                <>
-                  <div className={styles.name}>
-                    {player.name}
-                    {player.id === view.selfId && <span className={styles.you}> (you)</span>}
-                  </div>
-                  <div className={styles.meta}>
-                    {player.isHost && <span>host</span>}
-                    {!player.connected && <span className={styles.warn}>reconnecting…</span>}
-                    <span className={player.ready ? styles.ok : styles.dim}>{player.ready ? 'ready' : 'not ready'}</span>
-                  </div>
-                </>
-              ) : (
-                <div className={styles.empty}>Waiting for player…</div>
-              )}
+            );
+          }
+          return (
+            <div key={slot} className={`${styles.slot} px-panel`} data-ready={player.ready} style={slotVars}>
+              <div className={styles.alcove}>
+                <CharacterPortrait characterId={player.characterId} scale={3} animated className={styles.portrait} />
+                <span className={`${styles.tag} ${styles.tagFloat} px-notch`}>{style.label}</span>
+                {player.isHost && <span className={styles.host}>Host</span>}
+              </div>
+              <div className={styles.name}>
+                <span className="px-outline-sm">{player.name}</span>
+                {player.id === view.selfId && <span className={styles.you}>(you)</span>}
+              </div>
+              <div className={styles.meta}>
+                {!player.connected ? (
+                  <span className={styles.warn}>Reconnecting…</span>
+                ) : (
+                  <span className={player.ready ? styles.ok : styles.dim}>
+                    <span className={styles.readyDot} aria-hidden />
+                    {player.ready ? 'Ready' : 'Not ready'}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {me && (
-        <CharacterPicker
-          legend="Your character"
-          value={me.characterId}
-          onChange={pickCharacter}
-          takenBy={takenBy}
-          disabled={room.phase !== 'lobby'}
-        />
-      )}
+      <div className={styles.setup}>
+        {me && (
+          <section className={`${styles.card} px-panel`} aria-label="Your character">
+            <CharacterPicker
+              legend="Your character"
+              value={me.characterId}
+              onChange={pickCharacter}
+              takenBy={takenBy}
+              disabled={room.phase !== 'lobby'}
+            />
+          </section>
+        )}
 
-      <ModePicker
-        value={room.mode}
-        onChange={(next) => client.selectMode(next)}
-        disabled={!isHost}
-        title={isHost ? undefined : 'Only the host can change the mode'}
-      />
-      {scaling && <p className={styles.scaling}>{scaling}</p>}
+        <section className={`${styles.card} px-panel`} aria-label="Mode">
+          <ModePicker value={room.mode} onChange={(next) => client.selectMode(next)} disabled={!isHost} title={hostOnly} />
+          {scaling && <p className={styles.note}>{scaling}</p>}
+          {race && mode.race && <p className={styles.note}>Points by place: {mode.race.placePoints.join(' · ')}</p>}
+        </section>
 
-      <div className={styles.controls}>
-        <label className={styles.level}>
-          <span>Level</span>
-          <select
-            value={room.selectedLevelId}
-            disabled={!isHost}
-            onChange={(e) => client.selectLevel(e.target.value)}
-            title={isHost ? 'Choose the starting level' : 'Only the host can change the level'}
-          >
-            {LEVELS.entries.map((entry, index) => (
-              <option key={entry.id} value={entry.id}>
-                {index + 1}. {entry.name}
-              </option>
+        <section className={`${styles.card} px-panel`} aria-label="Starting level">
+          <span className="px-label">Starting level</span>
+          <div className={styles.carousel} title={hostOnly}>
+            <button type="button" className={styles.arrow} aria-label="Previous level" disabled={!isHost} onClick={() => stepLevel(-1)}>
+              ◀
+            </button>
+            <div className={styles.levelShown} aria-live="polite">
+              <span className={`${styles.levelNo} px-outline`}>{levelIndex + 1}</span>
+              <span className={`${styles.levelName} px-outline-sm`}>{selected?.name ?? room.selectedLevelId}</span>
+            </div>
+            <button type="button" className={styles.arrow} aria-label="Next level" disabled={!isHost} onClick={() => stepLevel(1)}>
+              ▶
+            </button>
+          </div>
+          <div className={styles.pips} aria-hidden>
+            {levels.map((entry, i) => (
+              <span key={entry.id} data-state={i === levelIndex ? 'current' : i < levelIndex ? 'before' : 'after'} />
             ))}
-          </select>
-        </label>
-        <button className={me?.ready ? '' : 'primary'} onClick={() => client.setReady(!me?.ready)} disabled={!me}>
-          {me?.ready ? 'Not ready' : 'Ready'}
-        </button>
+          </div>
+        </section>
       </div>
 
-      <p className={styles.hint}>
-        {readyCount}/{connected.length} ready · {mode.name} from “{selected?.name ?? room.selectedLevelId}” starts when
-        everyone is ready. Share the invite link (or room code) to play together — up to {MAX_PLAYERS} players.
-      </p>
+      <footer className={styles.footer}>
+        <div className={styles.count}>
+          <span className={`${styles.countNumber} px-outline`} data-all={readyCount === connected.length}>
+            {readyCount}/{connected.length}
+          </span>
+          <span className={styles.hint}>
+            {mode.name} from “{selected?.name ?? room.selectedLevelId}” starts when everyone is ready. Share the invite
+            link or code — up to {MAX_PLAYERS} players.
+          </span>
+        </div>
+        <button className={`${styles.ready} ${me?.ready ? '' : 'primary'}`} onClick={() => client.setReady(!me?.ready)} disabled={!me}>
+          {me?.ready ? 'Not ready' : 'Ready'}
+        </button>
+      </footer>
     </section>
   );
 }

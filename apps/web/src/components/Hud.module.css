@@ -1,183 +1,385 @@
+/* Authored in 1280×720 reference pixels; GameView sets --k (stage width / 1280, clamped) and the
+   layer is scaled back up to cover the stage, so the HUD keeps its proportions at any size. */
 .hud {
   position: absolute;
-  inset: 0 0 auto;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  gap: 0.5rem;
-  padding: 0.6rem;
+  left: 0;
+  top: 0;
+  width: calc(100% / var(--k, 1));
+  height: calc(100% / var(--k, 1));
+  transform: scale(var(--k, 1));
+  transform-origin: 0 0;
   pointer-events: none;
-  font-size: clamp(0.65rem, 1.2vw, 0.85rem);
+  color: var(--bone);
+  font-family: var(--body);
 }
 
-.players {
+/* --- top-left: you, then your teammates --- */
+
+.topLeft {
+  position: absolute;
+  left: 24px;
+  top: 20px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plate {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.plate[data-dim='true'] .frame {
+  filter: grayscale(0.8) brightness(0.7);
+}
+
+.frame {
+  width: 80px;
+  height: 80px;
+  padding: 4px;
+  background: var(--night);
+}
+
+.frameSlot {
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  background: var(--slot);
+}
+
+.frameInner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--fern);
+}
+
+.plateBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plateHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 7px;
+  background: var(--slot);
+  color: var(--night);
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.plateName {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ui);
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.status {
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .chip {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
-  border-radius: 999px;
-  background: rgb(10 12 23 / 72%);
-  border: 1px solid color-mix(in srgb, var(--slot) 55%, transparent);
-  backdrop-filter: blur(3px);
-}
-
-.chip[data-self='true'] {
-  border-color: var(--slot);
-  box-shadow: 0 0 0 1px var(--slot);
+  gap: 8px;
+  min-width: 214px;
+  width: max-content;
+  height: 36px;
+  padding-right: 8px;
+  background: rgb(7 17 13 / 82%);
+  box-shadow: inset 5px 0 0 var(--slot);
 }
 
 .chip[data-dim='true'] {
   opacity: 0.6;
 }
 
-.portrait {
-  margin-left: 0.15rem;
+.chipPortrait {
+  margin-left: 8px;
 }
 
-.badge {
-  display: grid;
-  place-items: center;
-  min-width: 1.9em;
-  height: 1.9em;
-  border-radius: 999px;
-  background: var(--slot);
-  color: #10131f;
-  font-weight: 800;
-  font-size: 0.85em;
-}
-
-.name {
-  font-weight: 600;
-  max-width: 9em;
+.chipName {
+  flex: 1;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--ui);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.chipStatus {
+  font-family: var(--ui);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.place {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  background: var(--stone);
+  color: var(--bone);
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.place[data-place='1'] {
+  background: var(--firefly);
+  color: var(--night);
+}
+
+.place[data-place='2'] {
+  background: var(--silver);
+  color: var(--night);
+}
+
+.place[data-place='3'] {
+  background: var(--bronze);
+  color: var(--night);
 }
 
 .hearts {
-  display: inline-flex;
-  gap: 0.12em;
+  display: flex;
+  gap: 8px;
+}
+
+.hearts[data-scale='2'] {
+  gap: 2px;
 }
 
 .heart {
-  width: 0.95em;
-  height: 0.82em;
-  fill: #ff4d6a;
-  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 60%));
+  display: block;
 }
 
-.heart[data-full='false'] {
-  fill: rgb(255 255 255 / 18%);
-  animation: heart-lost 380ms ease-out;
+.heart[data-kind='empty'] {
+  animation: heart-lost 380ms steps(4);
 }
 
 @keyframes heart-lost {
   0% {
-    fill: #ff4d6a;
-    transform: scale(1.6);
+    transform: scale(1.5);
   }
   60% {
     transform: scale(0.8);
   }
-  100% {
-    transform: scale(1);
+}
+
+/* Low on hearts: the last one blinks. */
+.plate .hearts:has(.heart:nth-child(1)[data-kind='full']):has(.heart:nth-child(2)[data-kind='empty']) .heart:first-child {
+  animation: blink 0.7s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
   }
+}
+
+/* --- top-right: score or race clock, then the level --- */
+
+.topRight {
+  position: absolute;
+  right: 28px;
+  top: 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .score {
-  font-family: var(--mono);
-  font-weight: 700;
-  color: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: 46px;
+  line-height: 1;
+  color: var(--firefly);
 }
 
-.status {
-  font-size: 0.85em;
-  color: var(--text-dim);
+.line {
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.level {
-  display: grid;
-  justify-items: end;
-  gap: 0.3rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 8px;
-  background: rgb(10 12 23 / 60%);
-  font-weight: 600;
+.sub {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--moss-lit);
 }
 
-.hint {
-  font-weight: 400;
-  color: var(--text-dim);
-  font-size: 0.85em;
+.dim {
+  color: var(--lichen);
 }
 
-/* Keyboard hints mean nothing on a phone (it has the touch controls). */
-@media (pointer: coarse) {
-  .hint {
-    display: none;
-  }
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 64px;
+  padding: 0 18px;
+  background: rgb(7 17 13 / 88%);
+  box-shadow: inset 0 0 0 4px var(--firefly);
 }
 
-/* Touch: players | level | menu button. */
-.hud[data-touch='true'] {
-  grid-template-columns: 1fr auto auto;
+.clockLabel {
+  font-family: var(--ui);
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.clockSeconds {
+  min-width: 1ch;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 56px;
+  line-height: 1;
+}
+
+.clockUnit {
+  font-family: var(--ui);
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.clock[data-urgent='true'] {
+  box-shadow: inset 0 0 0 4px var(--ember);
+}
+
+.clock[data-urgent='true'] .clockSeconds,
+.clock[data-urgent='true'] .clockUnit {
+  color: var(--ember);
+}
+
+.clock[data-urgent='true'] .clockSeconds {
+  animation: blink 1s steps(2) infinite;
 }
 
 .menu {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 48px;
+  height: 48px;
+  min-height: 0;
   padding: 0;
-  border-radius: 50%;
-  background: rgb(10 12 23 / 65%);
-  border-color: rgb(255 255 255 / 30%);
-  color: var(--text);
   pointer-events: auto;
   touch-action: manipulation;
+  background: rgb(75 90 70 / 92%);
+  box-shadow: inset 0 -4px 0 var(--stone-lo);
 }
+
+.menu:hover:not(:disabled) {
+  box-shadow: inset 0 -4px 0 var(--stone-lo);
+}
+
+/* The HUD is scaled down on a phone: keep the button a comfortable thumb target. */
+@container stage (max-width: 720px) {
+  .menu {
+    width: 72px;
+    height: 72px;
+  }
+  .menu svg {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* --- bottom-right: menu key --- */
+
+.escHint {
+  position: absolute;
+  right: 28px;
+  bottom: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--ui);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* --- F3 network stats --- */
 
 .stats {
-  grid-column: 1 / -1;
-  justify-self: start;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  background: rgb(10 12 23 / 70%);
-  font-family: var(--mono);
-  font-size: 0.8em;
-  color: var(--ok);
-}
-
-.chip[data-finished='true'] .status {
-  color: var(--warn);
-  font-weight: 700;
-}
-
-/* Race: time left after the first finish, on its own row under the chips (never covering
-   them when they wrap). */
-.raceClock {
-  grid-column: 1 / -1;
-  justify-self: center;
-  padding: 0.3rem 0.9rem;
-  border-radius: 999px;
-  background: rgb(10 12 23 / 72%);
-  border: 1px solid var(--warn);
-  font-weight: 700;
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
   white-space: nowrap;
-}
-
-.raceClock[data-urgent='true'] {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.raceSeconds {
+  background: rgb(7 17 13 / 85%);
+  box-shadow: 0 0 0 2px var(--night);
   font-family: var(--mono);
-  font-size: 1.2em;
+  font-size: 12px;
+  color: var(--moss-lit);
+}
+
+/* Small stage (phone): teammates shrink to portrait + hearts. */
+@container stage (max-width: 720px) {
+  .chip {
+    min-width: 0;
+  }
+  .chipName,
+  .chip [data-size='chip'] {
+    display: none;
+  }
+  .plateName {
+    max-width: 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart[data-kind='empty'],
+  .plate .hearts .heart:first-child,
+  .clock[data-urgent='true'] .clockSeconds {
+    animation: none;
+  }
 }

@@ -1,131 +1,649 @@
-.panel {
-  min-width: min(360px, 90%);
-  max-width: 90%;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
-  box-shadow: 0 12px 48px rgb(0 0 0 / 45%);
+/*
+ * Overlays drawn over the stage: countdown, pause menu, level results. Like the HUD they are
+ * authored in 1280×720 reference pixels; `zoom` (not a transform, so the overlay can still
+ * scroll) sizes them with the stage. On touch screens never below 0.8, so targets stay usable.
+ */
+.tablet,
+.menuStrip,
+.resultsHead,
+.resultsBody,
+.resultsFoot,
+.countdown > * {
+  zoom: clamp(0.7, var(--k, 1), 1.25);
 }
 
-.panel h2 {
-  margin: 0 0 0.5rem;
+@media (pointer: coarse) {
+  .tablet,
+  .menuStrip,
+  .resultsHead,
+  .resultsBody,
+  .resultsFoot,
+  .countdown > * {
+    zoom: clamp(0.8, var(--k, 1), 1.25);
+  }
 }
 
-.dim {
-  color: var(--text-dim);
-  font-size: 0.9rem;
-}
-
-.buttons {
-  display: grid;
-  gap: 0.5rem;
-  margin: 1rem 0;
-}
+/* =========================== countdown =========================== */
 
 .countdown {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
   pointer-events: none;
-  text-shadow: 0 4px 0 rgb(0 0 0 / 45%);
+  background: radial-gradient(ellipse at center, rgb(5 11 8 / 55%), rgb(5 11 8 / 15%) 70%);
+}
+
+.countHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.modeTag {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  background: var(--moss-lit);
+  color: var(--night);
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.modeTag[data-mode='race'] {
+  background: var(--ember);
 }
 
 .levelName {
-  font-size: clamp(1rem, 3vw, 1.8rem);
-  font-weight: 700;
-  padding: 0.3rem 1rem;
-  border-radius: 999px;
-  background: rgb(10 12 23 / 60%);
+  font-family: var(--display);
+  font-size: 64px;
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+}
+
+.scaledFor {
+  font-family: var(--ui);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--firefly);
 }
 
 .number {
-  font-size: clamp(3rem, 12vw, 7rem);
-  font-weight: 900;
-  color: var(--warn);
-  animation: pop 400ms ease-out;
+  font-family: var(--display);
+  font-size: 200px;
+  line-height: 0.8;
+  color: var(--firefly);
+  text-shadow:
+    6px 0 0 var(--night),
+    -6px 0 0 var(--night),
+    0 6px 0 var(--night),
+    0 -6px 0 var(--night),
+    6px 6px 0 var(--night),
+    -6px 6px 0 var(--night),
+    6px -6px 0 var(--night),
+    -6px -6px 0 var(--night),
+    0 14px 0 rgb(0 0 0 / 40%);
+  animation: pop 420ms steps(5);
 }
 
+.number[data-go='true'] {
+  color: var(--moss-lit);
+}
+
+/* Scale only: if the animation never runs (hidden tab), the number is still there. */
 @keyframes pop {
   from {
-    transform: scale(1.6);
-    opacity: 0;
+    transform: scale(1.5);
   }
 }
 
-.who {
+/* =========================== pause menu =========================== */
+
+.pauseOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 20px;
+}
+
+.tablet {
+  width: min(540px, 100%);
+  padding: 30px 32px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow:
+    inset 0 4px 0 0 var(--stone-hi),
+    inset 0 -4px 0 0 var(--stone-lo),
+    inset 0 0 0 4px var(--stone),
+    0 0 0 4px var(--night),
+    0 16px 0 4px rgb(0 0 0 / 45%);
+}
+
+.moss {
+  position: absolute;
+  left: 0;
+  top: -6px;
+  display: block;
+}
+
+.tabletHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 72px;
+  line-height: 0.85;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.lead {
+  margin: 0;
+  max-width: 420px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--mist);
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  background: var(--night);
+}
+
+/* Menu rows: flat text on night; the hovered / focused one lights up with the firefly arrow. */
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  background: none;
+  box-shadow: none;
+  color: var(--mist);
+  font-family: var(--ui);
+  font-weight: 400;
+  font-size: 19px;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.item:hover:not(:disabled),
+.item:focus-visible,
+.item:focus-within,
+.item:focus {
+  outline: none;
+  background: var(--fern);
+  color: var(--firefly);
+  box-shadow: none;
+}
+
+.item:active:not(:disabled) {
+  transform: none;
+}
+
+.arrow {
+  flex: none;
+  visibility: hidden;
+}
+
+.item:hover .arrow,
+.item:focus .arrow,
+.item:focus-within .arrow {
+  visibility: visible;
+}
+
+.itemText {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemValue {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--mist);
 }
 
-.audio {
-  display: grid;
-  grid-template-columns: auto 1fr;
+.itemValue [data-on='true'] {
+  color: var(--moss-lit);
+}
+
+.itemValue [data-on='false'] {
+  color: var(--ember);
+}
+
+.item[data-danger='true']:hover,
+.item[data-danger='true']:focus {
+  color: var(--ember);
+}
+
+.item[data-danger='true'] .arrow {
+  color: var(--ember);
+}
+
+.item[data-disabled='true'] {
+  cursor: default;
+}
+
+.item[data-disabled='true'] .itemText,
+.item[data-disabled='true'] .itemValue {
+  opacity: 0.45;
+}
+
+.volume {
+  width: 160px;
+}
+
+.devTag {
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  margin: 0 0 1rem;
-  font-size: 0.9rem;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--stone-lo);
+  color: var(--lichen);
+  font-size: 10px;
 }
 
-.audio input[type='range'] {
-  width: 100%;
-  accent-color: var(--accent);
+.close {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--ui);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+/* Who else has the menu open. */
+.menuStrip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.stripNote {
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.stripPlayers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.stripChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 214px;
+  height: 40px;
+  padding: 0 10px 0 10px;
+  background: var(--canopy);
+  box-shadow: inset 5px 0 0 var(--slot);
+}
+
+.stripName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ui);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.stripState {
+  font-family: var(--ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.stripChip[data-open='true'] .stripState {
+  color: var(--firefly);
+}
+
+.stripChip[data-away='true'] {
+  opacity: 0.55;
+}
+
+/* =========================== level results =========================== */
+
+.resultsOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 22px;
+  background: rgb(5 11 8 / 84%);
+}
+
+.resultsHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.kicker {
+  font-family: var(--ui);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--moss-lit);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 72px;
+  line-height: 0.85;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.resultsBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px 56px;
+  max-width: 100%;
+}
+
+.resultsPanel {
+  width: min(640px, 100%);
+  padding: 22px 18px 12px;
 }
 
 .results {
   width: 100%;
   border-collapse: collapse;
-  margin: 0.75rem 0;
-  font-size: 0.9rem;
+  font-size: 17px;
 }
 
-.results th,
-.results td {
-  text-align: right;
-  padding: 0.35rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.results th:first-child,
-.results td:first-child {
+.results th {
+  padding: 0 10px 10px;
   text-align: left;
-  font-weight: 700;
+  font-family: var(--ui);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.results td {
+  height: 52px;
+  padding: 0 10px;
+  box-shadow: inset 0 2px 0 var(--rule);
+}
+
+.results .num {
+  text-align: right;
 }
 
 .results tr[data-self='true'] td {
-  background: rgb(255 255 255 / 4%);
+  background: var(--fern);
 }
 
-.modeName {
-  font-size: clamp(0.8rem, 2vw, 1.1rem);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent-strong);
-}
-
-.modeName[data-mode='race'] {
-  color: var(--warn);
-}
-
-.scaledFor {
-  padding: 0.15rem 0.7rem;
-  border-radius: 999px;
-  background: rgb(10 12 23 / 60%);
-  font-size: clamp(0.7rem, 1.6vw, 0.95rem);
-  font-weight: 600;
+.results tr[data-self='true'] td:first-child {
+  box-shadow:
+    inset 4px 0 0 var(--slot),
+    inset 0 2px 0 var(--rule);
 }
 
 .results tfoot td {
-  border-bottom: 0;
-  font-weight: 700;
+  height: 46px;
+  font-family: var(--ui);
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--firefly);
+  box-shadow: inset 0 3px 0 var(--stone-lo);
 }
 
-.place {
-  font-family: var(--mono);
-  color: var(--warn);
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.slotLabel {
+  font-family: var(--ui);
+  font-size: 11px;
+  color: var(--slot);
+}
+
+.you {
+  font-size: 14px;
+  color: var(--lichen);
+}
+
+.placeTag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 7px;
+  background: var(--stone);
+  color: var(--bone);
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.placeTag[data-place='1'] {
+  background: var(--firefly);
+  color: var(--night);
+}
+
+.placeTag[data-place='2'] {
+  background: var(--silver);
+  color: var(--night);
+}
+
+.placeTag[data-place='3'] {
+  background: var(--bronze);
+  color: var(--night);
+}
+
+.muted {
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--lichen);
+}
+
+.dnf {
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--ember);
+}
+
+.points {
+  font-family: var(--ui);
+  font-size: 14px;
+  color: var(--moss-lit);
+}
+
+.points[data-zero='true'] {
+  color: var(--lichen);
+}
+
+.results tbody .total,
+.results tfoot .total {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.results tfoot .total {
+  color: var(--firefly);
+}
+
+/* Podium: stone steps, 1st in the middle and tallest. */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  width: 420px;
+}
+
+.podiumCol {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.podiumCol[data-place='1'] {
+  z-index: 1;
+}
+
+.podiumTrophy {
+  margin-bottom: 8px;
+}
+
+.podiumName {
+  max-width: 100%;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ui);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.podiumCol[data-place='1'] .podiumName {
+  color: var(--firefly);
+}
+
+.step {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  background: var(--stone);
+  box-shadow:
+    inset 0 4px 0 var(--stone-hi),
+    inset 0 -6px 0 var(--stone-lo),
+    0 0 0 4px var(--night);
+  font-family: var(--display);
+  line-height: 1;
+}
+
+.podiumCol[data-place='1'] .step {
+  width: calc(100% + 8px);
+  height: 150px;
+  padding-top: 16px;
+  background: #5a6a52;
+  font-size: 80px;
+  color: var(--firefly);
+}
+
+.podiumCol[data-place='2'] .step {
+  height: 106px;
+  padding-top: 12px;
+  font-size: 64px;
+  color: var(--silver);
+}
+
+.podiumCol[data-place='3'] .step {
+  height: 76px;
+  padding-top: 8px;
+  font-size: 56px;
+  color: var(--bronze);
+}
+
+/* Small stage: no room for the podium beside the table. */
+@container stage (max-width: 900px) {
+  .podium {
+    display: none;
+  }
+}
+
+.resultsFoot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.nextLine {
+  font-family: var(--ui);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nextLine strong {
+  color: var(--firefly);
+  font-weight: 400;
+}
+
+.nextBar {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  background: var(--night);
+}
+
+.nextBar span {
+  width: 36px;
+  height: 10px;
+  background: var(--stone-lo);
+}
+
+.nextBar span[data-filled='true'] {
+  background: var(--moss-lit);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .number {
+    animation: none;
+  }
 }

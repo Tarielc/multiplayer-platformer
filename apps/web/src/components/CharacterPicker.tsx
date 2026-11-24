@@ -3,8 +3,9 @@ import { CharacterPortrait } from './CharacterPortrait';
 import styles from './CharacterPicker.module.css';
 
 /**
- * Radio group of the playable characters, with animated portraits. Characters in `takenBy`
- * (id → who has it, e.g. "P2") are disabled and labelled.
+ * Radio group of the playable characters: animated portraits in stone frames, the picked one
+ * ringed in firefly gold. Characters in `takenBy` (id → who has it, e.g. "P2") are disabled
+ * and labelled.
  */
 export function CharacterPicker({
   value,
@@ -21,7 +22,7 @@ export function CharacterPicker({
 }) {
   return (
     <fieldset className={styles.picker} disabled={disabled}>
-      <legend>{legend}</legend>
+      <legend className="px-label">{legend}</legend>
       <div className={styles.options}>
         {CHARACTER_IDS.map((id) => {
           const owner = takenBy?.get(id);
@@ -37,7 +38,11 @@ export function CharacterPicker({
                 onChange={() => onChange(id)}
                 aria-label={owner ? `${name} (taken by ${owner})` : name}
               />
-              <CharacterPortrait characterId={id} scale={2} animated={value === id} />
+              <span className={`${styles.frame} px-notch`}>
+                <span className={`${styles.inner} px-notch`}>
+                  <CharacterPortrait characterId={id} scale={2} animated={value === id} />
+                </span>
+              </span>
               <span className={styles.name}>{name}</span>
               {owner && <span className={styles.owner}>{owner}</span>}
             </label>

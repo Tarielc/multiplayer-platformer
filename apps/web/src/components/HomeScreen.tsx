@@ -1,18 +1,29 @@
 'use client';
 
 import {
+  CHARACTER_IDS,
+  CHARACTERS,
+  GAME_MODES,
   LEVELS,
   MAX_PLAYERS,
+  MODE_CONFIG,
   PLAYER_CONFIG,
   isRoomCode,
   normalizeRoomCode,
   type CharacterId,
+  type GameMode,
 } from '@platformer/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
+import { abilityIconPath } from '@/game/abilities/abilityArt';
+import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { loadPlayerName, loadPreferredCharacter, savePlayerName, savePreferredCharacter } from '@/net/identity';
 import { gameServerHttpUrl } from '@/net/serverUrl';
+import { ABILITY_BLURBS, BACKDROP_URL, GAME_TITLE, abilityName } from './brand';
 import { CharacterPicker } from './CharacterPicker';
+import { CharacterPortrait } from './CharacterPortrait';
+import { Fireflies } from './Fireflies';
+import { MossCap } from './PixelIcons';
 import styles from './HomeScreen.module.css';
 
 interface Health {
@@ -22,6 +33,11 @@ interface Health {
 }
 
 type ServerState = { kind: 'checking' } | { kind: 'online'; health: Health } | { kind: 'offline' };
+
+const MODE_ART: Record<GameMode, { image: string; alt: string }> = {
+  coop: { image: '/ui/mode-coop.png', alt: "Four players face the rhino boss in Rhino's Den" },
+  race: { image: '/ui/mode-race.png', alt: 'Three racers run through Orchard Hills' },
+};
 
 export function HomeScreen() {
   const router = useRouter();
@@ -89,90 +105,267 @@ export function HomeScreen() {
     router.push(`/room/${normalized}`);
   };
 
+  const levelCount = LEVELS.entries.length;
+
   return (
-    <main className={styles.page}>
-      <section className={styles.card}>
-        <header className={styles.header}>
-          <h1>Platformer Template</h1>
-          <p>
-            1–{MAX_PLAYERS} players per room · {LEVELS.entries.length} levels · server-authoritative netcode
-          </p>
-        </header>
+    <div className={styles.page}>
+      <section className={styles.hero} aria-label="Play">
+        <img className={`${styles.backdrop} px-sprite`} src={BACKDROP_URL} alt="" />
+        <div className={styles.scrim} aria-hidden />
+        <Fireflies className={styles.fireflies} />
 
-        <label className={styles.field}>
-          <span>Your name</span>
-          <input
-            value={name}
-            maxLength={PLAYER_CONFIG.nameMaxLength}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => setName(savePlayerName(name))}
-            placeholder={PLAYER_CONFIG.defaultName}
-            autoComplete="nickname"
-          />
-        </label>
+        <div className={styles.wrap}>
+          <nav className={styles.nav} aria-label="Site">
+            <a href="#top" className={`${styles.brand} px-outline`}>
+              {GAME_TITLE}
+            </a>
+            <div className={styles.links}>
+              <a className="px-outline-sm" href="#characters">
+                Characters
+              </a>
+              <a className="px-outline-sm" href="#modes">
+                Modes
+              </a>
+              <a className="px-outline-sm" href="#levels">
+                Levels
+              </a>
+              <a className="px-outline-sm" href="#controls">
+                Controls
+              </a>
+              <ServerStatus server={server} />
+            </div>
+          </nav>
 
-        <CharacterPicker value={character} onChange={pickCharacter} />
+          <div id="top" className={styles.heroBody}>
+            <h1 className={styles.logo}>{GAME_TITLE}</h1>
+            <p className={`${styles.tagline} px-outline-sm`}>
+              An online platformer for 1–{MAX_PLAYERS} players. Team up to topple the rhino, or race your friends to the
+              trophy through {levelCount} overgrown levels.
+            </p>
 
-        <div className={styles.actions}>
-          <button className="primary" disabled={busy} onClick={() => void createRoom(true)}>
-            Play solo
-          </button>
-          <button disabled={busy} onClick={() => void createRoom(false)}>
-            Create room
-          </button>
+            <div className={`${styles.play} px-panel`}>
+              <MossCap className={styles.moss} />
+              <label className={styles.field}>
+                <span className="px-label">Your name</span>
+                <input
+                  value={name}
+                  maxLength={PLAYER_CONFIG.nameMaxLength}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={() => setName(savePlayerName(name))}
+                  placeholder={PLAYER_CONFIG.defaultName}
+                  autoComplete="nickname"
+                />
+              </label>
+
+              <CharacterPicker value={character} onChange={pickCharacter} />
+
+              <div className={styles.actions}>
+                <button className="primary" disabled={busy} onClick={() => void createRoom(true)}>
+                  Play solo
+                </button>
+                <button disabled={busy} onClick={() => void createRoom(false)}>
+                  Create room
+                </button>
+              </div>
+
+              <form className={styles.join} onSubmit={joinRoom}>
+                <label htmlFor="room-code" className="px-label">
+                  Got a code?
+                </label>
+                <input
+                  id="room-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="ROOM CODE"
+                  maxLength={12}
+                  spellCheck={false}
+                  autoCapitalize="characters"
+                />
+                <button type="submit" disabled={busy || code.trim() === ''}>
+                  Join
+                </button>
+              </form>
+
+              {error && (
+                <p className={styles.error} role="alert">
+                  {error}
+                </p>
+              )}
+              {server.kind === 'offline' && (
+                <p className={styles.offline}>
+                  Game server not reachable at <code>{gameServerHttpUrl()}</code>. Start everything with{' '}
+                  <code>npm run dev</code>.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-
-        <form className={styles.join} onSubmit={joinRoom}>
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="ROOM CODE"
-            aria-label="Room code"
-            maxLength={12}
-            spellCheck={false}
-            autoCapitalize="characters"
-          />
-          <button type="submit" disabled={busy || code.trim() === ''}>
-            Join
-          </button>
-        </form>
-
-        {error && <p className={styles.error}>{error}</p>}
-
-        <footer className={styles.status} data-state={server.kind}>
-          <span className={styles.dot} />
-          {server.kind === 'checking' && 'Checking game server…'}
-          {server.kind === 'online' &&
-            `Game server online · ${server.health.rooms} room(s) · ${server.health.connectedPlayers} player(s)`}
-          {server.kind === 'offline' && (
-            <span>
-              Game server not reachable at <code>{gameServerHttpUrl()}</code>. Start everything with{' '}
-              <code>npm run dev</code>.
-            </span>
-          )}
-        </footer>
       </section>
 
-      <section className={styles.help}>
-        <h2>Controls</h2>
-        <ul>
-          <li>
-            <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd> move · <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd>{' '}
-            jump (hold for higher, press again in mid-air to double jump)
-          </li>
-          <li>
-            <kbd>J</kbd> / <kbd>X</kbd> attack (shoves other players)
-          </li>
-          <li>
-            <kbd>↓</kbd> + jump drops through wooden platforms · <kbd>Esc</kbd> menu · <kbd>F3</kbd> debug overlay
-          </li>
-          <li>Gamepad: stick / D-pad, A to jump, X to attack, Start for the menu</li>
-          <li>
-            Touch: walk stick on the left; jump button, attack stick and special stick (drag to aim, lift to fire) on
-            the right
-          </li>
-        </ul>
+      <section id="characters" className={styles.section} aria-labelledby="characters-title">
+        <header className={styles.sectionHead}>
+          <span className={styles.kicker}>Characters</span>
+          <h2 id="characters-title" className="px-outline">
+            One special each. Fruit recharges it.
+          </h2>
+        </header>
+        <div className={styles.cards}>
+          {CHARACTER_IDS.map((id) => (
+            <article key={id} className={`${styles.card} px-panel`}>
+              <div className={styles.alcove}>
+                <CharacterPortrait characterId={id} scale={6} animated className={styles.alcovePortrait} />
+              </div>
+              <h3 className="px-outline-sm">{CHARACTERS[id].name}</h3>
+              <div className={styles.ability}>
+                <span className={`${styles.abilityIcon} px-notch`}>
+                  <img className="px-sprite" src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(id)}`} alt="" />
+                </span>
+                <span className={styles.abilityName}>{abilityName(id)}</span>
+              </div>
+              <p>{ABILITY_BLURBS[id]}</p>
+            </article>
+          ))}
+        </div>
       </section>
-    </main>
+
+      <section id="modes" className={styles.section} aria-labelledby="modes-title">
+        <header className={styles.sectionHead}>
+          <span className={styles.kicker}>Modes</span>
+          <h2 id="modes-title" className="px-outline">
+            Together, or against each other.
+          </h2>
+        </header>
+        <div className={styles.modes}>
+          {GAME_MODES.map((mode) => {
+            const config = MODE_CONFIG[mode];
+            return (
+              <article key={mode} className={`${styles.mode} px-panel`} data-mode={mode}>
+                <img className={`${styles.modeArt} px-sprite`} src={MODE_ART[mode].image} alt={MODE_ART[mode].alt} />
+                <div className={styles.modeHead}>
+                  <h3 className="px-outline">{config.name}</h3>
+                  <span className="px-label">
+                    {config.race ? `${config.race.placePoints.join(' · ')} pts` : 'Shared checkpoints'}
+                  </span>
+                </div>
+                <p>{config.summary}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section id="levels" className={styles.section} aria-labelledby="levels-title">
+        <header className={styles.sectionHead}>
+          <span className={styles.kicker}>Levels</span>
+          <h2 id="levels-title" className="px-outline">
+            {levelCount} levels, played in order.
+          </h2>
+        </header>
+        <ol className={styles.levels}>
+          {LEVELS.entries.map((entry, index) => (
+            <li key={entry.id} className="px-notch" data-final={entry.next === null}>
+              <span className={`${styles.levelNo} px-outline`}>{index + 1}</span>
+              <span className={styles.levelName}>{entry.name}</span>
+              {entry.next === null && <span className={styles.levelTag}>Finale</span>}
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section id="controls" className={styles.section} aria-labelledby="controls-title">
+        <header className={styles.sectionHead}>
+          <span className={styles.kicker}>Controls</span>
+          <h2 id="controls-title" className="px-outline">
+            Keyboard, pad or thumbs.
+          </h2>
+        </header>
+        <div className={`${styles.controls} px-panel`}>
+          <div className={styles.tableScroll}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Keyboard</th>
+                  <th>Gamepad</th>
+                  <th>Touch</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Move</td>
+                  <td>
+                    <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd>
+                  </td>
+                  <td>Left stick, D-pad</td>
+                  <td>Walk stick (left)</td>
+                </tr>
+                <tr>
+                  <td>Jump · hold for higher, again in mid-air to double jump</td>
+                  <td>
+                    <kbd>Space</kbd> <kbd>↑</kbd> <kbd>W</kbd> <kbd>Z</kbd> <kbd>K</kbd>
+                  </td>
+                  <td>A / B</td>
+                  <td>Jump button</td>
+                </tr>
+                <tr>
+                  <td>Drop through planks</td>
+                  <td>
+                    <kbd>↓</kbd> + jump
+                  </td>
+                  <td>Down + A</td>
+                  <td>Walk stick down + Jump</td>
+                </tr>
+                <tr>
+                  <td>Attack · shoves players, breaks boxes</td>
+                  <td>
+                    <kbd>J</kbd> <kbd>X</kbd>
+                  </td>
+                  <td>X / □</td>
+                  <td>Attack stick: lift to swing, drag first to aim</td>
+                </tr>
+                <tr>
+                  <td>Special ability</td>
+                  <td>
+                    <kbd>L</kbd> <kbd>C</kbd> right-click · aim with arrows or mouse
+                  </td>
+                  <td>Y / RB · aim with the right stick</td>
+                  <td>Special stick: drag to aim, lift to fire</td>
+                </tr>
+                <tr>
+                  <td>Menu · debug overlay</td>
+                  <td>
+                    <kbd>Esc</kbd> · <kbd>F3</kbd>
+                  </td>
+                  <td>Start</td>
+                  <td>Menu button (top right)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <footer className={styles.footer}>
+        <div className={styles.footerRow}>
+          <span className={`${styles.footerBrand} px-outline`}>{GAME_TITLE}</span>
+          <span>
+            1–{MAX_PLAYERS} players per room · {levelCount} levels · server-authoritative netcode
+          </span>
+          <ServerStatus server={server} />
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function ServerStatus({ server }: { server: ServerState }) {
+  return (
+    <span className={styles.status} data-state={server.kind} role="status">
+      <span className={styles.dot} aria-hidden />
+      {server.kind === 'checking' && 'Checking server…'}
+      {server.kind === 'online' &&
+        `Server online · ${server.health.rooms} room${server.health.rooms === 1 ? '' : 's'} · ${server.health.connectedPlayers} player${server.health.connectedPlayers === 1 ? '' : 's'}`}
+      {server.kind === 'offline' && 'Server offline'}
+    </span>
   );
 }

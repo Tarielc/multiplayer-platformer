@@ -1,5 +1,6 @@
 /* Laid over the whole game view (not just the 16:9 stage): in landscape the sticks sit in the
-   side gutters / stage corners, in portrait below the stage. Only the controls take touches. */
+   side gutters / stage corners, in portrait below the stage. Only the controls take touches.
+   Carved stone: notched, night-outlined, moss when pressed; jump is the lit-moss button. */
 .layer {
   --pad: clamp(10px, 3vmin, 24px);
   --gap: clamp(8px, 2.5vmin, 16px);
@@ -27,18 +28,18 @@
   position: absolute;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: rgb(10 12 23 / 32%);
-  border: 2px solid rgb(255 255 255 / 20%);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 25%);
-  transition:
-    background 120ms,
-    border-color 120ms;
+  clip-path: var(--notch);
+  background: rgb(7 17 13 / 45%);
+  box-shadow:
+    inset 0 0 0 4px rgb(75 90 70 / 75%),
+    inset 0 0 0 8px rgb(7 17 13 / 55%);
 }
 
 .base[data-active='true'] {
-  background: rgb(10 12 23 / 48%);
-  border-color: rgb(255 255 255 / 42%);
+  background: rgb(7 17 13 / 65%);
+  box-shadow:
+    inset 0 0 0 4px var(--moss),
+    inset 0 0 0 8px rgb(7 17 13 / 55%);
 }
 
 .knob {
@@ -46,23 +47,26 @@
   place-items: center;
   width: 54%;
   height: 54%;
-  border-radius: 50%;
-  background: rgb(232 234 246 / 20%);
-  border: 2px solid rgb(255 255 255 / 50%);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
-  color: #f4f5ff;
+  clip-path: var(--notch);
+  background: rgb(75 90 70 / 88%);
+  box-shadow:
+    inset 0 -5px 0 var(--stone-lo),
+    inset 0 3px 0 var(--stone-hi);
+  color: var(--bone);
   will-change: transform;
 }
 
 .base[data-active='true'] .knob {
-  background: rgb(124 140 255 / 45%);
-  border-color: rgb(255 255 255 / 80%);
+  background: var(--moss);
+  box-shadow:
+    inset 0 -5px 0 var(--moss-dark),
+    inset 0 3px 0 var(--moss-lit);
 }
 
 .icon {
   width: 62%;
   height: 62%;
-  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 55%));
+  filter: drop-shadow(0 2px 0 var(--night));
 }
 
 /* Walk: the zone is the bottom-left area; the base rests in its corner and floats to the thumb. */
@@ -98,8 +102,22 @@
   bottom: var(--pad);
 }
 
+.attack .base[data-active='true'] .knob {
+  background: var(--ember);
+  box-shadow:
+    inset 0 -5px 0 var(--ember-dark),
+    inset 0 3px 0 var(--ember-pale);
+  color: var(--night);
+}
+
 .special {
   bottom: calc(var(--pad) + var(--stick) + var(--gap));
+}
+
+/* The special knob carries the ability badge, which has its own frame. */
+.special .knob {
+  background: transparent;
+  box-shadow: none;
 }
 
 /* --- jump: left of the attack stick, level with it --- */
@@ -112,22 +130,26 @@
   place-items: center;
   width: var(--jump);
   height: var(--jump);
-  border-radius: 50%;
-  background: rgb(232 234 246 / 18%);
-  border: 2px solid rgb(255 255 255 / 45%);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
-  color: #f4f5ff;
+  clip-path: var(--notch);
+  background: rgb(169 207 78 / 85%);
+  box-shadow:
+    inset 0 -6px 0 var(--moss),
+    inset 0 4px 0 var(--moss-pale);
+  color: var(--night);
 }
 
 .jump[data-active='true'] {
-  background: rgb(124 140 255 / 50%);
-  border-color: rgb(255 255 255 / 85%);
-  transform: scale(0.94);
+  background: var(--moss);
+  box-shadow:
+    inset 0 -3px 0 var(--moss-dark),
+    inset 0 4px 0 var(--moss-lit);
+  transform: translateY(3px);
 }
 
 .jump .icon {
   width: 50%;
   height: 50%;
+  filter: none;
 }
 
 /* --- special: the character's ability icon --- */
@@ -136,6 +158,6 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 70%;
-  height: 70%;
+  width: 100%;
+  height: 100%;
 }

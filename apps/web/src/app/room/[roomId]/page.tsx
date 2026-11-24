@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { isRoomCode, normalizeRoomCode } from '@platformer/shared';
 import { notFound } from 'next/navigation';
+import { GAME_TITLE } from '@/components/brand';
 import { RoomScreen } from '@/components/RoomScreen';
 
 interface RoomPageProps {
@@ -10,7 +11,7 @@ interface RoomPageProps {
 
 export async function generateMetadata({ params }: RoomPageProps): Promise<Metadata> {
   const { roomId } = await params;
-  return { title: `Room ${normalizeRoomCode(roomId)} · Platformer Template` };
+  return { title: `Room ${normalizeRoomCode(roomId)} · ${GAME_TITLE}` };
 }
 
 export default async function RoomPage({ params, searchParams }: RoomPageProps) {

@@ -1,18 +1,70 @@
+/*
+ * "Overgrown" look: carved stone, lit moss and firefly gold over a dark jungle canopy.
+ * Everything sits on a 4 px grid, corners are notched (never rounded), and anything drawn over
+ * gameplay gets a 2-4 px Night outline. Fonts come from next/font in app/layout.tsx.
+ */
 :root {
-  --bg: #0e1120;
-  --bg-raised: #171b30;
-  --bg-sunken: #0a0c17;
-  --border: #2a3052;
-  --text: #e8eaf6;
-  --text-dim: #9aa0c3;
-  --accent: #7c8cff;
-  --accent-strong: #5b6cff;
-  --ok: #7ee081;
-  --warn: #ffc94d;
-  --danger: #ff5d73;
-  --radius: 10px;
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, sans-serif;
+  /* palette */
+  --night: #07110d;
+  --canopy: #0f2119;
+  --fern: #163126;
+  --rule: #1e3a2a;
+  --stone: #4b5a46;
+  --stone-hi: #66775c;
+  --stone-lo: #323d30;
+  --stone-dim: #253129;
+  --moss-dark: #3f6b2a;
+  --moss: #6e9f33;
+  --moss-lit: #a9cf4e;
+  --moss-pale: #d6ee8a;
+  --firefly: #f2c14e;
+  --firefly-pale: #fff3b0;
+  --gold-dark: #9a6a00;
+  --ember: #e8743b;
+  --ember-dark: #a9441f;
+  --ember-pale: #f7a574;
+  --heart: #e5484d;
+  --bone: #ede6c8;
+  --mist: #c9d3b5;
+  --lichen: #a9b39a;
+  --silver: #c9d3dc;
+  --bronze: #d08a4e;
+
+  /* fonts (CSS variables set by next/font on <html>) */
+  --display: var(--font-display), 'Pixelify Sans', system-ui, sans-serif;
+  --ui: var(--font-ui), ui-monospace, monospace;
+  --body: var(--font-body), system-ui, sans-serif;
   --mono: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+
+  /* older names, kept so every screen speaks the same palette */
+  --bg: var(--night);
+  --bg-raised: var(--canopy);
+  --bg-sunken: var(--night);
+  --border: var(--stone);
+  --text: var(--bone);
+  --text-dim: var(--lichen);
+  --accent: var(--moss-lit);
+  --accent-strong: var(--moss);
+  --ok: var(--moss-lit);
+  --warn: var(--firefly);
+  --danger: var(--ember);
+  --radius: 0;
+
+  --notch: polygon(
+    0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px),
+    calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+  --outline: 3px 0 0 var(--night), -3px 0 0 var(--night), 0 3px 0 var(--night), 0 -3px 0 var(--night),
+    3px 3px 0 var(--night), -3px 3px 0 var(--night), 3px -3px 0 var(--night), -3px -3px 0 var(--night),
+    0 6px 0 rgb(0 0 0 / 40%);
+  --outline-sm: 2px 0 0 var(--night), -2px 0 0 var(--night), 0 2px 0 var(--night), 0 -2px 0 var(--night),
+    2px 2px 0 var(--night), -2px 2px 0 var(--night), 2px -2px 0 var(--night), -2px -2px 0 var(--night);
+  --panel-shadow: inset 0 4px 0 0 var(--stone-hi), inset 0 -4px 0 0 var(--stone-lo), inset 0 0 0 4px var(--stone),
+    0 0 0 4px var(--night), 0 12px 0 4px rgb(0 0 0 / 35%);
+
   color-scheme: dark;
 }
 
@@ -26,14 +78,17 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  -webkit-font-smoothing: antialiased;
+  background: var(--night);
+  color: var(--bone);
+  font-family: var(--body);
 }
 
 a {
-  color: var(--accent);
+  color: var(--moss-lit);
+}
+
+a:hover {
+  color: var(--firefly);
 }
 
 button,
@@ -43,68 +98,276 @@ select {
   color: inherit;
 }
 
-button {
+/* --- buttons: carved stone; .primary is lit moss, .danger ember, .gold firefly --- */
+
+button,
+.px-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--bg-raised);
-  border-radius: 8px;
-  padding: 0.55rem 1rem;
-  transition:
-    background 120ms,
-    border-color 120ms,
-    transform 60ms;
+  background: var(--stone);
+  color: var(--bone);
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 -5px 0 var(--stone-lo),
+    inset 0 3px 0 var(--stone-hi),
+    0 0 0 4px var(--night);
+  transition: transform 60ms steps(1);
 }
 
-button:hover:not(:disabled) {
-  border-color: var(--accent);
+.px-button:hover {
+  color: var(--bone);
 }
 
-button:active:not(:disabled) {
-  transform: translateY(1px);
+button:hover:not(:disabled),
+.px-button:hover {
+  box-shadow:
+    inset 0 -5px 0 var(--stone-lo),
+    inset 0 3px 0 var(--stone-hi),
+    0 0 0 4px var(--night),
+    0 0 0 7px var(--firefly);
+}
+
+button:active:not(:disabled),
+.px-button:active {
+  transform: translateY(3px);
 }
 
 button:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+  background: var(--stone-dim);
+  color: #6b7663;
+  box-shadow:
+    inset 0 -5px 0 #1a231d,
+    0 0 0 4px var(--night);
 }
 
-button.primary {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
-  color: white;
-  font-weight: 600;
+button.primary,
+.px-button.primary {
+  background: var(--moss-lit);
+  color: var(--night);
+  box-shadow:
+    inset 0 -6px 0 var(--moss),
+    inset 0 4px 0 var(--moss-pale),
+    0 0 0 4px var(--night);
 }
 
-button.primary:hover:not(:disabled) {
-  background: var(--accent);
+button.primary:hover:not(:disabled),
+.px-button.primary:hover {
+  background: #bee065;
+  color: var(--night);
+  box-shadow:
+    inset 0 -6px 0 var(--moss),
+    inset 0 4px 0 #e2f5a6,
+    0 0 0 4px var(--night),
+    0 0 0 7px var(--firefly);
 }
 
-button.danger {
-  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
-  color: var(--danger);
+button.gold,
+.px-button.gold {
+  background: var(--firefly);
+  color: var(--night);
+  box-shadow:
+    inset 0 -6px 0 var(--gold-dark),
+    inset 0 4px 0 #ffe7a0,
+    0 0 0 4px var(--night);
 }
+
+button.danger,
+.px-button.danger {
+  background: var(--ember);
+  color: var(--night);
+  box-shadow:
+    inset 0 -5px 0 var(--ember-dark),
+    inset 0 3px 0 var(--ember-pale),
+    0 0 0 4px var(--night);
+}
+
+button.primary:disabled,
+button.gold:disabled,
+button.danger:disabled {
+  background: var(--stone-dim);
+  color: #6b7663;
+  box-shadow:
+    inset 0 -5px 0 #1a231d,
+    0 0 0 4px var(--night);
+}
+
+/* --- fields: sunken night with a stone rim --- */
 
 input,
 select {
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.55rem 0.75rem;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: var(--night);
+  color: var(--bone);
+  box-shadow:
+    inset 0 4px 0 #050b08,
+    0 0 0 4px var(--stone),
+    0 0 0 8px var(--night);
+}
+
+input::placeholder {
+  color: #7d8a72;
 }
 
 input:focus-visible,
-select:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+select:focus-visible {
+  box-shadow:
+    inset 0 4px 0 #050b08,
+    0 0 0 4px var(--firefly),
+    0 0 0 8px var(--night);
+}
+
+button:focus-visible,
+a:focus-visible,
+.px-button:focus-visible {
+  outline: 3px solid var(--firefly);
+  outline-offset: 6px;
+}
+
+input[type='range'] {
+  min-height: 0;
+  height: 22px;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+/* WebKit has no progress pseudo-element: set --fill (e.g. 70%) on the input to light the track. */
+input[type='range']::-webkit-slider-runnable-track {
+  height: 14px;
+  background:
+    linear-gradient(90deg, var(--moss-lit) var(--fill, 0%), transparent var(--fill, 0%)),
+    repeating-linear-gradient(90deg, var(--stone-dim) 0 10px, var(--night) 10px 13px);
+  box-shadow: 0 0 0 3px var(--night);
+}
+
+input[type='range']::-moz-range-track {
+  height: 14px;
+  background: repeating-linear-gradient(90deg, var(--stone-dim) 0 10px, var(--night) 10px 13px);
+  box-shadow: 0 0 0 3px var(--night);
+}
+
+input[type='range']::-moz-range-progress {
+  height: 14px;
+  background: var(--moss-lit);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 22px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 0;
+  background: var(--firefly);
+  box-shadow: 0 0 0 3px var(--night);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 22px;
+  border: 0;
+  border-radius: 0;
+  background: var(--firefly);
+  box-shadow: 0 0 0 3px var(--night);
+}
+
+input[type='range']:focus-visible {
+  outline: 3px solid var(--firefly);
+  outline-offset: 4px;
+}
+
+input[type='range']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  vertical-align: middle;
+  background: var(--stone);
+  color: var(--bone);
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 -4px 0 var(--stone-lo),
+    inset 0 2px 0 var(--stone-hi),
+    0 0 0 2px var(--night);
+}
+
+code {
   font-family: var(--mono);
-  font-size: 0.8em;
-  padding: 0.1em 0.4em;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--bg-sunken);
+  font-size: 0.9em;
+}
+
+/* --- shared pixel helpers --- */
+
+.px-notch {
+  clip-path: var(--notch);
+}
+
+.px-outline {
+  text-shadow: var(--outline);
+}
+
+.px-outline-sm {
+  text-shadow: var(--outline-sm);
+}
+
+/* Night outline around a pixel SVG (hearts, trophy). */
+.px-edge {
+  filter: drop-shadow(2px 0 0 var(--night)) drop-shadow(-2px 0 0 var(--night)) drop-shadow(0 2px 0 var(--night))
+    drop-shadow(0 -2px 0 var(--night));
+}
+
+.px-panel {
+  position: relative;
+  background: var(--canopy);
+  box-shadow: var(--panel-shadow);
+}
+
+.px-label {
+  font-family: var(--ui);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.px-sprite {
+  image-rendering: pixelated;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
 }

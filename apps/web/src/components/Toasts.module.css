@@ -1,38 +1,59 @@
 .stack {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
+  right: 20px;
+  bottom: 20px;
   display: grid;
-  gap: 0.5rem;
+  justify-items: end;
+  gap: 10px;
   z-index: 50;
   pointer-events: none;
 }
 
+/* A dark notched tab with a coloured underline: moss (info), firefly (warn), ember (error). */
 .toast {
+  --line: var(--moss-lit);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+  min-height: 44px;
+  padding: 10px 16px;
   pointer-events: auto;
   cursor: pointer;
-  max-width: 320px;
-  padding: 0.6rem 0.9rem;
-  border-radius: 8px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  font-size: 0.85rem;
-  box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
-  animation: enter 160ms ease-out;
+  clip-path: var(--notch);
+  background: rgb(7 17 13 / 94%);
+  box-shadow: inset 0 -4px 0 var(--line);
+  color: var(--bone);
+  font-size: 15px;
+  line-height: 1.35;
+  animation: enter 200ms steps(4);
+}
+
+.toast::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--line);
 }
 
 .toast[data-kind='warn'] {
-  border-left-color: var(--warn);
+  --line: var(--firefly);
 }
 
 .toast[data-kind='error'] {
-  border-left-color: var(--danger);
+  --line: var(--ember);
 }
 
 @keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
   }
 }

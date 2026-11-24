@@ -224,7 +224,7 @@ function SpecialSymbol({ self }: { self: HudPlayer | undefined }) {
   if (!self) return <StarIcon />;
   return (
     <span className={styles.ability}>
-      <AbilityBadge characterId={self.characterId} ability={self.ability} color={self.color} size="fill" />
+      <AbilityBadge characterId={self.characterId} ability={self.ability} size="fill" />
     </span>
   );
 }
@@ -249,7 +249,7 @@ function WalkIcon() {
 function FistIcon() {
   return (
     <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden>
-      <g fill="currentColor" stroke="rgb(16 19 31 / 85%)" strokeWidth="1.1" strokeLinejoin="round">
+      <g fill="currentColor" stroke="#07110d" strokeWidth="1.1" strokeLinejoin="round">
         <rect x="8.5" y="16" width="7" height="6.5" rx="1" />
         <rect x="5" y="8" width="14.5" height="10.5" rx="3.5" />
         <rect x="5.5" y="3.5" width="3.6" height="7.5" rx="1.8" />

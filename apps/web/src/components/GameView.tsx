@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_AUDIO_SETTINGS,
   loadAudioSettings,
@@ -20,11 +20,14 @@ import { TouchControls } from './TouchControls';
 import { AbilityButton } from './AbilityBadge';
 import styles from './GameView.module.css';
 
+/** Width the HUD is laid out for; it scales with the stage from there. */
+const HUD_REFERENCE_WIDTH = 1280;
+
 /**
  * In-game screen (countdown / playing / level complete): the Phaser canvas plus React overlays.
  * Owns the menu + debug UI state and forwards it to Phaser (bridge) and the server (pause rule).
  */
-export function GameView({ session, view }: { session: GameSession; view: RoomView }) {
+export function GameView({ session, view, onLeave }: { session: GameSession; view: RoomView; onLeave: () => void }) {
   const { client, store } = session;
   const room = view.room!;
   const [bridge] = useState(() => new GameBridge());
@@ -33,6 +36,21 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
   const [debug, setDebug] = useState(false);
   const [audio, setAudio] = useState<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
   const [stats, setStats] = useState<NetStats | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  // The HUD is drawn in 1280×720 reference pixels: --k scales it with the stage (no re-render).
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const fit = () => {
+      const k = Math.min(1.5, Math.max(0.6, stage.clientWidth / HUD_REFERENCE_WIDTH));
+      stage.style.setProperty('--k', k.toFixed(3));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
 
   // A new level run closes the menu (derived-state reset during render).
   const run = room.level?.run ?? 0;
@@ -83,7 +101,7 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
 
   return (
     <div className={styles.view}>
-      <div className={styles.stage}>
+      <div ref={stageRef} className={styles.stage}>
         <GameCanvas services={services} />
         <Hud view={view} stats={debug ? stats : null} onMenu={() => setMenuOpen(true)} />
         {room.phase === 'playing' && <AbilityButton self={view.hud.find((p) => p.isSelf)} />}
@@ -91,10 +109,11 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
         {room.phase === 'levelComplete' && (
           <LevelCompleteOverlay room={room} receivedAt={view.roomReceivedAt} selfId={view.selfId} />
         )}
-        {room.paused && !menuOpen && <div className={styles.pausedBadge}>Paused</div>}
+        {room.paused && !menuOpen && <div className={`${styles.pausedBadge} px-notch`}>Paused</div>}
         {menuOpen && (
           <PauseMenu
             room={room}
+            players={view.hud}
             solo={solo}
             debug={debug}
             audio={audio}
@@ -105,10 +124,11 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
               client.dev(cmd);
               setMenuOpen(false);
             }}
+            onLeave={onLeave}
           />
         )}
         {view.status !== 'open' && !view.fatal && (
-          <div className={styles.connection}>{view.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</div>
+          <div className={`${styles.connection} px-notch`}>{view.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</div>
         )}
       </div>
       {!menuOpen && <TouchControls touch={bridge.touch} self={view.hud.find((p) => p.isSelf)} />}
