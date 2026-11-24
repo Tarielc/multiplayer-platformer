@@ -154,48 +154,13 @@
   color: var(--ok);
 }
 
-.ability {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  outline: 1px solid rgb(255 255 255 / 18%);
-}
-
-.ability img {
-  image-rendering: pixelated;
-}
-
-.ability[data-ready='false'] img {
-  filter: grayscale(1) brightness(0.55);
-}
-
-.ability[data-active='true'] {
-  outline: 2px solid var(--slot);
-  box-shadow: 0 0 8px var(--slot);
-}
-
-.cooldown {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-family: var(--mono);
-  font-size: 0.75em;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 1px 2px #000;
-}
-
 .chip[data-finished='true'] .status {
   color: var(--warn);
   font-weight: 700;
 }
 
-/* Race: time left after the first finish, under the player chips. */
-/* Its own row under the chips, so it never covers them when they wrap. */
+/* Race: time left after the first finish, on its own row under the chips (never covering
+   them when they wrap). */
 .raceClock {
   grid-column: 1 / -1;
   justify-self: center;

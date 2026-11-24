@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { abilityIconPath } from '@/game/abilities/abilityArt';
 import type { TouchInput } from '@/game/input/TouchInput';
-import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { useTouchDevice } from '@/hooks/useTouchDevice';
 import type { HudPlayer } from '@/net/RoomStore';
+import { AbilityBadge } from './AbilityBadge';
 import styles from './TouchControls.module.css';
 
 /** The knob travels this far from the centre, as a fraction of the base's width. */
@@ -220,15 +219,12 @@ function JumpButton({ touch }: { touch: TouchInput }) {
   );
 }
 
-/** The local character's ability icon, dimmed with the seconds left while it recharges. */
+/** The local character's ability: its icon in the recharge ring (see `AbilityBadge`). */
 function SpecialSymbol({ self }: { self: HudPlayer | undefined }) {
   if (!self) return <StarIcon />;
-  const { cooldown, active } = self.ability;
-  const ready = cooldown <= 0;
   return (
-    <span className={styles.ability} data-ready={ready} data-active={active}>
-      <img src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(self.characterId)}`} alt="" draggable={false} />
-      {!ready && !active && <span className={styles.cooldown}>{Math.ceil(cooldown)}</span>}
+    <span className={styles.ability}>
+      <AbilityBadge characterId={self.characterId} ability={self.ability} color={self.color} size="fill" />
     </span>
   );
 }

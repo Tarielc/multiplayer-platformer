@@ -3,8 +3,10 @@ import {
   MODE_CONFIG,
   PLAYER_CONFIG,
   abilityForCharacter,
+  fullCooldown,
   ordinal,
   slotStyle,
+  type AbilityId,
   type CharacterId,
   type GameEvent,
   type NetWorldState,
@@ -32,8 +34,22 @@ export interface HudPlayer {
   /** Hearts left (traps cost one) out of `maxHp`. */
   hp: number;
   maxHp: number;
-  /** Special ability: name, seconds until it can be used again (0 = ready), in use now. */
-  ability: { name: string; cooldown: number; active: boolean };
+  /** Special ability: what it is and how far it has recharged. */
+  ability: HudAbility;
+}
+
+export interface HudAbility {
+  name: string;
+  /** Seconds until it can be used again (0 = ready). */
+  cooldown: number;
+  /** Its full cooldown, seconds (a miss restarts it shorter). */
+  full: number;
+  /** 0 (just used) … 1 (ready): `1 - cooldown / full`. */
+  charge: number;
+  /** In use now (giant form, drone flying, a hug or tongue under way). */
+  active: boolean;
+  /** Fruit pickups that recharged it so far this level (a change replays the HUD flash). */
+  refills: number;
 }
 
 export interface Notice {
@@ -76,6 +92,9 @@ export class RoomStore {
   private view: RoomView = INITIAL_VIEW;
   private readonly listeners = new Set<() => void>();
   private hudKey = '';
+  /** Per player: fruit pickups that recharged the special ability (reset with each level run). */
+  private readonly refills = new Map<string, number>();
+  private refillRun = -1;
   private noticeId = 0;
   private readonly unsubscribe: Array<() => void> = [];
 
@@ -127,7 +146,17 @@ export class RoomStore {
   }
 
   private onWorld(update: WorldUpdate): void {
-    for (const event of update.events) this.announceEvent(event);
+    const run = this.view.room?.level?.run ?? -1;
+    if (run !== this.refillRun) {
+      this.refillRun = run;
+      this.refills.clear();
+    }
+    for (const event of update.events) {
+      if (event.type === 'collect' && event.recharged > 0) {
+        this.refills.set(event.playerId, (this.refills.get(event.playerId) ?? 0) + 1);
+      }
+      this.announceEvent(event);
+    }
     this.updateHud(this.view.room, update.state);
   }
 
@@ -185,12 +214,12 @@ export class RoomStore {
         place: s?.place ?? 0,
         hp: s?.hp ?? PLAYER_CONFIG.maxHp,
         maxHp: s?.maxHp ?? PLAYER_CONFIG.maxHp,
-        ability: {
-          name: ABILITY_NAMES[abilityForCharacter(p.characterId)],
-          // Tenths of a second keep HUD updates rare while a cooldown runs.
-          cooldown: Math.ceil((s?.specialCooldown ?? 0) * 10) / 10,
-          active: (s?.phase ?? 0) !== 0 || (s?.giant ?? 0) > 0,
-        },
+        ability: hudAbility(
+          abilityForCharacter(p.characterId),
+          s?.specialCooldown ?? 0,
+          (s?.phase ?? 0) !== 0 || (s?.giant ?? 0) > 0,
+          this.refills.get(p.id) ?? 0,
+        ),
       };
     });
     const key = JSON.stringify(hud);
@@ -203,4 +232,12 @@ export class RoomStore {
     this.view = { ...this.view, ...partial };
     for (const listener of this.listeners) listener();
   }
+}
+
+function hudAbility(ability: AbilityId, specialCooldown: number, active: boolean, refills: number): HudAbility {
+  // Tenths of a second keep HUD updates rare while a cooldown runs.
+  const cooldown = Math.ceil(specialCooldown * 10) / 10;
+  const full = fullCooldown(ability);
+  const charge = full > 0 ? Math.max(0, Math.min(1, 1 - cooldown / full)) : 1;
+  return { name: ABILITY_NAMES[ability], cooldown, full, charge, active, refills };
 }

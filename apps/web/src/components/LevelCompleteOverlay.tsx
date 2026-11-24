@@ -7,12 +7,12 @@ import viewStyles from './GameView.module.css';
 import styles from './Overlays.module.css';
 import { useCountdown } from './useCountdown';
 
-/** Race: placed players first (by place), then everyone else by score. */
+/** Race: placed players first (by place), then everyone else by slot. Fruit doesn't count. */
 function byPlace(a: LevelResult, b: LevelResult): number {
   if (a.place !== null && b.place !== null) return a.place - b.place;
   if (a.place !== null) return -1;
   if (b.place !== null) return 1;
-  return b.score - a.score;
+  return a.slot - b.slot;
 }
 
 export function LevelCompleteOverlay({
@@ -47,10 +47,10 @@ export function LevelCompleteOverlay({
               <th>Player</th>
               {race && <th>Place</th>}
               {race && <th>Time</th>}
-              <th>Score</th>
-              <th>Items</th>
+              {!race && <th>Score</th>}
+              {!race && <th>Items</th>}
               <th>Deaths</th>
-              {race && <th>Place pts</th>}
+              {race && <th>Points</th>}
               <th>Total</th>
             </tr>
           </thead>
@@ -67,11 +67,11 @@ export function LevelCompleteOverlay({
                   </td>
                   {race && <td className={styles.place}>{r.place !== null ? ordinal(r.place) : '–'}</td>}
                   {race && <td>{r.timeMs !== null ? formatRaceTime(r.timeMs) : 'DNF'}</td>}
-                  <td>{r.score}</td>
-                  <td>{r.collected}</td>
+                  {!race && <td>{r.score}</td>}
+                  {!race && <td>{r.collected}</td>}
                   <td>{r.deaths}</td>
                   {race && <td>{r.placePoints > 0 ? `+${r.placePoints}` : 0}</td>}
-                  <td>{totals.get(r.playerId) ?? r.score + r.placePoints}</td>
+                  <td>{totals.get(r.playerId) ?? (race ? r.placePoints : r.score)}</td>
                 </tr>
               );
             })}

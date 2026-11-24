@@ -118,6 +118,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
+| `abilities.ts` | special abilities: timings, reach, damage, cooldowns, and `fruitRecharge` (see [Special abilities](#special-abilities)) |
 | `modes.ts` | game modes (co-op, race): checkpoint scope, shoves, friendly damage, the race finish window and placement points |
 | `traps.ts` | trap damage, knockback and invulnerability; per-trap sizes, speeds and timings (see [Traps and health](#traps-and-health)) |
 | `net.ts` | tick and snapshot rates, interpolation delay, input queue limits, room timers, reconnect and rate limits |
@@ -142,7 +143,7 @@ The host picks a mode in the lobby; it applies to the whole campaign. Solo play 
 | Checkpoints | Shared: one touch moves everyone's respawn point | Your own |
 | Other players | Swings shove, but nothing costs a teammate hearts | Swings shove; giant swings and spit cost hearts |
 | End of level | When every player stands in the trophy | When everyone has finished, or 20 s after the first finish |
-| Score | Fruit and foes, with a team total | Fruit and foes, plus placement points (1st 300, 2nd 200, 3rd 100, 4th 50) |
+| Score | Fruit and foes, with a team total | Placement points only (1st 300, 2nd 200, 3rd 100, 4th 50); fruit and foes don't count |
 | Foes | Tougher for every extra player (below) | As tuned |
 
 In a race, a player who reaches the trophy gets a place and leaves play, and their camera follows a player still racing. The HUD shows places and the time left. The rules are in `packages/shared/src/config/modes.ts`.
@@ -155,6 +156,19 @@ In co-op, each player after the first gives foes **+40% health** (bosses **+60%*
 | 2 | 1 | 3 | 4 | 19 | ×1.15 |
 | 3 | 2 | 4 | 5 | 26 | ×1.3 |
 | 4 | 2 | 4 | 7 | 34 | ×1.45 |
+
+### Special abilities
+
+Each character has one special ability. Its cooldown is ranked by how strong the ability is:
+
+| Character | Ability | Cooldown | After a miss |
+|---|---|---|---|
+| Mask Dude | Giant Form: 10 s of armour, damaging swings and 2 bonus hearts | 30 s | – |
+| Virtual Guy | Claw Drone: 15 s of flight that carries players, boxes and foes | 22 s | – |
+| Ninja Frog | Tongue Spit: grab, hold and spit a damaging projectile | 15 s | 3 s |
+| Bunny Man | Healing Hug: heals 2 hearts, plus 1 for the healer | 12 s | 3 s |
+
+**Fruit recharges abilities.** Each point of a pickup takes 1% of the ability's full cooldown off: an apple, strawberry or coin (10 pts) 10%, a pineapple 20%, a melon or gem (50 pts) half. This works in both modes, so fruit still matters in a race. The HUD shows your ability as a large badge in the bottom-left corner, and each player's chip shows a smaller one. The ring around the icon fills as it recharges, glows when it is ready, and flashes when fruit tops it up.
 
 ### Traps and health
 

@@ -136,29 +136,6 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 62%;
-  height: 62%;
-}
-
-.ability img {
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-  pointer-events: none;
-}
-
-.ability[data-ready='false'] img {
-  filter: grayscale(1) brightness(0.55);
-}
-
-.cooldown {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-family: var(--mono);
-  font-size: clamp(0.8rem, 3.5vmin, 1.1rem);
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 1px 2px #000;
+  width: 70%;
+  height: 70%;
 }

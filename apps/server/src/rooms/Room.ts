@@ -17,6 +17,7 @@ import {
   modeWorldOptions,
   msToTicks,
   pickFreeCharacter,
+  campaignPoints,
   racePoints,
   sanitizePlayerName,
   ticksToMs,
@@ -449,7 +450,7 @@ export class Room {
       const player = this.players.get(wp.id);
       const place = wp.place > 0 ? wp.place : null;
       const placePoints = racePoints(place, this.mode);
-      if (player) player.campaignScore += wp.score + placePoints;
+      if (player) player.campaignScore += campaignPoints(this.mode, wp.score, place);
       return {
         playerId: wp.id,
         name: player?.name ?? 'Player',

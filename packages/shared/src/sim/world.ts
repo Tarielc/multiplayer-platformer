@@ -1,4 +1,4 @@
-import { ABILITIES, Ability, Held, abilityForCharacter, type AbilityId, type CompiledAbilities } from '../config/abilities';
+import { ABILITIES, Ability, Held, abilityForCharacter, fullCooldown, type AbilityId, type CompiledAbilities } from '../config/abilities';
 import type { CharacterId } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
@@ -278,6 +278,20 @@ export class GameWorld {
     return this.ctx.abilities ?? ABILITIES;
   }
 
+  /**
+   * Fruit recharges the special ability while it cools down: `value` points take
+   * `fruitRecharge.perPoint × value` of its full cooldown off. Returns the seconds taken off
+   * (0 when it was ready, or in use: giant form and the drone run with no cooldown).
+   */
+  private rechargeSpecial(player: WorldPlayer, value: number): number {
+    const body = player.body;
+    if (body.specialCooldown <= 0) return 0;
+    const c = this.abilityTuning;
+    const cut = Math.min(body.specialCooldown, c.fruitRecharge.perPoint * value * fullCooldown(body.ability, c));
+    body.specialCooldown -= cut;
+    return Math.round(cut * 1000) / 1000;
+  }
+
   setPresent(id: string, present: boolean): void {
     const player = this.players.get(id);
     if (player) player.present = present;
@@ -503,7 +517,8 @@ export class GameWorld {
       this.collected.add(item.id);
       player.score += item.value;
       player.collected += 1;
-      this.events.push({ type: 'collect', playerId: player.id, entityId: item.id, kind: item.kind, value: item.value });
+      const recharged = this.rechargeSpecial(player, item.value);
+      this.events.push({ type: 'collect', playerId: player.id, entityId: item.id, kind: item.kind, value: item.value, recharged });
     }
     for (const zone of this.level.checkpoints) {
       if (rectsOverlap(box, zone)) this.activateCheckpoint(player, zone);

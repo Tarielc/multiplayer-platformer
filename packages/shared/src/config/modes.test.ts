@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FOE_KINDS, FOE_TUNING, type FoeTuning } from './foes';
-import { MODE_CONFIG, modeFoes, modeWorldOptions, scaleFoes, scalingSummary, type CoopScaling } from './modes';
+import { MODE_CONFIG, campaignPoints, modeFoes, racePoints, modeWorldOptions, scaleFoes, scalingSummary, type CoopScaling } from './modes';
 
 const SCALING: CoopScaling = { foeHpPerPlayer: 0.4, bossHpPerPlayer: 0.6, attackRatePerPlayer: 0.25 };
 
@@ -73,5 +73,14 @@ describe('co-op scaling', () => {
   it('sums the scaling up in one line', () => {
     expect(MODE_CONFIG.coop.scaling).not.toBeNull();
     expect(scalingSummary('coop', 3)).toMatch(/^Foes scaled for 3 players: \d+% more health \(boss \d+%\), attacks \d+% more often\.$/);
+  });
+});
+
+describe('campaign points', () => {
+  it('co-op counts the level score; a race only the place', () => {
+    expect(campaignPoints('coop', 250, null)).toBe(250);
+    expect(campaignPoints('race', 250, 1)).toBe(racePoints(1));
+    expect(campaignPoints('race', 900, 2)).toBeLessThan(campaignPoints('race', 0, 1));
+    expect(campaignPoints('race', 900, null)).toBe(0);
   });
 });

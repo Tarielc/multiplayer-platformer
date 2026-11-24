@@ -191,6 +191,12 @@ export interface AbilityTuning {
     knockbackX: number;
     knockbackY: number;
   };
+  /**
+   * Picking up fruit (any collectible) recharges a special ability that is cooling down: each
+   * point of the pickup's value takes `perPoint` of the ability's full cooldown off (an apple,
+   * 10 pts, 10%; a melon, 50 pts, half).
+   */
+  fruitRecharge: { perPoint: number };
 }
 
 export const ABILITY_TUNING: Readonly<AbilityTuning> = {
@@ -215,8 +221,9 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
       [700, 15, 0],
       [870, 20, 0],
     ],
-    cooldownMs: 6000,
-    missCooldownMs: 1500,
+    // Support: heals 2 hearts (and 1 for the healer).
+    cooldownMs: 12000,
+    missCooldownMs: 3000,
     afterglowMs: 600,
   },
   drone: {
@@ -229,7 +236,8 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     returnMs: 300,
     catchMs: 420,
     standMs: 370,
-    cooldownMs: 5000,
+    // 15 s of flight that carries players, boxes and foes.
+    cooldownMs: 22000,
     acceleration: 900,
     deceleration: 700,
     maxSpeed: 160,
@@ -243,7 +251,8 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     growMs: 680,
     durationMs: 10000,
     shrinkMs: 540,
-    cooldownMs: 12000,
+    // The strongest: 10 s of armour, damaging swings and 2 bonus hearts.
+    cooldownMs: 30000,
     bonusHp: 2,
     swingDamage: 1,
     reachMultiplier: 1.5,
@@ -263,14 +272,16 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     spitRecoverMs: 120,
     spitSpeed: 460,
     flightMs: 650,
-    missCooldownMs: 1200,
-    spitCooldownMs: 4000,
+    missCooldownMs: 3000,
+    // Grab, hold and a damaging spit.
+    spitCooldownMs: 15000,
     mouth: { x: 9, y: -14 },
     tipRadius: 7,
     damage: 1,
     knockbackX: 300,
     knockbackY: 220,
   },
+  fruitRecharge: { perPoint: 0.01 },
 };
 
 /** Ability values in simulation units (seconds, px, px/s). */
@@ -320,6 +331,7 @@ export interface CompiledAbilities {
     missCooldown: number;
     spitCooldown: number;
   };
+  fruitRecharge: AbilityTuning['fruitRecharge'];
 }
 
 const s = (ms: number) => ms / 1000;
@@ -330,6 +342,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
   if (heal.maxLength <= 0 || heal.reachSpeed <= 0) throw new Error('AbilityTuning: heal reach speed and length must be > 0');
   if (drone.spawnAtMs > drone.deployMs) throw new Error('AbilityTuning: drone.spawnAtMs must be <= deployMs');
   if (tongue.maxLength <= 0 || tongue.speed <= 0) throw new Error('AbilityTuning: tongue speed and length must be > 0');
+  if (!(t.fruitRecharge.perPoint >= 0)) throw new Error('AbilityTuning: fruitRecharge.perPoint must be >= 0');
   return {
     heal: {
       reachSpeed: heal.reachSpeed,
@@ -402,6 +415,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
       missCooldown: s(tongue.missCooldownMs),
       spitCooldown: s(tongue.spitCooldownMs),
     },
+    fruitRecharge: { ...t.fruitRecharge },
   };
 }
 
@@ -409,4 +423,23 @@ export const ABILITIES: Readonly<CompiledAbilities> = compileAbilities(ABILITY_T
 
 export function abilityForCharacter(id: CharacterId): AbilityId {
   return CHARACTER_ABILITY[id];
+}
+
+/**
+ * An ability's full cooldown in seconds (after a successful use; a miss is shorter): what fruit
+ * recharges a share of, and what the HUD's recharge ring measures against.
+ */
+export function fullCooldown(ability: AbilityId | number, c: Readonly<CompiledAbilities> = ABILITIES): number {
+  switch (ability) {
+    case Ability.HEAL:
+      return c.heal.cooldown;
+    case Ability.DRONE:
+      return c.drone.cooldown;
+    case Ability.GIANT:
+      return c.giant.cooldown;
+    case Ability.TONGUE:
+      return c.tongue.spitCooldown;
+    default:
+      return 0;
+  }
 }

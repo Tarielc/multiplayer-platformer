@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { ABILITIES, Ability, abilityForCharacter, fullCooldown } from '../config/abilities';
+import { CHARACTER_IDS } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { resolveMovement } from '../config/movement';
@@ -95,6 +97,48 @@ describe('GameWorld: collectibles', () => {
     expect(ticks(world, 90, { b: Button.RIGHT }).filter((e) => e.type === 'collect')).toEqual([]);
     expect(world.getPlayer('b')!.score).toBe(0);
     expect(world.toNetState(() => 0).collected).toEqual(world.level.collectibles.map((c) => c.id).sort((x, y) => x - y));
+  });
+});
+
+describe('GameWorld: fruit recharges special abilities', () => {
+  // Coin (10 pts) at (144, 80), gem (50 pts) at (240, 80).
+  const COINS = ['            ', '            ', ' 1  o  g    ', '############'];
+  const share = (points: number) => ABILITIES.fruitRecharge.perPoint * points;
+  const recharges = (events: GameEvent[]) => events.flatMap((e) => (e.type === 'collect' ? [e.recharged] : []));
+
+  it('maps every ability to its full cooldown', () => {
+    expect(fullCooldown(Ability.HEAL)).toBe(ABILITIES.heal.cooldown);
+    expect(fullCooldown(Ability.DRONE)).toBe(ABILITIES.drone.cooldown);
+    expect(fullCooldown(Ability.GIANT)).toBe(ABILITIES.giant.cooldown);
+    expect(fullCooldown(Ability.TONGUE)).toBe(ABILITIES.tongue.spitCooldown);
+    expect(fullCooldown(Ability.NONE)).toBe(0);
+  });
+
+  it('takes a share of the full cooldown off, by the pickup value, for every ability', () => {
+    for (const character of CHARACTER_IDS) {
+      const world = makeWorld(COINS);
+      const a = world.addPlayer('a', 0, character);
+      const full = fullCooldown(abilityForCharacter(character));
+      a.body.specialCooldown = full;
+      const got = recharges(ticks(world, 60, { a: Button.RIGHT }));
+      expect(got).toHaveLength(2);
+      expect(got[0]).toBeCloseTo(share(10) * full, 3); // the coin: 10%
+      expect(got[1]).toBeCloseTo(share(50) * full, 3); // the gem: half
+      // About 1 s went by on its own, on top of the 60% the pickups took off.
+      expect(a.body.specialCooldown).toBeCloseTo(full * (1 - share(60)) - 1, 1);
+    }
+  });
+
+  it('never takes the cooldown below zero, and does nothing once the ability is ready', () => {
+    const world = makeWorld(COINS);
+    const a = world.addPlayer('a', 0, 'mask-dude');
+    a.body.specialCooldown = 0.5;
+    const got = recharges(ticks(world, 60, { a: Button.RIGHT }));
+    // The coin finished it off; the gem found it ready.
+    expect(got[0]).toBeGreaterThan(0);
+    expect(got[0]).toBeLessThanOrEqual(0.5);
+    expect(got[1]).toBe(0);
+    expect(a.body.specialCooldown).toBe(0);
   });
 });
 

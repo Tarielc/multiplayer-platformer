@@ -9,8 +9,8 @@ import { FOE_TUNING, type FoeCommon, type FoeTuning } from './foes';
  *    still shove teammates around, but nothing another player does costs hearts. Foes get
  *    tougher for every player after the first (see `CoopScaling`).
  *  - `race`: first to the trophy. Checkpoints are your own. The first finish starts a short
- *    countdown for everyone else; each finisher gets a place and leaves play. Placement points
- *    plus score (fruit, foes) decide the campaign.
+ *    countdown for everyone else; each finisher gets a place and leaves play. Only placement
+ *    points count for the campaign: fruit and foes score nothing in a race.
  */
 export type GameMode = 'coop' | 'race';
 
@@ -26,7 +26,7 @@ export function isGameMode(value: unknown): value is GameMode {
 export interface RaceRules {
   /** After the first player finishes, everyone else has this long to reach the trophy. */
   finishWindowMs: number;
-  /** Campaign points for 1st, 2nd, … place (on top of the level score). No place: 0. */
+  /** Campaign points for 1st, 2nd, … place; the only points a race gives. No place: 0. */
   placePoints: readonly number[];
 }
 
@@ -79,8 +79,6 @@ export const MODE_CONFIG: Readonly<Record<GameMode, Readonly<ModeConfig>>> = {
     checkpointScope: 'player',
     playerHits: true,
     playerDamage: true,
-    // Fruit is worth 10-50 a piece (a level holds up to ~1700), so places weigh about as much
-    // as a good haul.
     race: { finishWindowMs: 20_000, placePoints: [300, 200, 100, 50] },
     // Rivals share the same foes, so a bigger field doesn't need tougher ones.
     scaling: null,
@@ -155,6 +153,14 @@ export function scalingSummary(mode: GameMode, players: number): string | null {
     `Foes scaled for ${players} players: ${pct(scaling.foeHpPerPlayer)} more health ` +
     `(boss ${pct(scaling.bossHpPerPlayer)}), attacks ${pct(scaling.attackRatePerPlayer)} more often.`
   );
+}
+
+/**
+ * Campaign points for one level: co-op adds the level score (fruit, foes); a race only the
+ * placement points, so the order of arrival alone decides it.
+ */
+export function campaignPoints(mode: GameMode, score: number, place: number | null): number {
+  return MODE_CONFIG[mode].race ? racePoints(place, mode) : score;
 }
 
 /** The `GameWorldOptions` a mode overrides (spread into the options). */

@@ -503,7 +503,8 @@ describe('Room: game modes', () => {
     expect(byId.get(a.id)).toMatchObject({ place: 2, placePoints: racePoints(2), score: 0 });
     expect(byId.get(b.id)!.timeMs).toBeLessThan(byId.get(a.id)!.timeMs!);
     const totals = new Map(room.info().players.map((p) => [p.id, p.campaignScore]));
-    expect(totals.get(b.id)).toBe(10 + racePoints(1));
+    // Only the place counts in a race: B's fruit adds nothing to the campaign.
+    expect(totals.get(b.id)).toBe(racePoints(1));
     expect(totals.get(a.id)).toBe(racePoints(2));
     expect(room.info().raceEndsInMs).toBeNull();
   });

@@ -17,6 +17,7 @@ import { Hud } from './Hud';
 import { LevelCompleteOverlay } from './LevelCompleteOverlay';
 import { PauseMenu } from './PauseMenu';
 import { TouchControls } from './TouchControls';
+import { AbilityButton } from './AbilityBadge';
 import styles from './GameView.module.css';
 
 /**
@@ -85,6 +86,7 @@ export function GameView({ session, view }: { session: GameSession; view: RoomVi
       <div className={styles.stage}>
         <GameCanvas services={services} />
         <Hud view={view} stats={debug ? stats : null} onMenu={() => setMenuOpen(true)} />
+        {room.phase === 'playing' && <AbilityButton self={view.hud.find((p) => p.isSelf)} />}
         {room.phase === 'countdown' && <CountdownOverlay room={room} receivedAt={view.roomReceivedAt} />}
         {room.phase === 'levelComplete' && (
           <LevelCompleteOverlay room={room} receivedAt={view.roomReceivedAt} selfId={view.selfId} />
