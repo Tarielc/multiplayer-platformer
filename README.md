@@ -117,6 +117,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | `players.ts` | max players, slot labels and colors, hitbox, hearts (`maxHp`), respawn delays (`respawnDelaysMs`, `soloMaxRespawnDelayMs`), name rules |
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
+| `fall.ts` | fall damage: `safeDropPx` (free drop), `pxPerHeart` (each further heart), landing stun and invulnerability |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
 | `abilities.ts` | special abilities: timings, reach, damage, cooldowns, `fruitRecharge` and `foeRecharge` (see [Special abilities](#special-abilities)) |
 | `modes.ts` | game modes (co-op, race): checkpoint scope, shoves, friendly damage, the race finish window and placement points |
@@ -176,6 +177,8 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 ### Traps and health
 
 Players have **3 hearts** (`PLAYER_CONFIG.maxHp`), shown in the HUD. Spikes, saws and spike-heads cost one heart, with a stun, a knockback away from the trap and about a second of invulnerability (the player blinks). At 0 hearts the player dies and respawns with full hearts. Lava, pits and being crushed by a rock-head kill outright.
+
+**Long falls hurt.** A drop of more than 16 tiles (256 px, measured from the top of the airtime to the landing) costs a heart, plus one more for every further 8 tiles, so a fall of 32 tiles or more is fatal. A hard landing stuns briefly in place and gives a moment of invulnerability. A double jump, a trampoline or a stomp on the way down breaks the fall, and landings after being carried or thrown by an ability, or after a drone flight, never hurt. Tune it in `FALL_DAMAGE_TUNING` (`config/fall.ts`).
 
 **Respawning takes longer with every death in a level:** 5 s after the first, 10 s after the second, 20 s after the third, then 30 s each time (`PLAYER_CONFIG.respawnDelaysMs`). In co-op with two or more players, a death while every teammate is already waiting to respawn wipes out the team: the level restarts from the start (new run, fruit and foes back, death counts reset), and the scores already earned in the campaign are kept. The count starts over on each new level. Playing alone, the wait never goes past 5 s (`soloMaxRespawnDelayMs`). While you wait, a countdown shows how long is left and what the next death will cost, and the camera follows the lowest-slot teammate still in play.
 

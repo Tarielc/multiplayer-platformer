@@ -2,6 +2,7 @@ import { ABILITY_TUNING } from './abilities';
 import { CHARACTERS } from './characters';
 import { COMBAT_TUNING } from './combat';
 import { ENTITY_CONFIG } from './entities';
+import { FALL_DAMAGE_TUNING } from './fall';
 import { FOE_TUNING } from './foes';
 import { MODE_CONFIG } from './modes';
 import { MOVEMENT_TUNING } from './movement';
@@ -13,6 +14,7 @@ export * from './abilities';
 export * from './characters';
 export * from './combat';
 export * from './entities';
+export * from './fall';
 export * from './foes';
 export * from './modes';
 export * from './movement';
@@ -29,6 +31,7 @@ export const GAME_CONFIG = {
   slots: PLAYER_SLOTS,
   characters: CHARACTERS,
   entities: ENTITY_CONFIG,
+  fallDamage: FALL_DAMAGE_TUNING,
   traps: TRAP_TUNING,
   foes: FOE_TUNING,
   modes: MODE_CONFIG,

@@ -604,6 +604,12 @@ export class LevelScene extends Phaser.Scene {
         // The damage itself shows on the player view (Hurt, blink); spike-heads also squash.
         this.trapViews?.trapHit(event.trapId, event.side);
         break;
+      case 'fallHit':
+        // The hearts lost show on the player view (Hurt, blink); the ground takes the impact.
+        puff(this, event.x, event.y - 2, 0xd9c8a9, 6 + 4 * event.damage);
+        this.presentation.emit('world', { cue: 'thud', x: event.x, y: event.y, isSelf: event.playerId === selfId });
+        if (event.playerId === selfId) this.cameras.main.shake(120 + 60 * event.damage, 0.004 + 0.002 * event.damage);
+        break;
       case 'bounce':
         if (event.playerId !== selfId) this.trapViews?.bounce(event.trapId, false);
         break;

@@ -3,6 +3,7 @@ import { ABILITIES, Ability, abilityForCharacter, fullCooldown } from '../config
 import { CHARACTER_IDS } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
+import { FALL_DAMAGE, fallDamageFor } from '../config/fall';
 import { resolveMovement } from '../config/movement';
 import { modeWorldOptions, type GameMode } from '../config/modes';
 import { msToTicks } from '../config/net';
@@ -226,6 +227,97 @@ describe('GameWorld: deaths and respawns', () => {
     const x = player.body.x;
     ticks(world, 10, { a: Button.RIGHT });
     expect(player.body.x).toBe(x);
+  });
+});
+
+describe('GameWorld: fall damage', () => {
+  // A tall empty shaft (32 px tiles) with the floor's top at y = 23 * 32.
+  const SHAFT = [...Array.from({ length: 22 }, () => '      '), ' 1    ', '######'];
+  const FLOOR = 23 * 32;
+  const { safeDrop, pxPerHeart } = FALL_DAMAGE;
+
+  /** Drops player `a` from `drop` px above the floor; returns the events until they land (or die). */
+  function dropFrom(world: GameWorld, drop: number, buttons: (body: MovementBodyView) => number = () => 0): GameEvent[] {
+    const player = world.getPlayer('a')!;
+    ticks(world, 2); // settle on the floor first, like a real player
+    place(world, 'a', 96, FLOOR - drop);
+    const events: GameEvent[] = [];
+    for (let i = 0; i < 400; i++) {
+      events.push(...tick(world, { a: buttons(player.body) }));
+      if (!player.body.alive || (player.body.grounded && player.body.y + HITBOX.height === FLOOR)) break;
+    }
+    return events;
+  }
+  type MovementBodyView = { y: number; vy: number };
+
+  it('costs nothing within the safe drop', () => {
+    const world = makeWorld(SHAFT);
+    const player = world.addPlayer('a', 0);
+    const events = dropFrom(world, safeDrop - 8);
+    expect(events.filter((e) => e.type === 'fallHit')).toEqual([]);
+    expect(player.hp).toBe(PLAYER_CONFIG.maxHp);
+    expect(player.body.grounded).toBe(true);
+  });
+
+  it('costs a heart past the safe drop, with a short stun and a moment of invulnerability', () => {
+    const world = makeWorld(SHAFT);
+    const player = world.addPlayer('a', 0);
+    const events = dropFrom(world, safeDrop + 32);
+    expect(events).toMatchObject([{ type: 'fallHit', playerId: 'a', damage: 1, hp: PLAYER_CONFIG.maxHp - 1, x: 96, y: FLOOR }]);
+    expect(player.hp).toBe(PLAYER_CONFIG.maxHp - 1);
+    expect(player.body.alive).toBe(true);
+    expect(player.body.hurt).toBeGreaterThan(0);
+    expect(player.invulnUntil).toBeGreaterThan(world.tick);
+    // Standing still afterwards costs nothing more.
+    expect(ticks(world, 30).filter((e) => e.type === 'fallHit')).toEqual([]);
+  });
+
+  it('costs another heart for every further step and kills from high enough', () => {
+    expect([0, safeDrop, safeDrop + 1, safeDrop + pxPerHeart, safeDrop + 2 * pxPerHeart].map((d) => fallDamageFor(d))).toEqual([0, 0, 1, 2, 3]);
+    const world = makeWorld(SHAFT);
+    const player = world.addPlayer('a', 0);
+    world.addPlayer('b', 1); // someone else in the level, so the death isn't the end
+    const events = dropFrom(world, safeDrop + 2 * pxPerHeart + 32);
+    expect(events).toMatchObject([
+      { type: 'fallHit', playerId: 'a', damage: 3, hp: 0 },
+      { type: 'death', playerId: 'a', cause: 'fall' },
+    ]);
+    expect(player.body.alive).toBe(false);
+  });
+
+  it('a double jump near the ground breaks the fall', () => {
+    const world = makeWorld(SHAFT);
+    const player = world.addPlayer('a', 0);
+    let jumped = false;
+    const events = dropFrom(world, safeDrop + 96, (body) => {
+      if (jumped || body.vy <= 0 || FLOOR - (body.y + HITBOX.height) > 64) return 0;
+      jumped = true;
+      return Button.JUMP;
+    });
+    expect(jumped).toBe(true);
+    expect(events.filter((e) => e.type === 'fallHit')).toEqual([]);
+    expect(player.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+
+  it('respawning does not count as a fall', () => {
+    const world = makeWorld(SHAFT);
+    const player = world.addPlayer('a', 0);
+    ticks(world, 2);
+    place(world, 'a', 96, FLOOR - safeDrop - 64);
+    tick(world); // airborne, high up
+    world.killPlayer('a');
+    world.drainEvents();
+    const events = ticks(world, RESPAWN_TICKS + 10);
+    expect(events.filter((e) => e.type === 'fallHit')).toEqual([]);
+    expect(player.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+
+  it('can be turned off', () => {
+    const world = new GameWorld({ level: asciiToLevel({ rows: SHAFT }), movement: resolveMovement(), fallDamage: null });
+    const player = world.addPlayer('a', 0);
+    const events = dropFrom(world, safeDrop + 3 * pxPerHeart);
+    expect(events.filter((e) => e.type === 'fallHit' || e.type === 'death')).toEqual([]);
+    expect(player.hp).toBe(PLAYER_CONFIG.maxHp);
   });
 });
 

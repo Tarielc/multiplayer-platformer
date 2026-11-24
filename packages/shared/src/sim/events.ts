@@ -16,6 +16,8 @@ export type GameEvent =
   | { type: 'finish'; playerId: string; place: number; timeMs: number; x: number; y: number }
   /** A trap cost a heart (`hp` left). `side`: where the player touched it (spike-head squash). */
   | { type: 'trapHit'; playerId: string; trapId: number; hp: number; side: 'up' | 'down' | 'left' | 'right' }
+  /** A long fall cost `damage` hearts on landing (`hp` left); (x, y): where the feet landed. */
+  | { type: 'fallHit'; playerId: string; damage: number; hp: number; x: number; y: number }
   /** A trampoline launched a player. */
   | { type: 'bounce'; playerId: string; trapId: number }
   /** A box was hit (by a swing or something thrown at it); `broken` on the last hit. */

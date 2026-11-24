@@ -2,6 +2,7 @@ import { ABILITIES, Ability, Held, abilityForCharacter, fullCooldown, type Abili
 import type { CharacterId } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
+import { FALL_DAMAGE, fallDamageFor, type CompiledFallDamage } from '../config/fall';
 import { FOE_TUNING, type FoeTuning } from '../config/foes';
 import type { CompiledMovement } from '../config/movement';
 import { msToTicks, TICK_DT } from '../config/net';
@@ -59,6 +60,11 @@ export interface WorldPlayer {
   hp: number;
   /** Traps can't hurt this player before this tick (replicated, so clients can blink them). */
   invulnUntil: number;
+  /**
+   * Server-only fall tracking: the body's `y` at the top of the current airtime (null while on
+   * the ground; `Infinity` after being carried or thrown, so that landing never hurts).
+   */
+  fallFrom: number | null;
   /** Server-only: boxes already hit by the current swing (`boxSwingSeq`), one hit per swing. */
   boxSwingSeq: number;
   swingBoxes: Set<number>;
@@ -101,6 +107,8 @@ export interface GameWorldOptions {
   race?: { finishWindowMs: number } | null;
   /** Co-op: two or more players all dead at once fails the level (`failed`). Default off. */
   teamWipe?: boolean;
+  /** Long falls cost hearts on landing (defaults to `FALL_DAMAGE`). `null`: falls never hurt. */
+  fallDamage?: Readonly<CompiledFallDamage> | null;
 }
 
 /**
@@ -130,6 +138,7 @@ export class GameWorld {
   private foes: FoeField;
   private readonly foeInvulnerabilityTicks: number;
   private readonly playerDamage: boolean;
+  private readonly fallDamage: Readonly<CompiledFallDamage> | null;
   /** Race: ticks between the first finish and the end of the level; `null` outside races. */
   private readonly raceWindowTicks: number | null;
   private finishCount = 0;
@@ -155,6 +164,7 @@ export class GameWorld {
     this.foes = FoeField.forLevel(options.foes === null ? { ...options.level, foes: [] } : options.level, foes, this.ctx.dt);
     this.foeInvulnerabilityTicks = msToTicks(foes.hit.invulnerabilityMs);
     this.playerDamage = options.playerDamage ?? true;
+    this.fallDamage = options.fallDamage === undefined ? FALL_DAMAGE : options.fallDamage;
     this.raceWindowTicks = options.race ? Math.max(1, msToTicks(options.race.finishWindowMs)) : null;
   }
 
@@ -258,6 +268,7 @@ export class GameWorld {
       hitImmuneTicks: 0,
       hp: this.playerConfig.maxHp,
       invulnUntil: 0,
+      fallFrom: null,
       boxSwingSeq: 0,
       swingBoxes: new Set(),
       foeSwingSeq: 0,
@@ -568,6 +579,8 @@ export class GameWorld {
       this.kill(player, 'hazard');
       return;
     }
+    this.trackFall(player, contacts);
+    if (!body.alive) return;
     if (this.ctx.traps) {
       if (contacts.ground >= 0) this.traps.trigger(contacts.ground, this.tick);
       if (contacts.bounced >= 0) this.events.push({ type: 'bounce', playerId: player.id, trapId: contacts.bounced });
@@ -652,6 +665,55 @@ export class GameWorld {
   /** Giants swing further. */
   private reachScale(body: MovementBody): number {
     return giantActive(body) ? this.abilityTuning.giant.reachMultiplier : 1;
+  }
+
+  /**
+   * Follows the player's airtime and, on touchdown, charges for a long fall. The fall starts
+   * where the body last moved upwards, so a double jump, a trampoline or a stomp breaks it.
+   */
+  private trackFall(player: WorldPlayer, contacts: StepContacts): void {
+    const body = player.body;
+    if (body.held !== Held.NONE || body.flight > 0) {
+      // Carried, thrown or flying: the next landing is free.
+      player.fallFrom = Infinity;
+      return;
+    }
+    if (body.grounded) {
+      const from = player.fallFrom;
+      player.fallFrom = null;
+      if (from !== null && contacts.bounced < 0) this.land(player, body.y - from);
+      return;
+    }
+    if (player.fallFrom === null || (body.vy < 0 && player.fallFrom !== Infinity)) player.fallFrom = body.y;
+  }
+
+  /** A landing `drop` px below the top of the airtime: past the safe drop it costs hearts. */
+  private land(player: WorldPlayer, drop: number): void {
+    const cfg = this.fallDamage;
+    if (!cfg) return;
+    const damage = fallDamageFor(drop, cfg);
+    if (damage <= 0) return;
+    const body = player.body;
+    player.hp = Math.max(0, player.hp - damage);
+    this.events.push({
+      type: 'fallHit',
+      playerId: player.id,
+      damage,
+      hp: player.hp,
+      x: body.x + this.ctx.hitbox.width / 2,
+      y: body.y + this.ctx.hitbox.height,
+    });
+    if (player.hp <= 0) {
+      this.kill(player, 'fall');
+      return;
+    }
+    // A hard landing: a short stun where they land (no knockback) and a moment of invulnerability.
+    body.hurt = Math.max(body.hurt, cfg.stun);
+    body.attack = 0;
+    body.vx = 0;
+    body.jumping = false;
+    body.buffer = 0;
+    player.invulnUntil = Math.max(player.invulnUntil, this.tick + cfg.invulnerabilityTicks);
   }
 
   /** First trap hurting the player this tick costs a heart (none while invulnerable or stunned). */
@@ -906,6 +968,7 @@ export class GameWorld {
     player.hitImmuneTicks = 0;
     player.hp = 0;
     player.invulnUntil = 0;
+    player.fallFrom = null;
     player.deaths += 1;
     // The wait grows with every death in the level (5 s, 10 s, 20 s, then 30 s), except alone
     // (nobody else in the level, connected or not): then it stays at the solo cap.
@@ -925,6 +988,7 @@ export class GameWorld {
     resetBody(player.body, player.respawnPoint.x, player.respawnPoint.y, this.ctx.hitbox, this.ctx.movement.airJumps);
     player.respawnTicks = 0;
     player.hp = this.playerConfig.maxHp;
+    player.fallFrom = null;
     player.tp += 1;
     this.events.push({ type: 'respawn', playerId: player.id });
   }

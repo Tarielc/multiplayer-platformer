@@ -243,6 +243,7 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | Drop-through | One-way tiles are ignored for 220 ms after Down + Jump |
 | Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom (`hazardTileHitbox`, tuned for 32 px spike tiles; the terrain tileset has no hazard tiles, so the samples use lava zones) |
 | Kill plane | 96 px below the bottom of the map |
+| Fall damage | Drops of more than 256 px = 16 tiles (8) cost a heart, plus one for every further 128 px = 8 tiles (4); 32 tiles (16) or more is fatal. Measured from the top of the airtime, and a double jump, trampoline or stomp on the way down resets it. Keep required drops within 16 tiles, or give players a trampoline or a ledge to break the fall (`FALL_DAMAGE_TUNING`). |
 | Respawn delay | 5 s, 10 s, 20 s, then 30 s for each further death in the level; always 5 s when playing alone |
 | View | 960×540 px = 60×34 tiles (30×17). Maps smaller than the view are centered. |
 
