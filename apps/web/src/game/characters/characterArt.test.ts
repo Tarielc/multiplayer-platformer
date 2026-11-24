@@ -45,7 +45,7 @@ describe('character art', () => {
   });
 
   it('finishes the death clip before the respawn', () => {
-    expect(clipDurationMs('death')).toBeLessThanOrEqual(PLAYER_CONFIG.respawnDelayMs - 100);
+    expect(clipDurationMs('death')).toBeLessThanOrEqual(Math.min(...PLAYER_CONFIG.respawnDelaysMs) - 100);
   });
 
   it('only declares frame events on existing frames', () => {

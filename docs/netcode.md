@@ -47,7 +47,7 @@ Players are not lockstepped. A laggy player's frames are applied whenever they a
 
 ## Snapshots and deltas
 
-The world state is small: `{ tick, players[], collected[], traps[] }`. Each player carries the full movement state (position, velocity, timers, flags, and `stepTick`, the tick of its last step) plus `alive`, `respawnIn`, `score`, `deaths`, `atExit`, `checkpointId`, `tp`, `ack`, and `hp`/`invulnUntil` (hearts, and the tick until which traps can't hurt it). `traps` lists only traps that differ from their initial state (see [Traps](#traps)). Every field the simulation needs travels with it, so a client can resume the simulation from any state.
+The world state is small: `{ tick, players[], collected[], traps[] }`. Each player carries the full movement state (position, velocity, timers, flags, and `stepTick`, the tick of its last step) plus `alive`, `respawnIn` (ticks; it grows with each death in the level, `respawnDelayMs`), `score`, `deaths`, `atExit`, `checkpointId`, `tp`, `ack`, and `hp`/`invulnUntil` (hearts, and the tick until which traps can't hurt it). `traps` lists only traps that differ from their initial state (see [Traps](#traps)). Every field the simulation needs travels with it, so a client can resume the simulation from any state.
 
 - **Keyframe:** `snapshot` carries the full state. It is sent at the start of each level, then every 60th broadcast (every 3 s). A player who joins or rejoins mid-level receives the last broadcast state, so they share the same delta base as everyone else. A client can also request one with `resync`.
 - **Delta:** `delta` holds only what changed since the previous broadcast (`baseTick`):

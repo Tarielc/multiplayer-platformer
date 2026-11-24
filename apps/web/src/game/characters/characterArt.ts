@@ -55,7 +55,7 @@ export const CLIPS: Readonly<Record<ClipName, ClipDef>> = {
   jump: { row: 3, frames: 4, frameRate: 14, loop: false },
   fall: { row: 4, frames: 3, frameRate: 12, loop: true, loopFrom: 1 },
   hurt: { row: 5, frames: 4, durationMs: COMBAT_TUNING.hurt.stunMs, loop: false },
-  // Must finish before the respawn (PLAYER_CONFIG.respawnDelayMs); a test checks this.
+  // Must finish before the respawn (the shortest of PLAYER_CONFIG.respawnDelaysMs); a test checks this.
   death: { row: 6, frames: 10, durationMs: 750, loop: false },
 };
 

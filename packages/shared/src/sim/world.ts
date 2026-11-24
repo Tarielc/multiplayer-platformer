@@ -5,7 +5,7 @@ import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { FOE_TUNING, type FoeTuning } from '../config/foes';
 import type { CompiledMovement } from '../config/movement';
 import { msToTicks, TICK_DT } from '../config/net';
-import { PLAYER_CONFIG, type PlayerConfig } from '../config/players';
+import { PLAYER_CONFIG, respawnDelayMs, type PlayerConfig } from '../config/players';
 import { TRAP_CONFIG, type CompiledTraps } from '../config/traps';
 import { CellFlag, type LevelData, type LevelZone } from '../level/types';
 import type { NetPlayerState, NetWorldState } from '../protocol/state';
@@ -116,7 +116,7 @@ export class GameWorld {
   private readonly ctx: MovementContext;
   private readonly playerConfig: Readonly<PlayerConfig>;
   private readonly entityConfig: Readonly<EntityConfig>;
-  private readonly respawnDelayTicks: number;
+
   private readonly players = new Map<string, WorldPlayer>();
   private readonly collected = new Set<number>();
   private teamCheckpoint: LevelZone | null = null;
@@ -147,7 +147,6 @@ export class GameWorld {
       platforms: { platformsFor: (body) => this.decksFor(body) },
     };
     this.abilities = new AbilitySystem(this.abilityHost());
-    this.respawnDelayTicks = Math.max(1, msToTicks(this.playerConfig.respawnDelayMs));
     const foes = options.foes ?? FOE_TUNING;
     this.foes = FoeField.forLevel(options.foes === null ? { ...options.level, foes: [] } : options.level, foes, this.ctx.dt);
     this.foeInvulnerabilityTicks = msToTicks(foes.hit.invulnerabilityMs);
@@ -873,8 +872,11 @@ export class GameWorld {
     player.hitImmuneTicks = 0;
     player.hp = 0;
     player.invulnUntil = 0;
-    player.respawnTicks = this.respawnDelayTicks;
     player.deaths += 1;
+    // The wait grows with every death in the level (5 s, 10 s, 20 s, then 30 s), except alone
+    // (nobody else in the level, connected or not): then it stays at the solo cap.
+    const solo = this.players.size === 1;
+    player.respawnTicks = Math.max(1, msToTicks(respawnDelayMs(player.deaths, solo, this.playerConfig)));
     player.atExit = false;
     this.events.push({
       type: 'death',

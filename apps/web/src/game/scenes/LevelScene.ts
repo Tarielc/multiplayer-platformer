@@ -361,8 +361,9 @@ export class LevelScene extends Phaser.Scene {
       const preview =
         ability === Ability.TONGUE ? (aim ?? (body.phase === Phase.TONGUE_HOLD ? ahead : null)) : ability === Ability.HEAL ? aim : null;
       local.render(feetX, feetY, body.facing, signals, frameMs, preview);
-      // Race: once you finished, watch someone still racing.
-      this.follow((local.isFinished ? this.spectateTarget(samples) : null) ?? local.droneTarget ?? local.container);
+      // Race: once you finished, watch someone still racing; dead, watch a teammate until you respawn.
+      const spectating = local.isFinished || !body.alive;
+      this.follow((spectating ? this.spectateTarget(samples) : null) ?? local.droneTarget ?? local.container);
       if (!this.cameraSnapped) {
         this.cameras.main.centerOn(local.container.x, local.container.y);
         this.cameraSnapped = true;
@@ -488,7 +489,7 @@ export class LevelScene extends Phaser.Scene {
     return view;
   }
 
-  /** Race spectating: the lowest-slot player still racing (or their drone), if any. */
+  /** Who to watch while out of play: the lowest-slot other player alive and still in the level (or their drone), if any. */
   private spectateTarget(samples: ReadonlyMap<string, RemoteSample>): (Phaser.GameObjects.GameObject & { x: number; y: number }) | null {
     const { client } = this.services;
     const players = [...(client.room?.players ?? [])].sort((a, b) => a.slot - b.slot);
@@ -496,7 +497,7 @@ export class LevelScene extends Phaser.Scene {
       if (player.id === client.playerId) continue;
       const view = this.views.get(player.id);
       const sample = samples.get(player.id);
-      if (view && sample && sample.place === 0) return view.droneTarget ?? view.container;
+      if (view && sample && sample.alive && sample.place === 0) return view.droneTarget ?? view.container;
     }
     return null;
   }

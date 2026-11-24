@@ -8,7 +8,8 @@
 .resultsHead,
 .resultsBody,
 .resultsFoot,
-.countdown > * {
+.countdown > *,
+.respawn > * {
   zoom: clamp(0.7, var(--k, 1), 1.25);
 }
 
@@ -18,7 +19,8 @@
   .resultsHead,
   .resultsBody,
   .resultsFoot,
-  .countdown > * {
+  .countdown > *,
+  .respawn > * {
     zoom: clamp(0.8, var(--k, 1), 1.25);
   }
 }
@@ -105,6 +107,57 @@
   from {
     transform: scale(1.5);
   }
+}
+
+/* =========================== respawn =========================== */
+
+/* Dead: a countdown in the middle of the stage, lighter than the level countdown so the
+   teammate the camera follows stays easy to watch. */
+.respawn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgb(5 11 8 / 40%), rgb(5 11 8 / 0%) 60%);
+}
+
+.respawnTag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 12px;
+  background: var(--ember);
+  color: var(--night);
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.respawnLabel,
+.respawnLine,
+.respawnHint {
+  font-family: var(--ui);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.respawnHint {
+  color: var(--lichen);
+}
+
+.respawnNumber {
+  font-family: var(--display);
+  font-size: 120px;
+  line-height: 0.85;
+  color: var(--bone);
+  animation: pop 420ms steps(5);
 }
 
 /* =========================== pause menu =========================== */
@@ -643,7 +696,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .number {
+  .number,
+  .respawnNumber {
     animation: none;
   }
 }

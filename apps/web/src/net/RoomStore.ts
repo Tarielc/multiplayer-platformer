@@ -2,6 +2,7 @@ import {
   ABILITY_NAMES,
   MODE_CONFIG,
   PLAYER_CONFIG,
+  TICK_DT,
   abilityForCharacter,
   fullCooldown,
   ordinal,
@@ -28,6 +29,8 @@ export interface HudPlayer {
   score: number;
   deaths: number;
   alive: boolean;
+  /** Whole seconds until a dead player respawns (0: alive, or out of play after finishing). */
+  respawnIn: number;
   atExit: boolean;
   /** Race: finishing place (1-based) once at the trophy; 0 while racing (and in co-op). */
   place: number;
@@ -210,6 +213,7 @@ export class RoomStore {
         score: s?.score ?? 0,
         deaths: s?.deaths ?? 0,
         alive: s?.alive ?? true,
+        respawnIn: s && !s.alive && s.place === 0 ? Math.ceil(s.respawnIn * TICK_DT) : 0,
         atExit: s?.atExit ?? false,
         place: s?.place ?? 0,
         hp: s?.hp ?? PLAYER_CONFIG.maxHp,

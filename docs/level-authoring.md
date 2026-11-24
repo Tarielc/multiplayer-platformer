@@ -219,7 +219,7 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | Drop-through | One-way tiles are ignored for 220 ms after Down + Jump |
 | Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom (`hazardTileHitbox`, tuned for 32 px spike tiles; the terrain tileset has no hazard tiles, so the samples use lava zones) |
 | Kill plane | 96 px below the bottom of the map |
-| Respawn delay | 0.9 s |
+| Respawn delay | 5 s, 10 s, 20 s, then 30 s for each further death in the level; always 5 s when playing alone |
 | View | 960×540 px = 60×34 tiles (30×17). Maps smaller than the view are centered. |
 
 A spot meant to be reachable only with a trampoline or a fan has to be out of double-jump reach (more than 12 tiles up, or 16 across). Otherwise, set `tuning: { airJumps: 0 }` on the level in the manifest to turn the double jump off there.

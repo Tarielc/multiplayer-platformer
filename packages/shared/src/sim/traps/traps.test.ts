@@ -17,7 +17,7 @@ import { TrapField } from './TrapField';
 import type { TrapOf } from './types';
 
 const HITBOX = PLAYER_CONFIG.hitbox;
-const RESPAWN_TICKS = msToTicks(PLAYER_CONFIG.respawnDelayMs);
+const RESPAWN_TICKS = msToTicks(PLAYER_CONFIG.respawnDelaysMs[0]!);
 
 /** 32 px debug tiles: open sky, spawn at (48, 160), floor top at y = 160. */
 const FLOOR = ['                    ', '                    ', '                    ', '                    ', ' 1                  ', '####################'];

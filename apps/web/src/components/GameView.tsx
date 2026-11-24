@@ -12,6 +12,7 @@ import { DEFAULT_ASSET_BASE, type GameServices } from '@/game/services';
 import type { GameSession } from '@/hooks/useGameSession';
 import type { RoomView } from '@/net/RoomStore';
 import { CountdownOverlay } from './CountdownOverlay';
+import { RespawnOverlay } from './RespawnOverlay';
 import { GameCanvas } from './GameCanvas';
 import { Hud } from './Hud';
 import { LevelCompleteOverlay } from './LevelCompleteOverlay';
@@ -105,6 +106,7 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
         <GameCanvas services={services} />
         <Hud view={view} stats={debug ? stats : null} onMenu={() => setMenuOpen(true)} />
         {room.phase === 'playing' && <AbilityButton self={view.hud.find((p) => p.isSelf)} />}
+        {room.phase === 'playing' && <RespawnOverlay players={view.hud} />}
         {room.phase === 'countdown' && <CountdownOverlay room={room} receivedAt={view.roomReceivedAt} />}
         {room.phase === 'levelComplete' && (
           <LevelCompleteOverlay room={room} receivedAt={view.roomReceivedAt} selfId={view.selfId} />

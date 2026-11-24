@@ -114,7 +114,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | File | Contents |
 |---|---|
 | `movement.ts` | `jumpHeight` + `timeToApex` (gravity and jump velocity are derived; a held jump peaks at exactly `jumpHeight`), fall multiplier, run speed, ground/air acceleration and deceleration, turn boost, jump cut (variable jump), air jumps (`airJumps` count and `airJumpHeight`; 0 turns the double jump off), coyote time, jump buffer, drop-through time |
-| `players.ts` | max players, slot labels and colors, hitbox, hearts (`maxHp`), respawn delay, name rules |
+| `players.ts` | max players, slot labels and colors, hitbox, hearts (`maxHp`), respawn delays (`respawnDelaysMs`, `soloMaxRespawnDelayMs`), name rules |
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
@@ -175,6 +175,8 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 ### Traps and health
 
 Players have **3 hearts** (`PLAYER_CONFIG.maxHp`), shown in the HUD. Spikes, saws and spike-heads cost one heart, with a stun, a knockback away from the trap and about a second of invulnerability (the player blinks). At 0 hearts the player dies and respawns with full hearts. Lava, pits and being crushed by a rock-head kill outright.
+
+**Respawning takes longer with every death in a level:** 5 s after the first, 10 s after the second, 20 s after the third, then 30 s each time (`PLAYER_CONFIG.respawnDelaysMs`). The count starts over on each new level. Playing alone, the wait never goes past 5 s (`soloMaxRespawnDelayMs`). While you wait, a countdown shows how long is left and what the next death will cost, and the camera follows the lowest-slot teammate still in play.
 
 | Trap | Behaviour | Sheet (`packages/shared/data/sprites/traps/`) |
 |---|---|---|

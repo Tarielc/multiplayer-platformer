@@ -6,14 +6,14 @@ import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { resolveMovement } from '../config/movement';
 import { modeWorldOptions } from '../config/modes';
 import { msToTicks } from '../config/net';
-import { PLAYER_CONFIG } from '../config/players';
+import { PLAYER_CONFIG, respawnDelayMs } from '../config/players';
 import { asciiToLevel } from '../dev/asciiMap';
 import type { GameEvent } from './events';
 import { Button } from './input';
 import { GameWorld } from './world';
 
 const HITBOX = PLAYER_CONFIG.hitbox;
-const RESPAWN_TICKS = msToTicks(PLAYER_CONFIG.respawnDelayMs);
+const RESPAWN_TICKS = msToTicks(PLAYER_CONFIG.respawnDelaysMs[0]!);
 
 function makeWorld(rows: string[], entities: Partial<EntityConfig> = {}, combat?: CompiledCombat): GameWorld {
   return new GameWorld({
@@ -185,6 +185,40 @@ describe('GameWorld: deaths and respawns', () => {
     expect(player.body.y + HITBOX.height).toBe(spawn.y);
   });
 
+  it('waits longer after each death in the level: 5 s, 10 s, 20 s, then 30 s', () => {
+    expect(PLAYER_CONFIG.respawnDelaysMs).toEqual([5000, 10000, 20000, 30000]);
+    const world = makeWorld(HAZARDS);
+    const player = world.addPlayer('a', 0);
+    world.addPlayer('b', 1);
+    for (const seconds of [5, 10, 20, 30, 30]) {
+      world.killPlayer('a', 'dev');
+      world.drainEvents();
+      expect(world.toNetState(() => 0).players[0]!.respawnIn).toBe(msToTicks(seconds * 1000));
+      expect(ticks(world, msToTicks(seconds * 1000) - 1)).toEqual([]);
+      expect(player.body.alive).toBe(false);
+      expect(tick(world)).toEqual([{ type: 'respawn', playerId: 'a' }]);
+    }
+    expect(player.deaths).toBe(5);
+  });
+
+  it('respawnDelayMs picks the delay for the nth death, capped when solo', () => {
+    expect([1, 2, 3, 4, 5, 12].map((n) => respawnDelayMs(n))).toEqual([5000, 10000, 20000, 30000, 30000, 30000]);
+    expect([1, 2, 3, 4].map((n) => respawnDelayMs(n, true))).toEqual([5000, 5000, 5000, 5000]);
+  });
+
+  it('never waits longer than 5 s when playing alone', () => {
+    expect(PLAYER_CONFIG.soloMaxRespawnDelayMs).toBe(5000);
+    const world = makeWorld(HAZARDS);
+    const player = world.addPlayer('a', 0);
+    for (let i = 0; i < 4; i++) {
+      world.killPlayer('a', 'dev');
+      world.drainEvents();
+      expect(world.toNetState(() => 0).players[0]!.respawnIn).toBe(msToTicks(5000));
+      ticks(world, msToTicks(5000));
+      expect(player.body.alive).toBe(true);
+    }
+  });
+
   it('ignores input while dead', () => {
     const world = makeWorld(HAZARDS);
     const player = world.addPlayer('a', 0);
@@ -322,9 +356,10 @@ describe('GameWorld: race', () => {
     expect(world.completed).toBe(false);
     expect(world.raceEndsInTicks).toBe(msToTicks(2000) - 1);
 
-    // Finished players never respawn and don't count as deaths.
-    const later = ticks(world, RESPAWN_TICKS + 5);
+    // Finished players never respawn (no respawn timer) and don't count as deaths.
+    const later = ticks(world, msToTicks(1500));
     expect(later.some((e) => e.type === 'respawn')).toBe(false);
+    expect(world.toNetState(() => 0).players[0]!.respawnIn).toBe(0);
     expect(a.body.alive).toBe(false);
     expect(a.deaths).toBe(0);
 
