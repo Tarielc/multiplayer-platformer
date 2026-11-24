@@ -18,6 +18,8 @@ export type GameEvent =
   | { type: 'trapHit'; playerId: string; trapId: number; hp: number; side: 'up' | 'down' | 'left' | 'right' }
   /** A long fall cost `damage` hearts on landing (`hp` left); (x, y): where the feet landed. */
   | { type: 'fallHit'; playerId: string; damage: number; hp: number; x: number; y: number }
+  /** A falling box landed on a player (`by`: who dropped it, '' nobody), costing hearts (`hp` left). */
+  | { type: 'crateHit'; playerId: string; by: string; hp: number; x: number; y: number }
   /** A trampoline launched a player. */
   | { type: 'bounce'; playerId: string; trapId: number }
   /** A box was hit (by a swing or something thrown at it); `broken` on the last hit. */
@@ -37,8 +39,10 @@ export type GameEvent =
   /** A foe (or its stinger / banana) cost a player a heart (`hp` left). */
   | { type: 'foeHit'; playerId: string; foeId: number; hp: number; x: number; y: number }
   /**
-   * A player hurt a foe: a swing, a stomp (`stomp`), or something the frog spat (`spit`; the
-   * frog is `playerId`, '' if they left). `hp` 0: it is beaten, and `score` points went to that player;
+   * A player hurt a foe: a swing, a stomp (`stomp`), something the frog spat (`spit`; the
+   * frog is `playerId`, '' if they left), a long fall (`fall`; `playerId` dropped it, '' nobody),
+   * a box falling on it (`crush`; `playerId` dropped the box) or a foe falling on it (`squash`;
+   * `playerId` dropped that foe). `hp` 0: it is beaten, and `score` points went to that player;
    * `recharged`: the seconds that took off their special cooldown (0: none).
    * `blocked`: its armour took the hit (the rhino boss, unless dazed), `hp` unchanged.
    */
@@ -51,6 +55,9 @@ export type GameEvent =
       blocked: boolean;
       stomp: boolean;
       spit: boolean;
+      fall: boolean;
+      crush: boolean;
+      squash: boolean;
       score: number;
       recharged: number;
       x: number;

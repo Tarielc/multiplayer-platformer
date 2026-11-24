@@ -610,6 +610,12 @@ export class LevelScene extends Phaser.Scene {
         this.presentation.emit('world', { cue: 'thud', x: event.x, y: event.y, isSelf: event.playerId === selfId });
         if (event.playerId === selfId) this.cameras.main.shake(120 + 60 * event.damage, 0.004 + 0.002 * event.damage);
         break;
+      case 'crateHit':
+        // A falling box on the head: the hearts show on the player view; splinters and a knock here.
+        puff(this, event.x, event.y, 0xc8955a, 10);
+        this.presentation.emit('world', { cue: 'boxHit', x: event.x, y: event.y, isSelf: event.playerId === selfId || event.by === selfId });
+        if (event.playerId === selfId) this.cameras.main.shake(160, 0.006);
+        break;
       case 'bounce':
         if (event.playerId !== selfId) this.trapViews?.bounce(event.trapId, false);
         break;
@@ -670,6 +676,12 @@ export class LevelScene extends Phaser.Scene {
         if (event.spit) playFx(this, ABILITY_SHEETS.spitFx.key, 'impact', event.x, event.y, { depth: VIEW_CONFIG.depth.effects });
         else puff(this, event.x, event.y, beaten ? 0xfff1c1 : 0xffffff, beaten ? 12 : 7);
         if (event.stomp) this.presentation.emit('world', { cue: 'stomp', x: event.x, y: event.y, isSelf });
+        // A hard landing, or a box or another foe on the head: a thud and dust.
+        if (event.fall || event.crush || event.squash) {
+          puff(this, event.x, event.y, 0xd9c8a9, 8);
+          const cue = event.crush ? 'boxHit' : event.squash ? 'stomp' : 'thud';
+          this.presentation.emit('world', { cue, x: event.x, y: event.y, isSelf });
+        }
         this.presentation.emit('world', { cue: beaten ? 'foeDefeat' : event.spit ? 'splat' : 'hit', x: event.x, y: event.y, isSelf });
         if (beaten && event.score > 0) floatText(this, event.x, event.y - 12, `+${event.score}`, this.slotCss(event.playerId));
         if (isSelf) this.cameras.main.shake(80, beaten ? 0.003 : 0.002);

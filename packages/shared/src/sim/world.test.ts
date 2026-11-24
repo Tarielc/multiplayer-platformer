@@ -234,7 +234,7 @@ describe('GameWorld: fall damage', () => {
   // A tall empty shaft (32 px tiles) with the floor's top at y = 23 * 32.
   const SHAFT = [...Array.from({ length: 22 }, () => '      '), ' 1    ', '######'];
   const FLOOR = 23 * 32;
-  const { safeDrop, pxPerHeart } = FALL_DAMAGE;
+  const { safeDrop, step: pxPerHeart } = FALL_DAMAGE.players;
 
   /** Drops player `a` from `drop` px above the floor; returns the events until they land (or die). */
   function dropFrom(world: GameWorld, drop: number, buttons: (body: MovementBodyView) => number = () => 0): GameEvent[] {

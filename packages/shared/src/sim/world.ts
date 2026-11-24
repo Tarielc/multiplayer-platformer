@@ -1,4 +1,4 @@
-import { ABILITIES, Ability, Held, abilityForCharacter, fullCooldown, type AbilityId, type CompiledAbilities } from '../config/abilities';
+import { ABILITIES, Ability, Cargo, Held, abilityForCharacter, fullCooldown, type AbilityId, type CompiledAbilities } from '../config/abilities';
 import type { CharacterId } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
@@ -16,7 +16,7 @@ import type { DeathCause, GameEvent } from './events';
 import { droneDeck, giantActive } from './abilities';
 import { AbilitySystem, cloneAbilityPlayerState, newAbilityPlayerState, type AbilityHit, type AbilityPlayerState } from './abilitySystem';
 import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
-import { FoeField, type Foe } from './foes/FoeField';
+import { FoeField, type Foe, type FoeLanding, type FoeSquash } from './foes/FoeField';
 import type { FoeStrike, FoeTarget } from './foes/types';
 import {
   cloneBody,
@@ -61,8 +61,9 @@ export interface WorldPlayer {
   /** Traps can't hurt this player before this tick (replicated, so clients can blink them). */
   invulnUntil: number;
   /**
-   * Server-only fall tracking: the body's `y` at the top of the current airtime (null while on
-   * the ground; `Infinity` after being carried or thrown, so that landing never hurts).
+   * Server-only fall tracking: the body's `y` at the top of the current airtime, or where it was
+   * let go after being carried (null while on the ground; `Infinity` after being spat, whose
+   * landing the spit already paid for).
    */
   fallFrom: number | null;
   /** Server-only: boxes already hit by the current swing (`boxSwingSeq`), one hit per swing. */
@@ -502,7 +503,39 @@ export class GameWorld {
       hitBox: (by: WorldPlayer | null, boxId: number, count: number) => world.hitBox(by, boxId, count),
       hurtFoe: (by: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1) => world.hurtFoe(by, foe, damage, dir, 'spit'),
       ticksFor: (seconds: number) => msToTicks(seconds * 1000),
+      get fall() {
+        return world.fallDamage;
+      },
+      crushPlayer: (target: WorldPlayer, hit: AbilityHit) => world.crushPlayer(target, hit),
+      crushFoe: (by: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1) => world.hurtFoe(by, foe, damage, dir, 'crush'),
     };
+  }
+
+  /**
+   * A falling box came down on a player's head: hearts (in every mode: it is the box, not a
+   * teammate's swing), then death or a shove out from under it and a moment of invulnerability.
+   * Nothing while they are invulnerable or already reeling.
+   */
+  private crushPlayer(target: WorldPlayer, hit: AbilityHit): void {
+    const t = target.body;
+    if (!t.alive || t.held !== Held.NONE || this.tick < target.invulnUntil || t.hurt > 0) return;
+    target.hp = Math.max(0, target.hp - hit.damage);
+    this.events.push({
+      type: 'crateHit',
+      playerId: target.id,
+      by: hit.by,
+      hp: target.hp,
+      x: t.x + this.ctx.hitbox.width / 2,
+      y: t.y,
+    });
+    if (target.hp <= 0) {
+      this.kill(target, 'crush');
+      return;
+    }
+    const taken = giantActive(t) ? this.abilityTuning.giant.knockbackTaken : 1;
+    this.stun(target, hit.dirX >= 0 ? 1 : -1, hit.knockbackX * taken, hit.knockbackY * taken);
+    const ticks = this.fallDamage?.invulnerabilityTicks ?? this.foeInvulnerabilityTicks;
+    target.invulnUntil = Math.max(target.invulnUntil, this.tick + ticks);
   }
 
   /** Hearts lost to an ability, then death or the usual stun + knockback. */
@@ -669,13 +702,19 @@ export class GameWorld {
 
   /**
    * Follows the player's airtime and, on touchdown, charges for a long fall. The fall starts
-   * where the body last moved upwards, so a double jump, a trampoline or a stomp breaks it.
+   * where the body last moved upwards, so a double jump, a trampoline or a stomp breaks it, or
+   * where it was let go after being carried (the drone's claw, its own pilot included).
    */
   private trackFall(player: WorldPlayer, contacts: StepContacts): void {
     const body = player.body;
-    if (body.held !== Held.NONE || body.flight > 0) {
-      // Carried, thrown or flying: the next landing is free.
+    if (body.flight > 0) {
+      // Spat: the spit's own hit pays for the landing.
       player.fallFrom = Infinity;
+      return;
+    }
+    if (body.held !== Held.NONE || body.cargo === Cargo.SELF) {
+      // Carried: the fall starts wherever it lets go.
+      player.fallFrom = body.y;
       return;
     }
     if (body.grounded) {
@@ -691,7 +730,7 @@ export class GameWorld {
   private land(player: WorldPlayer, drop: number): void {
     const cfg = this.fallDamage;
     if (!cfg) return;
-    const damage = fallDamageFor(drop, cfg);
+    const damage = fallDamageFor(drop, cfg.players);
     if (damage <= 0) return;
     const body = player.body;
     player.hp = Math.max(0, player.hp - damage);
@@ -853,6 +892,25 @@ export class GameWorld {
       const player = this.players.get(strike.targetId);
       if (player) this.foeStrike(player, strike);
     }
+    // Foes dropped onto foes first (the one underneath may be beaten), then the landings.
+    for (const squash of foes.takeSquashes()) this.foeSquashed(squash);
+    for (const landing of foes.takeLandings()) this.foeLanded(landing);
+  }
+
+  /** A foe that fell at least the crush drop onto another hurts it, credited to whoever dropped it. */
+  private foeSquashed({ foe, faller, drop, by }: FoeSquash): void {
+    const crush = this.fallDamage?.crush;
+    if (!crush || crush.damage <= 0 || drop < crush.minDrop) return;
+    this.hurtFoe(by ? (this.players.get(by) ?? null) : null, foe, crush.damage, foe.x >= faller.x ? 1 : -1, 'squash');
+  }
+
+  /** A foe touched down: a long fall costs it hit points, credited to whoever dropped it. */
+  private foeLanded({ foe, drop, by }: FoeLanding): void {
+    const cfg = this.fallDamage;
+    if (!cfg) return;
+    const damage = fallDamageFor(drop, cfg.foes);
+    if (damage <= 0) return;
+    this.hurtFoe(by ? (this.players.get(by) ?? null) : null, foe, damage, foe.facing > 0 ? -1 : 1, 'fall');
   }
 
   /** A player as the foes see them. */
@@ -875,7 +933,7 @@ export class GameWorld {
    * A player hurt a foe (a swing, a stomp, or something the frog spat; `player` is null when the
    * frog already left); finishing it scores its points and recharges their special ability by them.
    */
-  private hurtFoe(player: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1, how: 'swing' | 'stomp' | 'spit'): void {
+  private hurtFoe(player: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1, how: 'swing' | 'stomp' | 'spit' | 'fall' | 'crush' | 'squash'): void {
     const result = this.foes.hurt(foe, damage, dir, player?.id ?? '');
     if (result === null) return;
     const blocked = result === 'blocked';
@@ -893,6 +951,9 @@ export class GameWorld {
       blocked,
       stomp: how === 'stomp',
       spit: how === 'spit',
+      fall: how === 'fall',
+      crush: how === 'crush',
+      squash: how === 'squash',
       score,
       recharged,
       x: box.x + box.width / 2,

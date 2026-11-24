@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ABILITIES, Ability, Cargo, Held, Phase } from '../config/abilities';
+import { compileFallDamage, FALL_DAMAGE_TUNING } from '../config/fall';
 import { FOE_TUNING } from '../config/foes';
 import { resolveMovement } from '../config/movement';
 import { msToTicks } from '../config/net';
@@ -11,6 +12,7 @@ import { diffWorld } from '../protocol/delta';
 import { droneDeck, droneGrip, tongueTip } from './abilities';
 import { stepPlayerBody } from './actions';
 import type { GameEvent } from './events';
+import type { Foe } from './foes/FoeField';
 import { aimFromButtons, Button, sanitizeButtons, withAim } from './input';
 import { GameWorld, type GameWorldOptions } from './world';
 
@@ -400,6 +402,227 @@ describe('drone (Virtual Guy)', () => {
       stepPlayerBody(replay, buttons, ctx);
     }
     expect(replay).toEqual(bodyFromNetState(world.toNetState(() => 0).players.find((p) => p.id === 'b')!));
+  });
+});
+
+describe('fall damage from drone drops and falling boxes', () => {
+  // The test map is 5 tiles tall, so drops are short: every rule starts hurting at 48 px.
+  const FALL = compileFallDamage({
+    players: { ...FALL_DAMAGE_TUNING.players, safeDropPx: 48, pxPerHeart: 1000 },
+    foes: { safeDropPx: 48, pxPerHit: 1000 },
+    boxes: { safeDropPx: 48, pxPerHit: 1000 },
+    crush: { ...FALL_DAMAGE_TUNING.crush, minDropPx: 32, damage: 1 },
+  });
+
+  /** A mushroom pacing at most 2 px from `x` (range 0 would let it wander off). */
+  function mushroom(x: number): Omit<TiledObject, 'id'> {
+    return { name: 'mushroom', type: 'mushroom', x, y: GROUND, width: 0, height: 0, point: true, properties: [{ name: 'range', type: 'int', value: 2 }] };
+  }
+
+  /** Virtual Guy ('a', piloting at x = 100) and Bunny Man ('b', at `bX`). */
+  function droneWorld(objects: Array<Omit<TiledObject, 'id'>> = [], bX = 400) {
+    const world = makeWorld(objects, { fallDamage: FALL });
+    world.addPlayer('a', 0, 'virtual-guy');
+    world.addPlayer('b', 1, 'bunny-man');
+    ticks(world, 5);
+    place(world, 'a', 100);
+    place(world, 'b', bX);
+    ticks(world, 5);
+    press(world, 'a');
+    ticks(world, seconds(ABILITIES.drone.deploy + ABILITIES.drone.sit) + 2);
+    expect(world.getPlayer('a')!.body.phase).toBe(Phase.DRONE_PILOT);
+    return world;
+  }
+
+  function flyTo(world: GameWorld, x: number, y: number): void {
+    const a = world.getPlayer('a')!.body;
+    for (let i = 0; i < 600; i++) {
+      const grip = droneGrip(a);
+      const dx = x - grip.x;
+      const dy = y - grip.y;
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+      let buttons = 0;
+      if (dx > 2) buttons |= Button.RIGHT;
+      if (dx < -2) buttons |= Button.LEFT;
+      if (dy > 2) buttons |= Button.DOWN;
+      if (dy < -2) buttons |= Button.JUMP;
+      tick(world, { a: buttons });
+    }
+  }
+
+  /** Flies the grip to (x, y) and comes to a stop there (a dropped foe keeps the drone's drift). */
+  function hoverOver(world: GameWorld, x: number, y: number): void {
+    flyTo(world, x, y);
+    ticks(world, 20);
+    flyTo(world, x, y);
+    ticks(world, 15);
+  }
+
+  /** Grabs whatever is under the claw at (x, y), climbs for `climb` ticks, then lets go. */
+  function liftAndDrop(world: GameWorld, x: number, y: number, climb = 50): GameEvent[] {
+    flyTo(world, x, y);
+    expect(press(world, 'a').some((e) => e.type === 'grab')).toBe(true);
+    ticks(world, climb, { a: Button.JUMP });
+    return [...press(world, 'a'), ...ticks(world, 90)];
+  }
+
+  const only = <T extends GameEvent['type']>(events: GameEvent[], type: T) =>
+    events.filter((e): e is Extract<GameEvent, { type: T }> => e.type === type);
+
+  it('a player dropped from high up takes fall damage', () => {
+    const world = droneWorld();
+    const b = world.getPlayer('b')!;
+    const events = liftAndDrop(world, 400, GROUND - HITBOX.height + 4);
+    expect(only(events, 'fallHit')).toEqual([expect.objectContaining({ playerId: 'b', damage: 1, hp: PLAYER_CONFIG.maxHp - 1 })]);
+    expect(b.hp).toBe(PLAYER_CONFIG.maxHp - 1);
+    expect(b.body.grounded).toBe(true);
+  });
+
+  it('a player set down gently does not', () => {
+    const world = droneWorld();
+    const b = world.getPlayer('b')!;
+    flyTo(world, 400, GROUND - HITBOX.height + 4);
+    press(world, 'a');
+    ticks(world, 50, { a: Button.JUMP });
+    flyTo(world, 400, GROUND - HITBOX.height - 8); // back down, feet just above the floor
+    const events = [...press(world, 'a'), ...ticks(world, 60)];
+    expect(only(events, 'fallHit')).toEqual([]);
+    expect(b.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+
+  it('the pilot carrying themself takes fall damage when they let go up high', () => {
+    const world = droneWorld();
+    const a = world.getPlayer('a')!;
+    flyTo(world, 100, GROUND - HITBOX.height + 4);
+    press(world, 'a');
+    expect(a.body.cargo).toBe(Cargo.SELF);
+    ticks(world, 50, { a: Button.JUMP });
+    const events = [...press(world, 'a'), ...ticks(world, 90)];
+    expect(only(events, 'fallHit')).toEqual([expect.objectContaining({ playerId: 'a', damage: 1 })]);
+    expect(a.hp).toBe(PLAYER_CONFIG.maxHp - 1);
+  });
+
+  it('a foe dropped from high up takes fall damage, credited to the pilot', () => {
+    const world = droneWorld([mushroom(250)]);
+    const shroom = world.foeField.foes[0]!;
+    const { height } = FOE_TUNING.mushroom;
+    const events = liftAndDrop(world, shroom.x, shroom.y - height + 4);
+    expect(only(events, 'foeHurt')).toEqual([expect.objectContaining({ foeId: shroom.id, playerId: 'a', fall: true, hp: 0, score: FOE_TUNING.mushroom.score })]);
+    expect(world.getPlayer('a')!.score).toBe(FOE_TUNING.mushroom.score);
+  });
+
+  it('a box dropped from high up takes a hit when it lands', () => {
+    const world = droneWorld([box(300, 2)]);
+    const boxId = world.level.traps[0]!.id;
+    const events = liftAndDrop(world, 300, GROUND - 20 + 2);
+    expect(only(events, 'boxHit')).toEqual([{ type: 'boxHit', playerId: 'a', boxId, hits: 1, broken: false }]);
+    const rect = world.trapField.boxRect(boxId)!;
+    expect(rect.y + rect.height).toBe(GROUND);
+  });
+
+  it('a box dropped on a player costs them a heart and shatters', () => {
+    const world = droneWorld([box(300, 1)], 500);
+    const b = world.getPlayer('b')!;
+    const boxId = world.level.traps[0]!.id;
+    flyTo(world, 300, GROUND - 20 + 2);
+    press(world, 'a');
+    ticks(world, 50, { a: Button.JUMP });
+    const grip = droneGrip(world.getPlayer('a')!.body);
+    place(world, 'b', grip.x); // right under it
+    const events = [...press(world, 'a'), ...ticks(world, 60)];
+    expect(only(events, 'crateHit')).toEqual([expect.objectContaining({ playerId: 'b', by: 'a', hp: PLAYER_CONFIG.maxHp - 1 })]);
+    expect(only(events, 'propBreak')).toEqual([expect.objectContaining({ boxId })]);
+    expect(b.hp).toBe(PLAYER_CONFIG.maxHp - 1);
+  });
+
+  it('a sturdy box bounces off the head it lands on and takes the knock when it settles', () => {
+    const world = droneWorld([box(300, 3)], 500);
+    const boxId = world.level.traps[0]!.id;
+    flyTo(world, 300, GROUND - 20 + 2);
+    press(world, 'a');
+    ticks(world, 50, { a: Button.JUMP });
+    place(world, 'b', droneGrip(world.getPlayer('a')!.body).x);
+    const events = [...press(world, 'a'), ...ticks(world, 90)];
+    expect(only(events, 'crateHit')).toHaveLength(1);
+    expect(only(events, 'propBreak')).toEqual([]);
+    // The head knock (1) plus its own fall from the top of the bounce, if that was long enough.
+    const [hit] = only(events, 'boxHit');
+    expect(hit).toMatchObject({ boxId, broken: false });
+    expect(hit!.hits).toBeGreaterThanOrEqual(1);
+    const rect = world.trapField.boxRect(boxId)!;
+    expect(rect.y + rect.height).toBe(GROUND);
+  });
+
+  it('a foe dropped on another foe hurts it, credited to the pilot, then lands hard itself', () => {
+    const world = droneWorld([mushroom(300), mushroom(200)]);
+    const [dropped, below] = world.foeField.foes as [Foe, Foe];
+    expect(dropped.x).toBeGreaterThan(below.x + 50); // the one at 300 is dropped on the one at 200
+    const { height } = FOE_TUNING.mushroom;
+    flyTo(world, dropped.x, dropped.y - height + 4);
+    expect(press(world, 'a').some((e) => e.type === 'grab')).toBe(true);
+    ticks(world, 50, { a: Button.JUMP });
+    hoverOver(world, below.x, droneGrip(world.getPlayer('a')!.body).y);
+    const events = [...press(world, 'a'), ...ticks(world, 60)];
+    const hurts = only(events, 'foeHurt');
+    expect(hurts).toContainEqual(expect.objectContaining({ foeId: below.id, playerId: 'a', squash: true, fall: false, hp: 0 }));
+    expect(hurts).toContainEqual(expect.objectContaining({ foeId: dropped.id, playerId: 'a', fall: true, squash: false }));
+    expect(hurts.filter((e) => e.foeId === below.id)).toHaveLength(1); // once per fall
+  });
+
+  it('a foe set down gently on another foe does not hurt it', () => {
+    const world = droneWorld([mushroom(300), mushroom(200)]);
+    const [dropped, below] = world.foeField.foes as [Foe, Foe];
+    const { height } = FOE_TUNING.mushroom;
+    flyTo(world, dropped.x, dropped.y - height + 4);
+    expect(press(world, 'a').some((e) => e.type === 'grab')).toBe(true);
+    ticks(world, 10, { a: Button.JUMP });
+    // Its feet 8 px above the other's head (a carried foe's feet hang `height` below the grip).
+    hoverOver(world, below.x, GROUND - height - 8 - height);
+    const events = [...press(world, 'a'), ...ticks(world, 60)];
+    expect(only(events, 'foeHurt')).toEqual([]);
+    expect(below.hp).toBe(FOE_TUNING.mushroom.hp);
+  });
+
+  it('a box dropped on a foe hurts it, credited to the pilot', () => {
+    const world = droneWorld([box(300, 1), mushroom(200)]);
+    const shroom = world.foeField.foes[0]!;
+    flyTo(world, 300, GROUND - 20 + 2);
+    press(world, 'a');
+    ticks(world, 50, { a: Button.JUMP });
+    flyTo(world, shroom.x, droneGrip(world.getPlayer('a')!.body).y);
+    const events = [...press(world, 'a'), ...ticks(world, 60)];
+    expect(only(events, 'foeHurt')).toEqual([expect.objectContaining({ foeId: shroom.id, playerId: 'a', crush: true, hp: 0 })]);
+  });
+
+  it('a box dropped on another box knocks it, and falls on through when it breaks', () => {
+    const world = droneWorld([box(300, 3), box(200, 1)]);
+    const [upper, lower] = world.level.traps.map((t) => t.id) as [number, number];
+    flyTo(world, 300, GROUND - 20 + 2);
+    press(world, 'a');
+    ticks(world, 50, { a: Button.JUMP });
+    flyTo(world, 200, droneGrip(world.getPlayer('a')!.body).y);
+    const events = [...press(world, 'a'), ...ticks(world, 90)];
+    const hits = only(events, 'boxHit');
+    expect(hits).toContainEqual({ type: 'boxHit', playerId: 'a', boxId: lower, hits: 1, broken: true });
+    expect(hits.find((e) => e.boxId === upper)).toMatchObject({ playerId: 'a', broken: false });
+    expect(world.trapField.boxRect(lower)).toBeNull();
+    const rect = world.trapField.boxRect(upper)!;
+    expect(rect.y + rect.height).toBe(GROUND); // fell on down to the floor
+  });
+
+  it('a box dropped on a sturdy box rests on it, both knocked', () => {
+    const world = droneWorld([box(300, 3), box(200, 3)]);
+    const [upper, lower] = world.level.traps.map((t) => t.id) as [number, number];
+    flyTo(world, 300, GROUND - 20 + 2);
+    press(world, 'a');
+    ticks(world, 50, { a: Button.JUMP });
+    flyTo(world, 200, droneGrip(world.getPlayer('a')!.body).y);
+    const events = [...press(world, 'a'), ...ticks(world, 90)];
+    const hits = only(events, 'boxHit');
+    expect(hits).toContainEqual({ type: 'boxHit', playerId: 'a', boxId: lower, hits: 1, broken: false });
+    expect(hits.find((e) => e.boxId === upper)!.hits).toBeGreaterThanOrEqual(1);
+    const rect = world.trapField.boxRect(upper)!;
+    expect(rect.y + rect.height).toBe(GROUND - 20); // stacked on top
   });
 });
 

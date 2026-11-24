@@ -31,6 +31,30 @@ export interface Foe extends NetFoeState {
   flight: number;
   /** The rhino: 0 asleep (it roars on waking), 1 fighting, 2 in a rage. */
   phase: number;
+  /**
+   * Fall tracking: its feet `y` at the top of the current airtime, or where it was let go after
+   * being carried (null on the ground; `Infinity` after being spat: the spit pays for the landing).
+   */
+  fallFrom: number | null;
+  /** The player who let it fall (dropped it), credited if the landing beats it ('' none). */
+  fallBy: string;
+  /** Foes it already came down on during this fall (each is hit once). */
+  fallHits: number[];
+}
+
+/** A foe touched down after a fall of `drop` px (`by`: who dropped it, '' nobody). */
+export interface FoeLanding {
+  foe: Foe;
+  drop: number;
+  by: string;
+}
+
+/** A falling foe (`faller`, `drop` px into its fall) came down on `foe`'s head (`by`: who dropped it). */
+export interface FoeSquash {
+  foe: Foe;
+  faller: Foe;
+  drop: number;
+  by: string;
 }
 
 /** What a hit did to a foe: hearts left, `'blocked'` (armour), or null (already dying). */
@@ -55,6 +79,10 @@ export class FoeField {
   foes: Foe[];
   shots: Shot[] = [];
   private nextShotId = 1;
+  /** Landings since the world last took them (`takeLandings`). */
+  private landings: FoeLanding[] = [];
+  /** Foes landed on by falling foes since the world last took them (`takeSquashes`). */
+  private squashes: FoeSquash[] = [];
   /** Hurt zones foes keep out of: hazard zones, spikes, spike-heads. */
   private readonly noGo: readonly Rect[];
 
@@ -84,7 +112,7 @@ export class FoeField {
     const copy = new FoeField(
       this.level,
       this.config,
-      this.foes.map((f) => ({ ...f })),
+      this.foes.map((f) => ({ ...f, fallHits: [...f.fallHits] })),
       this.dt,
       this.noGo,
     );
@@ -140,6 +168,9 @@ export class FoeField {
   release(foe: Foe, x: number, y: number, vx: number, vy: number): void {
     this.place(foe, x, y);
     this.enter(foe, 'hurt');
+    foe.fallFrom = foe.y;
+    foe.fallBy = foe.owner;
+    foe.fallHits = [];
     foe.owner = '';
     foe.flight = 0;
     foe.vx = vx;
@@ -172,6 +203,7 @@ export class FoeField {
   /** A spat foe's flight is over: it drops, dazed (the caller hurts it for the landing). */
   land(foe: Foe): void {
     this.enter(foe, 'hurt');
+    foe.fallFrom = Infinity;
     foe.owner = '';
     foe.flight = 0;
     foe.vx *= 0.3;
@@ -261,6 +293,7 @@ export class FoeField {
       if (isCaptive(foe.state)) {
         // In a player's grip (or spat): the ability moves it. Spikes and lava still kill it.
         foe.t += this.dt;
+        foe.fallFrom = foe.state === 'flying' ? Infinity : foe.y;
         if (foe.state !== 'swallowed' && this.inHazard(foe)) this.die(foe);
         continue;
       }
@@ -1143,9 +1176,64 @@ export class FoeField {
     }
     const blocked = this.moveX(foe, foe.vx * this.dt);
     if (blocked) foe.vx = 0;
+    const feetBefore = foe.y;
     const landed = this.moveY(foe, foe.vy * this.dt, !flying);
     foe.grounded = !flying && !clinging && landed;
+    this.fallOnFoes(foe, feetBefore);
+    this.trackFall(foe);
     return blocked;
+  }
+
+  /**
+   * A falling foe whose feet came down through another foe's head this tick lands on it (once
+   * per fall); the world decides what that costs (`takeSquashes`). It falls on through, as
+   * foes don't stand on each other.
+   */
+  private fallOnFoes(foe: Foe, feetBefore: number): void {
+    const from = foe.fallFrom;
+    if (from === null || from === Infinity || foe.y <= feetBefore || foe.state === 'dead' || foe.kind === 'wasp') return;
+    const box = this.hitbox(foe);
+    const slack = Math.max(6, foe.y - feetBefore + 2);
+    for (const other of this.foes) {
+      if (other === foe || !this.catchable(other) || foe.fallHits.includes(other.id)) continue;
+      const head = this.hitbox(other);
+      if (feetBefore > head.y + slack || !rectsOverlap(box, head)) continue;
+      foe.fallHits.push(other.id);
+      this.squashes.push({ foe: other, faller: foe, drop: foe.y - from, by: foe.fallBy });
+    }
+  }
+
+  /** Follows a foe's airtime; a landing is kept for the world to charge (`takeLandings`). */
+  private trackFall(foe: Foe): void {
+    if (foe.state === 'dead' || foe.kind === 'wasp' || foe.wall !== 0) {
+      foe.fallFrom = null;
+      foe.fallBy = '';
+      return;
+    }
+    if (foe.grounded) {
+      const from = foe.fallFrom;
+      const by = foe.fallBy;
+      foe.fallFrom = null;
+      foe.fallBy = '';
+      foe.fallHits = [];
+      if (from !== null && foe.y - from > 0) this.landings.push({ foe, drop: foe.y - from, by });
+      return;
+    }
+    if (foe.fallFrom === null || (foe.vy < 0 && foe.fallFrom !== Infinity)) foe.fallFrom = foe.y;
+  }
+
+  /** Foes that touched down since the last call, with how far they fell. */
+  takeLandings(): FoeLanding[] {
+    const out = this.landings;
+    this.landings = [];
+    return out;
+  }
+
+  /** Foes that falling foes came down on since the last call. */
+  takeSquashes(): FoeSquash[] {
+    const out = this.squashes;
+    this.squashes = [];
+    return out;
   }
 
   private moveX(foe: Foe, dx: number): boolean {
@@ -1362,6 +1450,9 @@ function spawnFoe(def: FoeDef, config: Readonly<FoeTuning>): Foe {
     owner: '',
     flight: 0,
     phase: 0,
+    fallFrom: null,
+    fallBy: '',
+    fallHits: [],
   };
 }
 

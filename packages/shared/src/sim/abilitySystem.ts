@@ -1,4 +1,5 @@
 import { Ability, Cargo, Held, Phase, type CompiledAbilities } from '../config/abilities';
+import { fallDamageFor, type CompiledFallDamage } from '../config/fall';
 import { CellFlag } from '../level/types';
 import type { NetPropState, PropState } from '../protocol/state';
 import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/math';
@@ -42,9 +43,22 @@ interface WorldProp {
   vy: number;
   state: PropState;
   owner: string;
-  /** Flying: seconds left before it drops; slots already hit. */
+  /** Flying: seconds left before it drops. Flying or falling: player slots already hit. */
   life: number;
   hitSlots: number;
+  /** Falling: its `y` at the top of the fall, and who let it fall ('' nobody). */
+  fallFrom: number;
+  droppedBy: string;
+  /** Falling: foes it already landed on, and boxes (as `-id - 1`) it already knocked. */
+  hitFoes: number[];
+  /** Falling: hits it took on the way down (heads and boxes it landed on), paid when it settles. */
+  pending: number;
+}
+
+/** Where a falling box came to rest: its new top, and the box it rests on (null: terrain or a trap). */
+interface PropLanding {
+  y: number;
+  boxId: number | null;
 }
 
 export interface AbilityHit {
@@ -74,6 +88,12 @@ export interface AbilityHost {
   hurtFoe(by: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1): void;
   /** Ticks of trap immunity for `seconds`. */
   ticksFor(seconds: number): number;
+  /** Fall damage tuning (null: off). */
+  readonly fall: Readonly<CompiledFallDamage> | null;
+  /** A falling box landed on `target`'s head: hearts (unless invulnerable or reeling), stun, knockback. */
+  crushPlayer(target: WorldPlayer, hit: AbilityHit): void;
+  /** A falling box landed on `foe`, credited to `by` (who dropped it). */
+  crushFoe(by: WorldPlayer | null, foe: Foe, damage: number, dir: 1 | -1): void;
 }
 
 /** Fields the ability rules keep on each world player (server-only, not replicated). */
@@ -142,7 +162,7 @@ export class AbilitySystem {
   /** Copy for a cloned world (props only; player state lives on the players). */
   cloneFor(host: AbilityHost): AbilitySystem {
     const copy = new AbilitySystem(host);
-    for (const [id, prop] of this.props) copy.props.set(id, { ...prop });
+    for (const [id, prop] of this.props) copy.props.set(id, { ...prop, hitFoes: [...prop.hitFoes] });
     return copy;
   }
 
@@ -346,7 +366,7 @@ export class AbilitySystem {
         prop.owner = '';
         if (spit) this.launchProp(p, prop);
         else {
-          prop.state = 'falling';
+          this.startFalling(prop, p.id);
           prop.vx = carryVx;
           prop.vy = carryVy;
         }
@@ -719,6 +739,10 @@ export class AbilitySystem {
       owner,
       life: 0,
       hitSlots: 0,
+      fallFrom: rect.y,
+      droppedBy: '',
+      hitFoes: [],
+      pending: 0,
     };
     this.props.set(boxId, prop);
     return prop;
@@ -760,10 +784,7 @@ export class AbilitySystem {
         case 'swallowed': {
           const owner = prop.owner ? this.host.getPlayer(prop.owner) : undefined;
           const grab = owner?.ability.grab;
-          if (!owner || grab?.kind !== 'box' || grab.id !== prop.id) {
-            prop.state = 'falling';
-            prop.owner = '';
-          }
+          if (!owner || grab?.kind !== 'box' || grab.id !== prop.id) this.startFalling(prop, prop.owner);
           break;
         }
         case 'falling': {
@@ -772,11 +793,13 @@ export class AbilitySystem {
           const nx = prop.x + prop.vx * dt;
           if (!this.solidAt({ ...prop, x: nx })) prop.x = nx;
           else prop.vx = 0;
-          const landY = this.landing(prop, prop.vy * dt);
-          if (landY !== null) {
-            this.host.traps.placeBox(prop.id, prop.x, landY);
-            this.props.delete(prop.id);
-          } else if (prop.y > ctx.level.heightPx + PROP_FALL_MARGIN) {
+          // Thrown back up (bounced off a head): the fall starts again from the top.
+          if (prop.vy < 0) prop.fallFrom = prop.y;
+          const top = prop.y;
+          const landed = this.landing(prop, prop.vy * dt);
+          if (prop.vy > 0 && this.crushBelow(prop, top)) break;
+          if (landed !== null) this.settle(prop, landed);
+          else if (prop.y > ctx.level.heightPx + PROP_FALL_MARGIN) {
             this.host.traps.destroyBox(prop.id);
             this.props.delete(prop.id);
           }
@@ -822,15 +845,14 @@ export class AbilitySystem {
       this.props.delete(prop.id);
       this.host.emit({ type: 'propBreak', boxId: prop.id, variant: prop.variant, x: prop.x + prop.width / 2, y: prop.y + prop.height / 2 });
     } else if (prop.life <= 0) {
-      prop.state = 'falling';
+      this.startFalling(prop, prop.owner);
       prop.vx *= 0.4;
       prop.vy = Math.max(0, prop.vy * 0.4);
-      prop.owner = '';
     }
   }
 
-  /** Moves a falling prop down by `dy`; returns its resting top if it landed on something. */
-  private landing(prop: WorldProp, dy: number): number | null {
+  /** Moves a falling prop down by `dy`; returns where it rests if it landed on something. */
+  private landing(prop: WorldProp, dy: number): PropLanding | null {
     const { ctx } = this.host;
     const { level } = ctx;
     const ts = level.tileSize;
@@ -852,16 +874,110 @@ export class AbilitySystem {
         }
       }
     }
+    let boxId: number | null = null;
     for (const c of this.host.traps.colliders(this.host.tick)) {
       if (c.id === prop.id || prop.x >= c.x + c.width - eps || prop.x + prop.width <= c.x + eps) continue;
-      if (c.y >= prevBottom - eps && c.y < nextBottom && c.y < stop) stop = c.y;
+      if (c.y >= prevBottom - eps && c.y < nextBottom && c.y < stop) {
+        stop = c.y;
+        boxId = c.kind === 'box' ? c.id : null;
+      }
     }
     if (stop === Infinity) {
       prop.y += dy;
       return null;
     }
     prop.y = stop - prop.height;
-    return prop.y;
+    return { y: prop.y, boxId };
+  }
+
+  /** A box starts falling freely (let go, lost, or at the end of a spit's flight). */
+  private startFalling(prop: WorldProp, by: string): void {
+    prop.state = 'falling';
+    prop.owner = '';
+    prop.fallFrom = prop.y;
+    prop.droppedBy = by;
+    prop.hitSlots = 0;
+    prop.hitFoes = [];
+    prop.pending = 0;
+  }
+
+  /**
+   * A falling box (whose top was at `top` before this tick's move) coming down on players' or
+   * foes' heads hurts them, takes a hit itself and bounces off (or shatters). True when it hit.
+   */
+  private crushBelow(prop: WorldProp, top: number): boolean {
+    const crush = this.host.fall?.crush;
+    if (!crush || top - prop.fallFrom < crush.minDrop) return false;
+    const { ctx } = this.host;
+    const hitbox = ctx.hitbox;
+    const prevBottom = top + prop.height;
+    const slack = Math.max(6, prop.vy * ctx.dt + 2);
+    const by = prop.droppedBy ? (this.host.getPlayer(prop.droppedBy) ?? null) : null;
+    const center = prop.x + prop.width / 2;
+    let headTop = Infinity;
+    let away = 0;
+    for (const other of this.host.listPlayers()) {
+      const o = other.body;
+      if (!o.alive || o.held !== Held.NONE || prop.hitSlots & bit(other.slot)) continue;
+      const rect = { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height };
+      if (!rectsOverlap(prop, rect) || prevBottom > rect.y + slack) continue;
+      prop.hitSlots |= bit(other.slot);
+      const dirX = o.x + hitbox.width / 2 >= center ? 1 : -1;
+      this.host.crushPlayer(other, { damage: crush.damage, dirX, knockbackX: crush.knockbackX, knockbackY: crush.knockbackY, by: prop.droppedBy });
+      headTop = Math.min(headTop, rect.y);
+      away -= dirX;
+    }
+    for (const foe of this.host.foes.live()) {
+      const rect = this.host.foes.hitbox(foe);
+      if (prop.hitFoes.includes(foe.id) || !rectsOverlap(prop, rect) || prevBottom > rect.y + slack) continue;
+      prop.hitFoes.push(foe.id);
+      const dir = foe.x >= center ? 1 : -1;
+      this.host.crushFoe(by, foe, crush.damage, dir);
+      headTop = Math.min(headTop, rect.y);
+      away -= dir;
+    }
+    if (headTop === Infinity) return false;
+    prop.pending += 1;
+    if (this.shatterIfSpent(prop)) return true;
+    // Bounce off the heads, sideways away from them.
+    prop.y = Math.min(prop.y, headTop - prop.height);
+    prop.vy = -Math.min(180, prop.vy * 0.35);
+    prop.vx = (away >= 0 ? 1 : -1) * 70;
+    return true;
+  }
+
+  /**
+   * A falling box came to rest. Landing hard on another box knocks that box too (and if that
+   * breaks, it falls on through); otherwise it is back in the level, paying for the fall and any
+   * knocks on the way down.
+   */
+  private settle(prop: WorldProp, landed: PropLanding): void {
+    const fall = this.host.fall;
+    const drop = landed.y - prop.fallFrom;
+    const by = prop.droppedBy ? (this.host.getPlayer(prop.droppedBy) ?? null) : null;
+    const knockKey = landed.boxId === null ? 0 : -landed.boxId - 1;
+    if (fall && landed.boxId !== null && fall.crush.damage > 0 && drop >= fall.crush.minDrop && !prop.hitFoes.includes(knockKey)) {
+      prop.hitFoes.push(knockKey);
+      this.host.hitBox(by, landed.boxId, fall.crush.damage);
+      prop.pending += 1;
+      if (this.shatterIfSpent(prop)) return;
+      if (this.host.traps.boxRect(landed.boxId) === null) return; // it broke underneath: keep falling
+    }
+    const hits = prop.pending + (fall ? fallDamageFor(drop, fall.boxes) : 0);
+    this.host.traps.placeBox(prop.id, prop.x, landed.y);
+    this.props.delete(prop.id);
+    if (hits > 0) this.host.hitBox(by, prop.id, hits);
+  }
+
+  /** A falling box that took as many hits as it had left shatters where it is. True if it did. */
+  private shatterIfSpent(prop: WorldProp): boolean {
+    const trap = this.host.traps.get(prop.id);
+    const left = trap?.kind === 'box' ? trap.maxHits - this.host.traps.boxHits(prop.id) : 1;
+    if (prop.pending < left) return false;
+    this.host.traps.destroyBox(prop.id);
+    this.props.delete(prop.id);
+    this.host.emit({ type: 'propBreak', boxId: prop.id, variant: prop.variant, x: prop.x + prop.width / 2, y: prop.y + prop.height / 2 });
+    return true;
   }
 
   // --- helpers ---------------------------------------------------------------------------------
