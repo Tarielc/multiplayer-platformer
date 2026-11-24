@@ -1,0 +1,172 @@
+/* Bottom sheet over the room screen: anchored to the bottom edge, above the safe area, never
+   modal (the lobby behind stays usable). Wide screens get it as a card in the corner. */
+.sheet {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 20;
+  max-width: 480px;
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  overflow-y: auto;
+  padding: 26px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: rise 160ms steps(4);
+}
+
+@media (min-width: 720px) {
+  .sheet {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 440px;
+  }
+}
+
+/* Phone held sideways: little height, so a compact sheet. */
+@media (max-height: 500px) {
+  .sheet {
+    padding: 16px 18px;
+    gap: 12px;
+  }
+  .body {
+    display: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  background: var(--fern);
+  color: var(--firefly);
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kicker {
+  font-family: var(--ui);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.titles h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 0.95;
+}
+
+.body {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--mist);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--night);
+  box-shadow: inset 0 -3px 0 var(--rule);
+  font-size: 15px;
+}
+
+.stepNo {
+  font-family: var(--display);
+  font-size: 26px;
+  color: var(--firefly);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.actions button {
+  min-height: 50px;
+}
+
+.actions .go {
+  min-height: 58px;
+  font-size: 17px;
+}
+
+.never {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 15px;
+  color: var(--mist);
+  cursor: pointer;
+}
+
+.never input {
+  appearance: none;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  background: var(--night);
+  box-shadow: inset 0 0 0 3px var(--stone);
+  cursor: pointer;
+}
+
+.never input:checked {
+  background: var(--moss-lit);
+  box-shadow:
+    inset 0 0 0 3px var(--moss),
+    inset 0 0 0 7px var(--night);
+}
+
+.never input:focus-visible {
+  outline: 3px solid var(--firefly);
+  outline-offset: 3px;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}

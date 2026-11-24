@@ -80,6 +80,26 @@
   font-size: 11px;
 }
 
+.icon {
+  width: 34px;
+  padding: 0;
+}
+
+/* Full label on wide screens, short one on phones. */
+.short {
+  display: none;
+}
+
+/* Thumb-sized bar buttons on touch screens. */
+@media (pointer: coarse) {
+  .small {
+    min-height: 44px;
+  }
+  .icon {
+    width: 44px;
+  }
+}
+
 .conn {
   display: inline-flex;
   align-items: center;
@@ -168,12 +188,38 @@
 
 @media (max-width: 640px) {
   .bar {
+    gap: 10px 12px;
     padding: 8px 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
   }
+  /* Leave takes you home: the logo link would only crowd the bar. */
   .brand {
-    font-size: 26px;
+    display: none;
+  }
+  .room {
+    gap: 10px;
   }
   .room strong {
     font-size: 26px;
+  }
+  .right {
+    gap: 12px;
+  }
+  .long {
+    display: none;
+  }
+  .short {
+    display: inline;
+  }
+}
+
+/* A phone held sideways has ~400 px of height: in game the bar goes (Leave is in the menu) and
+   the stage takes it. GameView.module.css sizes the stage to match. */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  .screen[data-ingame='true'] {
+    grid-template-rows: 1fr;
+  }
+  .screen[data-ingame='true'] .bar {
+    display: none;
   }
 }

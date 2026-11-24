@@ -14,7 +14,7 @@ import {
   type GameMode,
 } from '@platformer/shared';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { abilityIconPath } from '@/game/abilities/abilityArt';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { loadPlayerName, loadPreferredCharacter, savePlayerName, savePreferredCharacter } from '@/net/identity';
@@ -48,6 +48,17 @@ export function HomeScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [server, setServer] = useState<ServerState>({ kind: 'checking' });
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // The phone menu closes with Esc, like the game's.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   useEffect(() => {
     setName(loadPlayerName());
@@ -120,20 +131,37 @@ export function HomeScreen() {
               {GAME_TITLE}
             </a>
             <div className={styles.links}>
-              <a className="px-outline-sm" href="#characters">
-                Characters
-              </a>
-              <a className="px-outline-sm" href="#modes">
-                Modes
-              </a>
-              <a className="px-outline-sm" href="#levels">
-                Levels
-              </a>
-              <a className="px-outline-sm" href="#controls">
-                Controls
-              </a>
+              {SECTIONS.map(([id, label]) => (
+                <a key={id} className="px-outline-sm" href={`#${id}`}>
+                  {label}
+                </a>
+              ))}
               <ServerStatus server={server} />
             </div>
+            {/* Phones: the links fold into a sheet behind this button. */}
+            <div className={styles.compact}>
+              <ServerStatus server={server} compact />
+              <button
+                type="button"
+                className={styles.menuButton}
+                aria-expanded={menuOpen}
+                aria-controls="site-menu"
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <MenuGlyph open={menuOpen} />
+                Menu
+              </button>
+            </div>
+            {menuOpen && (
+              <div id="site-menu" className={`${styles.sheet} px-panel`}>
+                {SECTIONS.map(([id, label]) => (
+                  <a key={id} href={`#${id}`} onClick={() => setMenuOpen(false)}>
+                    {label}
+                  </a>
+                ))}
+                <ServerStatus server={server} />
+              </div>
+            )}
           </nav>
 
           <div id="top" className={styles.heroBody}>
@@ -291,58 +319,34 @@ export function HomeScreen() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Move</td>
-                  <td>
-                    <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd>
-                  </td>
-                  <td>Left stick, D-pad</td>
-                  <td>Walk stick (left)</td>
-                </tr>
-                <tr>
-                  <td>Jump · hold for higher, again in mid-air to double jump</td>
-                  <td>
-                    <kbd>Space</kbd> <kbd>↑</kbd> <kbd>W</kbd> <kbd>Z</kbd> <kbd>K</kbd>
-                  </td>
-                  <td>A / B</td>
-                  <td>Jump button</td>
-                </tr>
-                <tr>
-                  <td>Drop through planks</td>
-                  <td>
-                    <kbd>↓</kbd> + jump
-                  </td>
-                  <td>Down + A</td>
-                  <td>Walk stick down + Jump</td>
-                </tr>
-                <tr>
-                  <td>Attack · shoves players, breaks boxes</td>
-                  <td>
-                    <kbd>J</kbd> <kbd>X</kbd>
-                  </td>
-                  <td>X / □</td>
-                  <td>Attack stick: lift to swing, drag first to aim</td>
-                </tr>
-                <tr>
-                  <td>Special ability</td>
-                  <td>
-                    <kbd>L</kbd> <kbd>C</kbd> right-click · aim with arrows or mouse
-                  </td>
-                  <td>Y / RB · aim with the right stick</td>
-                  <td>Special stick: drag to aim, lift to fire</td>
-                </tr>
-                <tr>
-                  <td>Menu · debug overlay</td>
-                  <td>
-                    <kbd>Esc</kbd> · <kbd>F3</kbd>
-                  </td>
-                  <td>Start</td>
-                  <td>Menu button (top right)</td>
-                </tr>
+                {CONTROLS.map((row) => (
+                  <tr key={row.action}>
+                    <td>
+                      {row.action}
+                      {row.detail && ` · ${row.detail}`}
+                    </td>
+                    <td>{row.keys}</td>
+                    <td>{row.pad}</td>
+                    <td>{row.touch}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
+        {/* Phones: one card per action, the touch control first. */}
+        <ul className={styles.controlCards}>
+          {CONTROLS.map((row) => (
+            <li key={row.action} className="px-panel">
+              <h3>{row.action}</h3>
+              <p className={styles.touchLine}>{row.touch}</p>
+              {row.detail && <p className={styles.detail}>{row.detail}</p>}
+              <p className={styles.otherInputs}>
+                {row.keys} <span aria-hidden>·</span> {row.pad}
+              </p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <footer className={styles.footer}>
@@ -358,14 +362,122 @@ export function HomeScreen() {
   );
 }
 
-function ServerStatus({ server }: { server: ServerState }) {
+const SECTIONS = [
+  ['characters', 'Characters'],
+  ['modes', 'Modes'],
+  ['levels', 'Levels'],
+  ['controls', 'Controls'],
+] as const;
+
+interface ControlRow {
+  action: string;
+  /** Extra how-to, after the action in the table and under it on a card. */
+  detail?: string;
+  keys: ReactNode;
+  pad: string;
+  touch: string;
+}
+
+const CONTROLS: ControlRow[] = [
+  {
+    action: 'Move',
+    keys: (
+      <>
+        <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd>
+      </>
+    ),
+    pad: 'Left stick, D-pad',
+    touch: 'Walk stick (left)',
+  },
+  {
+    action: 'Jump',
+    detail: 'hold for higher, again in mid-air to double jump',
+    keys: (
+      <>
+        <kbd>Space</kbd> <kbd>↑</kbd> <kbd>W</kbd> <kbd>Z</kbd> <kbd>K</kbd>
+      </>
+    ),
+    pad: 'A / B',
+    touch: 'Jump button',
+  },
+  {
+    action: 'Drop through planks',
+    keys: (
+      <>
+        <kbd>↓</kbd> + jump
+      </>
+    ),
+    pad: 'Down + A',
+    touch: 'Walk stick down + Jump',
+  },
+  {
+    action: 'Attack',
+    detail: 'shoves players, breaks boxes',
+    keys: (
+      <>
+        <kbd>J</kbd> <kbd>X</kbd>
+      </>
+    ),
+    pad: 'X / □',
+    touch: 'Attack stick: lift to swing, drag first to aim',
+  },
+  {
+    action: 'Special ability',
+    keys: (
+      <>
+        <kbd>L</kbd> <kbd>C</kbd> right-click · aim with arrows or mouse
+      </>
+    ),
+    pad: 'Y / RB · aim with the right stick',
+    touch: 'Special stick: drag to aim, lift to fire',
+  },
+  {
+    action: 'Menu',
+    detail: 'F3 toggles the debug overlay',
+    keys: (
+      <>
+        <kbd>Esc</kbd> · <kbd>F3</kbd>
+      </>
+    ),
+    pad: 'Start',
+    touch: 'Menu button (top right)',
+  },
+];
+
+function MenuGlyph({ open }: { open: boolean }) {
   return (
-    <span className={styles.status} data-state={server.kind} role="status">
+    <svg viewBox="0 0 7 7" width="14" height="14" shapeRendering="crispEdges" aria-hidden>
+      <path
+        fill="currentColor"
+        d={
+          open
+            ? 'M0 0h2v1h1v1h1v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-1v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1z'
+            : 'M0 0h7v1h-7zM0 3h7v1h-7zM0 6h7v1h-7z'
+        }
+      />
+    </svg>
+  );
+}
+
+function ServerStatus({ server, compact = false }: { server: ServerState; compact?: boolean }) {
+  const full =
+    server.kind === 'checking'
+      ? 'Checking server…'
+      : server.kind === 'offline'
+        ? 'Server offline'
+        : `Server online · ${server.health.rooms} room${server.health.rooms === 1 ? '' : 's'} · ${server.health.connectedPlayers} player${server.health.connectedPlayers === 1 ? '' : 's'}`;
+  const short =
+    server.kind === 'checking' ? '…' : server.kind === 'offline' ? 'Offline' : `${server.health.connectedPlayers} on`;
+  return (
+    <span
+      className={styles.status}
+      data-state={server.kind}
+      role="status"
+      aria-label={compact ? full : undefined}
+      title={compact ? full : undefined}
+    >
       <span className={styles.dot} aria-hidden />
-      {server.kind === 'checking' && 'Checking server…'}
-      {server.kind === 'online' &&
-        `Server online · ${server.health.rooms} room${server.health.rooms === 1 ? '' : 's'} · ${server.health.connectedPlayers} player${server.health.connectedPlayers === 1 ? '' : 's'}`}
-      {server.kind === 'offline' && 'Server offline'}
+      {compact ? short : full}
     </span>
   );
 }

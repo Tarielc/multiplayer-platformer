@@ -14,10 +14,14 @@ const body = Pixelify_Sans({ subsets: ['latin'], variable: '--font-body', displa
 export const metadata: Metadata = {
   title: GAME_TITLE,
   description: 'An online platformer for 1-4 players: team up against the rhino or race to the trophy.',
+  // Opened from an iPhone home screen: no Safari bars, content under the status bar.
+  appleWebApp: { capable: true, title: GAME_TITLE, statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {
   themeColor: '#07110d',
+  // Edge to edge on notched phones; screens pad with env(safe-area-inset-*) where it matters.
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -374,3 +374,90 @@
     animation: none;
   }
 }
+
+/* --- phones: tighter alcoves, and the ready bar sticks to the bottom edge so Ready is always
+   one thumb away, however far down the setup cards are scrolled --- */
+
+@media (max-width: 640px) {
+  .lobby {
+    gap: 22px;
+  }
+
+  .slots {
+    gap: 16px;
+  }
+
+  .slot,
+  .empty {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .empty {
+    min-height: 172px;
+  }
+
+  .alcove {
+    height: 88px;
+  }
+
+  .name {
+    font-size: 26px;
+  }
+
+  .setup {
+    gap: 22px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .levelNo {
+    font-size: 48px;
+  }
+
+  .levelName {
+    font-size: 28px;
+  }
+
+  .footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    flex-wrap: nowrap;
+    gap: 14px;
+    margin: 0 -16px -40px;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: var(--canopy);
+    box-shadow:
+      inset 0 4px 0 var(--rule),
+      0 -4px 0 var(--night);
+  }
+
+  .count {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .countNumber {
+    font-size: 40px;
+  }
+
+  .hint {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .ready {
+    flex: none;
+    min-width: 128px;
+    min-height: 56px;
+    font-size: 17px;
+  }
+}

@@ -9,7 +9,62 @@
 @media (pointer: coarse) and (orientation: portrait) {
   .view {
     align-items: start;
+    align-content: start;
+    row-gap: 26px;
   }
+}
+
+/* Portrait nudge, in the gap between the stage and the sticks; above the touch layer. */
+.nudge {
+  position: relative;
+  z-index: 2;
+  justify-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  margin: 0 4px;
+  padding: 14px 16px;
+  background: var(--canopy);
+  box-shadow: inset 0 0 0 3px var(--stone);
+}
+
+.nudgeIcon {
+  flex: none;
+  color: var(--firefly);
+}
+
+.nudgeText {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--mist);
+}
+
+.nudgeText strong {
+  font-family: var(--ui);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+
+.nudgeActions {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 14px;
+}
+
+.nudgeActions button {
+  flex: 1;
+  min-height: 48px;
+}
+
+.nudgeActions button:last-child {
+  flex: none;
 }
 
 /* 16:9 stage that fits the viewport below the top bar (and its 4 px stone rim); Phaser's
@@ -74,4 +129,12 @@
 .connection {
   color: var(--firefly);
   box-shadow: inset 0 -4px 0 var(--gold-dark);
+}
+
+/* Matches RoomScreen: no top bar in game on a phone held sideways, only the body padding and the stage rim. */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  .stage {
+    width: min(100%, calc((100vh - 52px) * 16 / 9));
+    width: min(100%, calc((100dvh - 52px) * 16 / 9));
+  }
 }

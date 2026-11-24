@@ -10,6 +10,8 @@ import {
 import { GameBridge, type NetStats } from '@/game/bridge';
 import { DEFAULT_ASSET_BASE, type GameServices } from '@/game/services';
 import type { GameSession } from '@/hooks/useGameSession';
+import { lockLandscape, useFullscreen, useMediaQuery } from '@/hooks/useFullscreen';
+import { useTouchDevice } from '@/hooks/useTouchDevice';
 import type { RoomView } from '@/net/RoomStore';
 import { CountdownOverlay } from './CountdownOverlay';
 import { RespawnOverlay } from './RespawnOverlay';
@@ -19,6 +21,7 @@ import { LevelCompleteOverlay } from './LevelCompleteOverlay';
 import { PauseMenu } from './PauseMenu';
 import { TouchControls } from './TouchControls';
 import { AbilityButton } from './AbilityBadge';
+import { FullscreenIcon } from './FullscreenButton';
 import styles from './GameView.module.css';
 
 /** Width the HUD is laid out for; it scales with the stage from there. */
@@ -98,6 +101,18 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
     };
   }, [bridge, store]);
 
+  // Full screen on a phone: keep it sideways while the game runs (released on leaving it).
+  const touch = useTouchDevice();
+  const fullscreen = useFullscreen();
+  useEffect(() => {
+    if (!touch || !fullscreen.active) return;
+    return lockLandscape();
+  }, [touch, fullscreen.active]);
+
+  const portrait = useMediaQuery('(orientation: portrait)');
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+  const showNudge = touch && portrait && !nudgeDismissed && !menuOpen;
+
   const solo = room.players.length === 1;
 
   return (
@@ -133,7 +148,42 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
           <div className={`${styles.connection} px-notch`}>{view.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</div>
         )}
       </div>
+      {showNudge && (
+        <RotateNudge
+          fullscreen={fullscreen.supported && !fullscreen.active ? fullscreen.toggle : null}
+          onDismiss={() => setNudgeDismissed(true)}
+        />
+      )}
       {!menuOpen && <TouchControls touch={bridge.touch} self={view.hud.find((p) => p.isSelf)} />}
+    </div>
+  );
+}
+
+/** Phone held upright: the 16:9 stage is a strip, so suggest turning it (and full screen). */
+function RotateNudge({ fullscreen, onDismiss }: { fullscreen: (() => void) | null; onDismiss: () => void }) {
+  return (
+    <div className={`${styles.nudge} px-notch`} role="status">
+      <svg className={styles.nudgeIcon} viewBox="0 0 13 13" width="44" height="44" shapeRendering="crispEdges" aria-hidden>
+        <path
+          fill="currentColor"
+          d="M4 1h5v11h-5zM5 2v8h3v-8zM6 10h1v1h-1zM0 6h1v3h1v1h1v1h-2v-1h-1zM12 7h-1v-3h-1v-1h-1v-1h2v1h1z"
+        />
+      </svg>
+      <div className={styles.nudgeText}>
+        <strong>Turn sideways</strong>
+        <span>{fullscreen ? 'Landscape and full screen give' : 'Landscape gives'} the stage far more room.</span>
+      </div>
+      <div className={styles.nudgeActions}>
+        {fullscreen && (
+          <button type="button" className="gold" onClick={fullscreen}>
+            <FullscreenIcon />
+            Full screen
+          </button>
+        )}
+        <button type="button" onClick={onDismiss}>
+          Stay
+        </button>
+      </div>
     </div>
   );
 }

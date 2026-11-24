@@ -3,6 +3,7 @@
 import type { DevCommand, RoomInfo } from '@platformer/shared';
 import { useEffect, useRef, type CSSProperties, type ReactNode, type Ref } from 'react';
 import type { AudioSettings } from '@/game/audio/audioSettings';
+import { useFullscreen } from '@/hooks/useFullscreen';
 import type { HudPlayer } from '@/net/RoomStore';
 import { CharacterPortrait } from './CharacterPortrait';
 import viewStyles from './GameView.module.css';
@@ -41,6 +42,7 @@ export function PauseMenu({
 }: PauseMenuProps) {
   const resumeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => resumeRef.current?.focus(), []);
+  const fullscreen = useFullscreen();
 
   const othersPlaying = !solo && !room.paused;
   const present = players.filter((p) => p.connected);
@@ -102,6 +104,15 @@ export function PauseMenu({
           >
             Debug overlay
           </MenuItem>
+          {fullscreen.supported && (
+            <MenuItem
+              onClick={fullscreen.toggle}
+              aria-pressed={fullscreen.active}
+              value={<span data-on={fullscreen.active}>{fullscreen.active ? 'On' : 'Off'}</span>}
+            >
+              Full screen
+            </MenuItem>
+          )}
           {room.devCommands && room.phase === 'playing' && (
             <>
               <MenuItem onClick={() => onDev('respawn')} value={<DevTag />}>

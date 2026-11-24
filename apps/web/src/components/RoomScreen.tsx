@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { useGameSession, useRoomView } from '@/hooks/useGameSession';
 import { gameServerHttpUrl } from '@/net/serverUrl';
 import { BACKDROP_URL, GAME_TITLE } from './brand';
+import { FullscreenButton } from './FullscreenButton';
+import { FullscreenPrompt } from './FullscreenPrompt';
 import { GameView } from './GameView';
 import { LobbyPanel } from './LobbyPanel';
 import { Toasts } from './Toasts';
@@ -48,7 +50,14 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
           <span className="px-label">Room</span>
           <strong className="px-outline-sm">{roomId}</strong>
           <button className={styles.small} onClick={() => void copyInvite()}>
-            {copied ? 'Copied!' : 'Copy invite link'}
+            {copied ? (
+              'Copied!'
+            ) : (
+              <>
+                <span className={styles.long}>Copy invite link</span>
+                <span className={styles.short}>Invite</span>
+              </>
+            )}
           </button>
         </div>
         <div className={styles.right}>
@@ -56,8 +65,9 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
             <span className={styles.connDot} aria-hidden />
             {status === 'open' ? (view.rttMs !== null ? `${view.rttMs} ms` : 'online') : status}
           </span>
+          <FullscreenButton className={`${styles.small} ${styles.icon}`} />
           <button className={styles.small} onClick={leave}>
-            Leave room
+            Leave<span className={styles.long}> room</span>
           </button>
         </div>
       </header>
@@ -96,6 +106,7 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
       </main>
 
       <Toasts store={session.store} notices={view.notices} />
+      <FullscreenPrompt ready={room !== null && !fatal} />
     </div>
   );
 }

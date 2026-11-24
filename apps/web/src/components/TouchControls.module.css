@@ -8,7 +8,8 @@
   --stick: clamp(72px, 21vmin, 112px);
   --jump: clamp(56px, 16vmin, 84px);
   position: absolute;
-  inset: 0;
+  /* Clear of notches and the home indicator (the viewport extends under them). */
+  inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   z-index: 1;
   pointer-events: none;
   user-select: none;

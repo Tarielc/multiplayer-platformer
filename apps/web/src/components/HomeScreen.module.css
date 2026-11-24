@@ -28,7 +28,8 @@
     linear-gradient(180deg, rgb(7 17 13 / 0%) 72%, var(--night) 100%);
 }
 
-@media (max-width: 720px) {
+/* Below desktop the play panel sits centred over the shrine, so darken top to bottom instead. */
+@media (max-width: 1023px) {
   .scrim {
     background:
       linear-gradient(180deg, rgb(5 11 8 / 70%), rgb(5 11 8 / 88%)),
@@ -44,6 +45,7 @@
 }
 
 .nav {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -131,7 +133,7 @@
   margin: 0;
   font-family: var(--display);
   font-weight: 400;
-  font-size: clamp(88px, 12vw, 168px);
+  font-size: clamp(64px, 12vw + 24px, 168px);
   line-height: 0.85;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -510,5 +512,250 @@ li[data-final='true'] .levelNo {
 @media (prefers-reduced-motion: reduce) {
   .status[data-state='online'] .dot {
     animation: none;
+  }
+}
+
+/* --- phone menu: brand, a compact status and a Menu button that opens a sheet of links --- */
+
+.compact {
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuButton {
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 8px);
+  z-index: 5;
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sheet a {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 12px;
+  font-family: var(--ui);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone);
+  text-decoration: none;
+  box-shadow: inset 0 -2px 0 var(--rule);
+}
+
+.sheet a:hover {
+  color: var(--firefly);
+}
+
+.sheet .status {
+  align-self: flex-start;
+  margin-top: 12px;
+}
+
+/* --- controls as cards (phones only; the table shows above that) --- */
+
+.controlCards {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.controlCards li {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.controlCards h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.controlCards p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.touchLine {
+  font-size: 16px;
+  color: var(--moss-pale);
+}
+
+.detail {
+  font-size: 14px;
+  color: var(--mist);
+}
+
+.otherInputs {
+  font-size: 13px;
+  color: var(--lichen);
+}
+
+/* --- tablet --- */
+
+@media (max-width: 1023px) {
+  .heroBody {
+    margin: 0 auto;
+    padding-top: 24px;
+  }
+}
+
+/* --- phone --- */
+
+@media (max-width: 639px) {
+  .wrap {
+    padding: 0 16px;
+  }
+
+  .nav {
+    flex-wrap: nowrap;
+    padding: 14px 0;
+  }
+
+  .brand {
+    font-size: 32px;
+  }
+
+  .links {
+    display: none;
+  }
+
+  .compact {
+    display: flex;
+  }
+
+  .heroBody {
+    gap: 16px;
+    padding: 12px 0 56px;
+  }
+
+  .tagline {
+    font-size: 17px;
+  }
+
+  .play {
+    padding: 24px 18px 20px;
+    gap: 18px;
+  }
+
+  /* Label on its own line, code box and Join side by side under it. */
+  .join > label {
+    flex-basis: 100%;
+  }
+
+  .join input {
+    flex-basis: 0;
+  }
+
+  .section {
+    padding: 48px 16px 24px;
+    gap: 24px;
+  }
+
+  .sectionHead h2 {
+    font-size: 40px;
+  }
+
+  /* Characters scroll sideways, one card at a time. */
+  .cards {
+    display: flex;
+    gap: 18px;
+    margin: 0 -16px;
+    padding: 8px 16px 24px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--stone) transparent;
+  }
+
+  .card {
+    flex: 0 0 min(290px, 80vw);
+    scroll-snap-align: center;
+  }
+
+  .card h3 {
+    font-size: 34px;
+  }
+
+  .alcove {
+    height: 160px;
+  }
+
+  .modes {
+    gap: 24px;
+  }
+
+  .mode {
+    padding: 10px 10px 20px;
+    gap: 12px;
+  }
+
+  .modeHead h3 {
+    font-size: 40px;
+  }
+
+  .mode p {
+    font-size: 15px;
+  }
+
+  .levels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .levels li {
+    min-height: 64px;
+    gap: 10px;
+    padding: 6px 12px;
+  }
+
+  .levels li[data-final='true'] {
+    grid-column: 1 / -1;
+  }
+
+  .levelNo {
+    width: auto;
+    font-size: 36px;
+  }
+
+  .levelName {
+    font-size: 22px;
+  }
+
+  .controls {
+    display: none;
+  }
+
+  .controlCards {
+    display: flex;
+  }
+
+  .footerRow {
+    padding: 28px 16px calc(36px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 640px) {
+  .sheet {
+    display: none;
   }
 }
