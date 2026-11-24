@@ -176,6 +176,77 @@
   color: var(--lichen);
 }
 
+.slotAbility {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--ui);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.slotAbility > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abilityIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  background: var(--fern);
+}
+
+.abilityIcon img {
+  width: 16px;
+  height: 16px;
+}
+
+.abilityIcon[data-large='true'] {
+  width: 56px;
+  height: 56px;
+}
+
+.abilityIcon[data-large='true'] img {
+  width: 40px;
+  height: 40px;
+}
+
+/* The picked character's special, under the picker. */
+.abilityInfo {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 4px solid var(--rule);
+}
+
+.abilityText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.abilityName {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 0.95;
+  color: var(--firefly);
+}
+
+.abilityBlurb {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--bone);
+}
+
 .meta {
   font-family: var(--ui);
   font-size: 12px;
