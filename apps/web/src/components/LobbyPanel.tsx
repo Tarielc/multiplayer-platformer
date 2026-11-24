@@ -2,10 +2,13 @@
 
 import { LEVELS, MAX_PLAYERS, MODE_CONFIG, PLAYER_SLOTS, scalingSummary, slotStyle, type CharacterId } from '@platformer/shared';
 import type { CSSProperties } from 'react';
+import { abilityIconPath } from '@/game/abilities/abilityArt';
+import { DEFAULT_ASSET_BASE } from '@/game/services';
 import type { GameSession } from '@/hooks/useGameSession';
 import { savePreferredCharacter } from '@/net/identity';
 import type { RoomView } from '@/net/RoomStore';
 import { CharacterPicker } from './CharacterPicker';
+import { ABILITY_BLURBS, abilityName } from './brand';
 import { CharacterPortrait } from './CharacterPortrait';
 import styles from './LobbyPanel.module.css';
 import { ModePicker } from './ModePicker';
@@ -92,6 +95,10 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
                 <span className="px-outline-sm">{player.name}</span>
                 {player.id === view.selfId && <span className={styles.you}>(you)</span>}
               </div>
+              <div className={styles.slotAbility}>
+                <AbilityIcon characterId={player.characterId} />
+                <span>{abilityName(player.characterId)}</span>
+              </div>
               <div className={styles.meta}>
                 {!player.connected ? (
                   <span className={styles.warn}>Reconnecting…</span>
@@ -117,6 +124,14 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
               takenBy={takenBy}
               disabled={room.phase !== 'lobby'}
             />
+            <div className={styles.abilityInfo} aria-live="polite">
+              <AbilityIcon characterId={me.characterId} large />
+              <div className={styles.abilityText}>
+                <span className="px-label">Special ability</span>
+                <span className={`${styles.abilityName} px-outline-sm`}>{abilityName(me.characterId)}</span>
+                <p className={styles.abilityBlurb}>{ABILITY_BLURBS[me.characterId]}</p>
+              </div>
+            </div>
           </section>
         )}
 
@@ -163,5 +178,14 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
         </button>
       </footer>
     </section>
+  );
+}
+
+/** A character's special-ability icon in a small notched fern tile. */
+function AbilityIcon({ characterId, large = false }: { characterId: CharacterId; large?: boolean }) {
+  return (
+    <span className={`${styles.abilityIcon} px-notch`} data-large={large}>
+      <img className="px-sprite" src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(characterId)}`} alt="" draggable={false} />
+    </span>
   );
 }
