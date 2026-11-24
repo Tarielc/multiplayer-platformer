@@ -360,6 +360,7 @@ export class GameWorld {
     if (this.ctx.combat.playerHits) this.resolveAttacks();
     this.resolveBoxAttacks();
     this.resolveFoes();
+    this.updateButtons();
     this.traps.expire(this.tick);
     for (const player of this.players.values()) {
       if (player.body.alive || player.place > 0) continue;
@@ -697,6 +698,22 @@ export class GameWorld {
   private hitBox(player: WorldPlayer | null, boxId: number, count = 1): void {
     const result = this.traps.hitBox(boxId, this.tick, count);
     if (result) this.events.push({ type: 'boxHit', playerId: player?.id ?? '', boxId, hits: result.hits, broken: result.broken });
+  }
+
+  /**
+   * Buttons are pressed by the feet of players standing on them and by boxes resting on them
+   * (or overlapping them); the traps they link to work only while one is pressed.
+   */
+  private updateButtons(): void {
+    if (this.traps.buttons.length === 0) return;
+    const { width, height } = this.ctx.hitbox;
+    const pressers: Rect[] = [];
+    for (const p of this.players.values()) {
+      const b = p.body;
+      if (b.alive && b.grounded) pressers.push({ x: b.x, y: b.y + height - 1, width, height: 2 });
+    }
+    for (const { rect } of this.traps.boxes()) pressers.push({ ...rect, height: rect.height + 1 });
+    this.traps.updateButtons(this.tick, pressers);
   }
 
   /** Swings break boxes too (whether or not they can hit players), once per box per swing. */

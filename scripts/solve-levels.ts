@@ -161,7 +161,7 @@ function exitDistance(level: LevelData, world: GameWorld): number {
 /** Positions are bucketed; traps add their replicated state and a coarse time phase. */
 function stateKey(world: GameWorld, timed: boolean): string {
   const body = world.getPlayer('solo')!.body;
-  const traps = world.trapField.toNet().map((t) => `${t.id}:${t.hits ?? ''}`).join(',');
+  const traps = world.trapField.toNet().map((t) => `${t.id}:${t.hits ?? ''}${t.pressed ? 'p' : ''}`).join(',');
   const phase = timed ? Math.floor(world.tick / 20) % 9 : 0;
   return `${Math.round(body.x / 4)},${Math.round(body.y / 4)},${Math.round(body.vx / 60)},${traps},${phase}`;
 }

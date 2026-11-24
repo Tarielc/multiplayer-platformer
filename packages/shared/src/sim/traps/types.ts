@@ -5,7 +5,7 @@ import type { Rect } from '../../util/math';
  * that affects the simulation is resolved here (defaults + per-object properties, times in
  * ticks), so the definitions alone decide where a trap is at any tick.
  */
-export const TRAP_KINDS = ['spikes', 'trampoline', 'saw', 'fallingPlatform', 'fan', 'rockHead', 'spikeHead', 'box'] as const;
+export const TRAP_KINDS = ['spikes', 'trampoline', 'saw', 'fallingPlatform', 'fan', 'rockHead', 'spikeHead', 'box', 'button'] as const;
 export type TrapKind = (typeof TRAP_KINDS)[number];
 
 export type Dir4 = 'up' | 'down' | 'left' | 'right';
@@ -94,6 +94,28 @@ export interface BoxTrap extends TrapCommon, Rect {
   maxHits: number;
 }
 
+/**
+ * Pressure plate on the floor. It is pressed while a player stands on it or a box rests on it.
+ * Pressing it switches the traps it is linked to (`targets`, trap ids) on (`action: 'on'`: they
+ * only work while it is pressed) or off (`'off'`: they work until it is pressed). The body is its
+ * cap: solid and low, so players walk up onto it.
+ */
+export interface ButtonTrap extends TrapCommon, Rect {
+  kind: 'button';
+  targets: number[];
+  action: ButtonAction;
+}
+
+/** What pressing a button does to the traps it links to. */
+export type ButtonAction = 'on' | 'off';
+export const BUTTON_ACTIONS: readonly ButtonAction[] = ['on', 'off'];
+
+/** Trap kinds a button can switch on and off. */
+export const SWITCHABLE_KINDS: readonly TrapKind[] = ['spikes', 'trampoline', 'saw', 'fallingPlatform', 'fan', 'rockHead', 'spikeHead'];
+
+/** Kinds that move or cycle with time: a switched-off one stops its clock, and picks up from there. */
+export const CLOCKED_KINDS: readonly TrapKind[] = ['saw', 'fan', 'rockHead'];
+
 export type TrapDef =
   | SpikesTrap
   | TrampolineTrap
@@ -102,7 +124,8 @@ export type TrapDef =
   | FanTrap
   | RockHeadTrap
   | SpikeHeadTrap
-  | BoxTrap;
+  | BoxTrap
+  | ButtonTrap;
 
 export type TrapOf<K extends TrapKind> = Extract<TrapDef, { kind: K }>;
 
@@ -121,6 +144,15 @@ export interface NetTrapState {
   y?: number;
   /** Box: picked up by an ability (not in the level right now; see `NetPropState`). */
   taken?: boolean;
+  /** Button: pressed right now. */
+  pressed?: boolean;
+  /**
+   * Trap linked to a button: its own clock (the ticks it has run while switched on) was at
+   * `clock` when it last stopped or started, and has been running since tick `since` (absent:
+   * stopped). Absent both: it hasn't run yet.
+   */
+  clock?: number;
+  since?: number;
 }
 
 /** Something a body collides with this tick. */
@@ -131,6 +163,8 @@ export interface TrapCollider extends Rect {
   oneWay: boolean;
   /** Landing on top launches the body upward at this speed (trampolines, boxes); 0 = none. */
   bounce: number;
+  /** Low enough to walk up onto (buttons). */
+  step?: boolean;
 }
 
 /** Something that hurts on overlap this tick. */

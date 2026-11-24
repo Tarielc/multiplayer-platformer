@@ -29,6 +29,8 @@ export type WorldCueName =
   | 'boxBreak'
   | 'thud'
   | 'shake'
+  | 'buttonOn'
+  | 'buttonOff'
   | 'heal'
   | 'grab'
   | 'drop'

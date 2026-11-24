@@ -6,7 +6,7 @@ import { CellFlag, type LevelData } from '../../level/types';
 import type { Rect } from '../../util/math';
 import { cellAt } from '../collision';
 import { accelTime } from './motion';
-import { DIR4, type Dir4, type TrapDef, type TrapKind } from './types';
+import { BUTTON_ACTIONS, DIR4, SWITCHABLE_KINDS, type ButtonAction, type Dir4, type TrapDef, type TrapKind } from './types';
 
 /** A Tiled object whose class is a trap kind. Position is the top-left (or the point). */
 export interface TrapObject {
@@ -31,6 +31,8 @@ const KIND_ALIASES: Record<string, TrapKind> = {
   rockhead: 'rockHead',
   spikehead: 'spikeHead',
   box: 'box',
+  button: 'button',
+  pressureplate: 'button',
 };
 
 /** Trap kind for a Tiled class name (case, spaces, `-` and `_` ignored), or null. */
@@ -46,7 +48,45 @@ const EPS = 1e-6;
  * Throws `LevelFormatError` for objects that can't work.
  */
 export function parseTraps(objects: readonly TrapObject[], level: LevelData, config: Readonly<CompiledTraps> = TRAP_CONFIG): TrapDef[] {
-  return objects.map((obj) => parseTrap(obj, level, config)).sort((a, b) => a.id - b.id);
+  const traps = objects.map((obj) => parseTrap(obj, level, config)).sort((a, b) => a.id - b.id);
+  linkButtons(objects, traps);
+  return traps;
+}
+
+/**
+ * Resolves each button's targets: every property named `target…` or `link…` holds a Tiled
+ * object reference (an id), or a string of object names or ids separated by commas. A name
+ * links every trap with that name.
+ */
+function linkButtons(objects: readonly TrapObject[], traps: TrapDef[]): void {
+  const byId = new Map(traps.map((t) => [t.id, t]));
+  for (const obj of objects) {
+    if (obj.kind !== 'button') continue;
+    const button = byId.get(obj.id);
+    if (button?.kind !== 'button') continue;
+    const where = `button "${obj.name}" (id ${obj.id}) at (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+    const ids = new Set<number>();
+    for (const [key, value] of Object.entries(obj.properties)) {
+      const name = key.toLowerCase();
+      if (!name.startsWith('target') && !name.startsWith('link')) continue;
+      const refs = typeof value === 'number' ? [value] : typeof value === 'string' ? value.split(',').map((r) => r.trim()).filter(Boolean) : [];
+      for (const ref of refs) {
+        const matches =
+          typeof ref === 'number'
+            ? traps.filter((t) => t.id === ref)
+            : traps.filter((t) => t.name.trim() === ref || (/^\d+$/.test(ref) && t.id === Number(ref)));
+        if (matches.length === 0) throw new LevelFormatError(`${where}: "${key}" names no trap ("${ref}")`);
+        for (const target of matches) {
+          if (!SWITCHABLE_KINDS.includes(target.kind)) {
+            throw new LevelFormatError(`${where}: can't switch ${target.kind} "${target.name}" (id ${target.id}); it links to ${SWITCHABLE_KINDS.join(', ')}`);
+          }
+          ids.add(target.id);
+        }
+      }
+    }
+    if (ids.size === 0) throw new LevelFormatError(`${where}: no "target" property linking it to a trap`);
+    button.targets = [...ids].sort((a, b) => a - b);
+  }
 }
 
 function parseTrap(obj: TrapObject, level: LevelData, cfg: Readonly<CompiledTraps>): TrapDef {
@@ -202,6 +242,14 @@ function parseTrap(obj: TrapObject, level: LevelData, cfg: Readonly<CompiledTrap
         variant,
         maxHits: cfg.box.hits[variant - 1]!,
       };
+    }
+    case 'button': {
+      const action = props.action ?? 'on';
+      if (typeof action !== 'string' || !BUTTON_ACTIONS.includes(action as ButtonAction)) {
+        throw new LevelFormatError(`${where}: "action" must be one of ${BUTTON_ACTIONS.join(', ')}`);
+      }
+      // Targets are resolved once every trap is parsed (`linkButtons`).
+      return { ...common, kind: 'button', ...body(cfg.button.width, cfg.button.height), targets: [], action: action as ButtonAction };
     }
   }
 }

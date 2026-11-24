@@ -20,6 +20,7 @@ export type TrapSheetName =
   | 'box1'
   | 'box2'
   | 'box3'
+  | 'button'
   | 'start'
   | 'checkpoint'
   | 'finish'
@@ -104,6 +105,9 @@ export const TRAP_SHEETS: Readonly<Record<TrapSheetName, TrapSheet>> = {
   box1: box('box1', 3),
   box2: box('box2', 4),
   box3: box('box3', 2),
+  // Frame 0: up (off), frame 1: pressed (on). Drawn by scripts/lib/buttonSprite.ts. The body is
+  // the pressed cap's outline, down to the floor.
+  button: sheet('button', { frameWidth: 24, frameHeight: 8, columns: 2, rowFrames: [2], bodyX: 5, bodyY: 5, placeholderColor: 0xde4840 }),
   // Rows: idle, moving (wobbles when a player runs past).
   start: marker('start', [1, 17], 0xe8b53a),
   // Rows: bare pole, flag out (on activation), flag idle (loop).

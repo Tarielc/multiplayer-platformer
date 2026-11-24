@@ -1,15 +1,25 @@
 import { TRAP_CONFIG, type CompiledTraps } from '../../config/traps';
 import type { LevelData } from '../../level/types';
-import type { Rect } from '../../util/math';
+import { rectsOverlap, type Rect, type Vec2 } from '../../util/math';
 import { fallingCycleTicks, fallingPlatformState, fanOn, rockHeadRect, sawCenter, type FallingState } from './motion';
-import type {
-  FallingPlatformTrap,
-  FanTrap,
-  NetTrapState,
-  TrapCollider,
-  TrapDef,
-  TrapHazard,
+import {
+  CLOCKED_KINDS,
+  type ButtonTrap,
+  type FallingPlatformTrap,
+  type FanTrap,
+  type NetTrapState,
+  type RockHeadTrap,
+  type SawTrap,
+  type TrapCollider,
+  type TrapDef,
+  type TrapHazard,
 } from './types';
+
+/** A switched trap's own clock: `clock` ticks run before `since`, and running since `since` (null: stopped). */
+interface TrapClock {
+  clock: number;
+  since: number | null;
+}
 
 /**
  * Runtime traps for one level run: the parsed definitions plus the little state that changes
@@ -33,6 +43,15 @@ export class TrapField {
   private readonly taken = new Set<number>();
   /** Server bookkeeping for the box hit cooldown (not replicated). */
   private readonly lastHit = new Map<number, number>();
+  readonly buttons: readonly ButtonTrap[];
+  /**
+   * Linked trap id -> the buttons switching it: it works while one of its `on` buttons is
+   * pressed (or it has none) and none of its `off` buttons is.
+   */
+  private readonly switchedBy = new Map<number, { on: number[]; off: number[] }>();
+  private readonly pressed = new Set<number>();
+  /** Clocks of switched saws, fans and rock-heads that have run at least once. */
+  private readonly clocks = new Map<number, TrapClock>();
 
   constructor(
     traps: readonly TrapDef[],
@@ -42,6 +61,14 @@ export class TrapField {
     for (const trap of traps) this.byId.set(trap.id, trap);
     this.fans = traps.filter((t): t is FanTrap => t.kind === 'fan');
     this.hasColliders = traps.some((t) => COLLIDER_KINDS.has(t.kind));
+    this.buttons = traps.filter((t): t is ButtonTrap => t.kind === 'button');
+    for (const button of this.buttons) {
+      for (const target of button.targets) {
+        const lists = this.switchedBy.get(target) ?? { on: [], off: [] };
+        lists[button.action].push(button.id);
+        this.switchedBy.set(target, lists);
+      }
+    }
   }
 
   static forLevel(level: LevelData, config: Readonly<CompiledTraps> = TRAP_CONFIG): TrapField {
@@ -60,13 +87,22 @@ export class TrapField {
     for (const [id, tick] of this.lastHit) copy.lastHit.set(id, tick);
     for (const [id, pos] of this.boxPos) copy.boxPos.set(id, { ...pos });
     for (const id of this.taken) copy.taken.add(id);
+    for (const id of this.pressed) copy.pressed.add(id);
+    for (const [id, c] of this.clocks) copy.clocks.set(id, { ...c });
     return copy;
   }
 
   // --- replication -----------------------------------------------------------------------------
 
   toNet(): NetTrapState[] {
-    const ids = new Set([...this.hits.keys(), ...this.triggers.keys(), ...this.boxPos.keys(), ...this.taken]);
+    const ids = new Set([
+      ...this.hits.keys(),
+      ...this.triggers.keys(),
+      ...this.boxPos.keys(),
+      ...this.taken,
+      ...this.pressed,
+      ...this.clocks.keys(),
+    ]);
     return [...ids]
       .sort((a, b) => a - b)
       .map((id) => {
@@ -81,6 +117,12 @@ export class TrapField {
           entry.y = pos.y;
         }
         if (this.taken.has(id)) entry.taken = true;
+        if (this.pressed.has(id)) entry.pressed = true;
+        const clock = this.clocks.get(id);
+        if (clock) {
+          entry.clock = clock.clock;
+          if (clock.since !== null) entry.since = clock.since;
+        }
         return entry;
       });
   }
@@ -91,12 +133,104 @@ export class TrapField {
     this.triggers.clear();
     this.boxPos.clear();
     this.taken.clear();
+    this.pressed.clear();
+    this.clocks.clear();
     for (const s of states) {
       if (s.hits !== undefined) this.hits.set(s.id, s.hits);
       if (s.trigger !== undefined) this.triggers.set(s.id, s.trigger);
       if (s.x !== undefined && s.y !== undefined) this.boxPos.set(s.id, { x: s.x, y: s.y });
       if (s.taken) this.taken.add(s.id);
+      if (s.pressed) this.pressed.add(s.id);
+      if (s.clock !== undefined) this.clocks.set(s.id, { clock: s.clock, since: s.since ?? null });
     }
+  }
+
+  // --- buttons ---------------------------------------------------------------------------------
+
+  isPressed(buttonId: number): boolean {
+    return this.pressed.has(buttonId);
+  }
+
+  /** True when a button links to this trap. */
+  isSwitched(id: number): boolean {
+    return this.switchedBy.has(id);
+  }
+
+  /**
+   * Whether a trap works: one of its `on` buttons is pressed (or it has none) and none of its
+   * `off` buttons is. Traps no button links to always work.
+   */
+  isActive(id: number): boolean {
+    const s = this.switchedBy.get(id);
+    if (!s) return true;
+    const enabled = s.on.length === 0 || s.on.some((b) => this.pressed.has(b));
+    return enabled && !s.off.some((b) => this.pressed.has(b));
+  }
+
+  /** Switched on when the level starts (nothing pressed): it is linked to `off` buttons only. */
+  private activeAtStart(id: number): boolean {
+    const s = this.switchedBy.get(id);
+    return !s || s.on.length === 0;
+  }
+
+  /**
+   * The tick a trap's motion is computed at: the level clock, except for switched saws, fans
+   * and rock-heads, which only count the ticks they ran while switched on (so they stop where
+   * they are and carry on from there).
+   */
+  trapTick(id: number, tick: number): number {
+    if (!this.switchedBy.has(id)) return tick;
+    const c = this.clocks.get(id);
+    // Never switched yet: running since the level started, or stopped at its start.
+    if (!c) return this.activeAtStart(id) ? tick : 0;
+    return c.since === null ? c.clock : c.clock + Math.max(0, tick - c.since);
+  }
+
+  /**
+   * Presses the buttons that one of `pressers` (players' feet, boxes, reaching a pixel below
+   * their bottom so resting on the cap counts) overlaps, releases the
+   * others, and starts or stops the clocks of the traps they switch (server, once per tick).
+   * Returns the buttons that changed.
+   */
+  updateButtons(tick: number, pressers: readonly Rect[]): { id: number; pressed: boolean }[] {
+    const changed: { id: number; pressed: boolean }[] = [];
+    if (this.buttons.length === 0) return changed;
+    const wasActive = new Map<number, boolean>();
+    for (const id of this.switchedBy.keys()) wasActive.set(id, this.isActive(id));
+    for (const button of this.buttons) {
+      const down = pressers.some((r) => rectsOverlap(r, button));
+      if (down === this.pressed.has(button.id)) continue;
+      if (down) this.pressed.add(button.id);
+      else this.pressed.delete(button.id);
+      changed.push({ id: button.id, pressed: down });
+    }
+    for (const [id, was] of wasActive) {
+      const trap = this.byId.get(id);
+      const now = this.isActive(id);
+      if (now === was || !trap || !CLOCKED_KINDS.includes(trap.kind)) continue;
+      const c = this.clocks.get(id) ?? { clock: 0, since: this.activeAtStart(id) ? 0 : null };
+      if (now) c.since = tick;
+      else if (c.since !== null) {
+        c.clock += Math.max(0, tick - c.since);
+        c.since = null;
+      }
+      this.clocks.set(id, c);
+    }
+    return changed;
+  }
+
+  // --- motion at a tick (switched traps on their own clock) ------------------------------------
+
+  sawCenter(saw: SawTrap, tick: number): Vec2 {
+    return sawCenter(saw, this.trapTick(saw.id, tick));
+  }
+
+  rockHeadRect(rock: RockHeadTrap, tick: number): Rect {
+    return rockHeadRect(rock, this.trapTick(rock.id, tick));
+  }
+
+  fanOn(fan: FanTrap, tick: number): boolean {
+    return this.isActive(fan.id) && fanOn(fan, this.trapTick(fan.id, tick));
   }
 
   // --- boxes -----------------------------------------------------------------------------------
@@ -181,7 +315,7 @@ export class TrapField {
   /** Starts a falling platform's countdown (someone stood on it). False if it is not idle. */
   trigger(id: number, tick: number): boolean {
     const trap = this.byId.get(id);
-    if (trap?.kind !== 'fallingPlatform') return false;
+    if (trap?.kind !== 'fallingPlatform' || !this.isActive(id)) return false;
     const current = this.triggers.get(id);
     if (current !== undefined && tick < current + fallingCycleTicks(trap, this.config)) return false;
     this.triggers.set(id, tick);
@@ -228,14 +362,15 @@ export class TrapField {
     const base = { id: trap.id, kind: trap.kind };
     switch (trap.kind) {
       case 'trampoline':
-        return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: true, bounce: trap.launch };
+        // Switched off, it is just a ledge.
+        return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: true, bounce: this.isActive(trap.id) ? trap.launch : 0 };
       case 'fallingPlatform': {
         const state = this.fallingState(trap, tick);
         if (state.phase === 'gone') return null;
         return { ...base, x: trap.x, y: trap.y + state.dy, width: trap.width, height: trap.height, oneWay: true, bounce: 0 };
       }
       case 'rockHead':
-        return { ...base, ...rockHeadRect(trap, tick), oneWay: false, bounce: 0 };
+        return { ...base, ...this.rockHeadRect(trap, tick), oneWay: false, bounce: 0 };
       case 'spikeHead':
         return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: false, bounce: 0 };
       case 'box': {
@@ -243,6 +378,8 @@ export class TrapField {
         if (!rect) return null;
         return { ...base, ...rect, oneWay: false, bounce: 0 };
       }
+      case 'button':
+        return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: false, bounce: 0, step: true };
       default:
         return null;
     }
@@ -253,6 +390,7 @@ export class TrapField {
     const out: TrapHazard[] = [];
     const s = this.config.spikes;
     for (const trap of this.traps) {
+      if (!this.isActive(trap.id)) continue;
       switch (trap.kind) {
         case 'spikes': {
           // Trim the strip to the blades: the inset is measured from the tips' side.
@@ -279,7 +417,7 @@ export class TrapField {
           break;
         }
         case 'saw': {
-          const c = sawCenter(trap, tick);
+          const c = this.sawCenter(trap, tick);
           out.push({ id: trap.id, kind: trap.kind, rect: null, circle: { x: c.x, y: c.y, r: trap.radius }, sourceX: c.x, sourceY: c.y });
           break;
         }
@@ -308,7 +446,7 @@ export class TrapField {
     const out: FanTrap[] = [];
     for (const fan of this.fans) {
       const s = fan.stream;
-      if (box.x < s.x + s.width && box.x + box.width > s.x && box.y < s.y + s.height && box.y + box.height > s.y && fanOn(fan, tick)) {
+      if (box.x < s.x + s.width && box.x + box.width > s.x && box.y < s.y + s.height && box.y + box.height > s.y && this.fanOn(fan, tick)) {
         out.push(fan);
       }
     }
@@ -316,4 +454,4 @@ export class TrapField {
   }
 }
 
-const COLLIDER_KINDS = new Set<TrapDef['kind']>(['trampoline', 'fallingPlatform', 'rockHead', 'spikeHead', 'box']);
+const COLLIDER_KINDS = new Set<TrapDef['kind']>(['trampoline', 'fallingPlatform', 'rockHead', 'spikeHead', 'box', 'button']);

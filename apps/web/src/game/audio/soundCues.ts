@@ -26,6 +26,8 @@ export const SOUND_CUES = [
   'boxBreak',
   'thud',
   'shake',
+  'buttonOn',
+  'buttonOff',
   'healStart',
   'kiss',
   'heal',
@@ -336,6 +338,30 @@ export const SOUND_CUE_DEFS: Readonly<Record<SoundCue, SoundCueDef>> = {
     volume: 0.35,
     detuneJitter: 60,
     maxVoices: 2,
+  }),
+  /** A button is pressed down: a click and a rising blip (the linked trap powers up). */
+  buttonOn: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 3200, freqEnd: 1200, attack: 0.001, sustain: 0.005, decay: 0.03, lowpass: 3500, gain: 0.5 },
+        { wave: 'square', duty: 0.25, freq: 520, freqEnd: 1040, attack: 0.004, sustain: 0.05, decay: 0.08, lowpass: 3000, gain: 0.3 },
+      ],
+    },
+    volume: 0.45,
+    detuneJitter: 20,
+    minIntervalMs: 60,
+  }),
+  /** A button pops back up: a click and a falling blip (the linked trap powers down). */
+  buttonOff: cue({
+    recipe: {
+      layers: [
+        { wave: 'noise', freq: 2400, freqEnd: 900, attack: 0.001, sustain: 0.005, decay: 0.03, lowpass: 3000, gain: 0.45 },
+        { wave: 'square', duty: 0.25, freq: 700, freqEnd: 300, attack: 0.004, sustain: 0.04, decay: 0.09, lowpass: 2400, gain: 0.25 },
+      ],
+    },
+    volume: 0.4,
+    detuneJitter: 20,
+    minIntervalMs: 60,
   }),
   // --- special abilities -----------------------------------------------------------------------
   /** Bunny-man opens his arms (heal starts). */

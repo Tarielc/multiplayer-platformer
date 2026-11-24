@@ -38,6 +38,7 @@ import {
   thinTerrainCells,
   type TerrainSetName,
 } from '@platformer/shared/dev';
+import { paintButtonSprite } from './lib/buttonSprite';
 import { paintFanPlaceholder } from './lib/fanPlaceholder';
 import { encodePng } from './lib/png';
 
@@ -216,6 +217,24 @@ class Sketch {
     return this.object('box', { x: (x + 0.5) * T, y: (y + 1) * T }, variant === 1 ? {} : { variant });
   }
 
+  /**
+   * A button on the floor under cell (x, y), linked to the traps named `target` (objects are
+   * named "<type> <n>", e.g. "spikes 1"; several separated by commas). It may share its cell
+   * with a box placed before it, which is lifted onto its cap and holds it down. `action: 'off'`
+   * makes pressing it switch the targets off instead of on.
+   */
+  button(x: number, y: number, target: string, action: 'on' | 'off' = 'on'): this {
+    const cell = this.at(x, y);
+    if (cell !== ' ') throw new Error(`button at (${x}, ${y}) overlaps "${cell}"`);
+    const other = this.reserved.get(`${x},${y}`);
+    if (other && !other.startsWith('box')) throw new Error(`button at (${x}, ${y}) overlaps ${other}`);
+    this.needsFloor('button', x, y, 1);
+    const at = { x: (x + 0.5) * T, y: (y + 1) * T };
+    const box = this.objects.find((o) => o.type === 'box' && o.x === at.x && o.y === at.y);
+    if (box) box.y -= TRAP_TUNING.button.height;
+    return this.object('button', at, action === 'on' ? { target } : { target, action });
+  }
+
   // --- foes (tile coordinates; `range` in tiles: how far they stray from where they start) ----
 
   /** A mushroom, chicken, bull or the rhino boss standing on the floor under cell (x, y). */
@@ -297,15 +316,18 @@ class Sketch {
 
 /**
  * Green Hills (gentle intro): grass, bronze and steel blocks, brick, wood platforms. Traps:
- * boxes, spikes, a saw over the pit, a trampoline to a high ledge, a fan, a box-blocked nook.
+ * boxes, a button under a box powering the spikes, a saw over the pit, a trampoline to a high
+ * ledge, a fan, a box-blocked nook.
  */
 function level1(): Sketch {
   const s = new Sketch(150, 36);
-  // 1. Start plateau with all four spawns, then two boxes to break or hop over.
+  // 1. Start plateau with all four spawns, then two boxes to break or hop over. The second
+  //    sits on a button that powers the spikes ahead: smash it and they switch off.
   s.ground(0, 23, 28);
   s.text(4, 27, '1 2 3 4');
   s.text(8, 22, 'o o o');
   s.box(15, 27, 1).box(18, 27, 2);
+  s.button(18, 27, 'spikes 1');
   // 2. Step up (4 tiles) with spikes to hop over.
   s.ground(24, 35, 24);
   s.text(28, 19, 'o o');
@@ -838,6 +860,11 @@ const fanPath = join(dataDir, 'sprites', 'traps', 'fan.png');
 if (!existsSync(fanPath)) {
   const fan = paintFanPlaceholder();
   writeFile(fanPath, encodePng(fan.width, fan.height, fan.data));
+}
+const buttonPath = join(dataDir, 'sprites', 'traps', 'button.png');
+if (!existsSync(buttonPath)) {
+  const button = paintButtonSprite();
+  writeFile(buttonPath, encodePng(button.width, button.height, button.data));
 }
 
 const samples: Array<{ id: string; sketch: Sketch; backgroundColor: string; properties?: Record<string, string> }> = [

@@ -91,6 +91,8 @@ export interface Collider extends Rect {
   oneWay: boolean;
   /** Landing on top launches the body upward at this speed; 0 = none. */
   bounce: number;
+  /** Low enough to walk up onto (buttons): moving into its side lifts the body on top. */
+  step?: boolean;
 }
 
 /**
@@ -139,6 +141,8 @@ const EPS = 1e-6;
 const RIDE_EPS = 0.5;
 /** Overlap (px) tolerated before a pushed body counts as crushed. */
 const CRUSH_TOLERANCE = 1;
+/** A body walking off a drop this small (a button's cap) steps down instead of falling. */
+const STEP_DOWN = 4;
 const NO_COLLIDERS: readonly Collider[] = [];
 
 /**
@@ -342,11 +346,27 @@ export function moveAndCollide(
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / half));
   let sx = dx / steps;
   let sy = dy / steps;
+  const wasGrounded = body.grounded;
   body.grounded = false;
   for (let i = 0; i < steps; i++) {
     if (sx !== 0 && moveX(body, sx, ctx, colliders)) sx = 0;
     if (sy !== 0 && moveY(body, sy, ctx, colliders, contacts)) sy = 0;
   }
+  if (wasGrounded && !body.grounded && body.vy >= 0 && !body.jumping) stepDown(body, ctx, colliders, contacts);
+}
+
+/** Walked off a ledge: if there is ground just below (`STEP_DOWN`), stand on it. */
+function stepDown(body: MovementBody, ctx: MovementContext, colliders: readonly Collider[], contacts: StepContacts): void {
+  const y = body.y;
+  const vy = body.vy;
+  const probe = noContacts();
+  if (moveY(body, STEP_DOWN, ctx, colliders, probe) && body.grounded) {
+    contacts.ground = probe.ground;
+    return;
+  }
+  body.y = y;
+  body.vy = vy;
+  body.grounded = false;
 }
 
 function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: readonly Collider[]): boolean {
@@ -372,6 +392,7 @@ function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: 
       if (c.oneWay || body.y >= c.y + c.height - EPS || body.y + h <= c.y + EPS) continue;
       // Only edges crossed by this move block it (never snap out of something already overlapped).
       if (startX + w <= c.x + EPS && body.x + w > c.x + EPS) {
+        if (c.step && stepUp(body, c, ctx, colliders)) continue;
         body.x = c.x - w;
         hit = true;
       }
@@ -389,6 +410,7 @@ function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: 
       if (c.oneWay || body.y >= c.y + c.height - EPS || body.y + h <= c.y + EPS) continue;
       const right = c.x + c.width;
       if (startX >= right - EPS && body.x < right - EPS) {
+        if (c.step && stepUp(body, c, ctx, colliders)) continue;
         body.x = right;
         hit = true;
       }
@@ -396,6 +418,28 @@ function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: 
   }
   if (hit) body.vx = 0;
   return hit;
+}
+
+/**
+ * Lifts a body walking into a low collider (`step`) on top of it, if there is head room.
+ * Returns false (blocked) when its feet are above the top already or there is no room.
+ */
+function stepUp(body: MovementBody, c: Collider, ctx: MovementContext, colliders: readonly Collider[]): boolean {
+  const { level, hitbox } = ctx;
+  const ts = level.tileSize;
+  const rise = body.y + hitbox.height - c.y;
+  if (rise <= EPS || rise > c.height + EPS) return false;
+  const y = c.y - hitbox.height;
+  const c0 = Math.floor(body.x / ts);
+  const c1 = Math.floor((body.x + hitbox.width - EPS) / ts);
+  for (let row = Math.floor(y / ts); row <= Math.floor((body.y - EPS) / ts); row++) {
+    for (let col = c0; col <= c1; col++) if (cellAt(level, col, row) & CellFlag.SOLID) return false;
+  }
+  for (const other of colliders) {
+    if (other !== c && !other.oneWay && overlaps(body.x, y, hitbox.width, hitbox.height, other, EPS)) return false;
+  }
+  body.y = y;
+  return true;
 }
 
 function moveY(

@@ -119,7 +119,17 @@ function sameTraps(a: readonly NetTrapState[], b: readonly NetTrapState[]): bool
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!;
     const y = b[i]!;
-    if (x.id !== y.id || x.hits !== y.hits || x.trigger !== y.trigger || x.x !== y.x || x.y !== y.y || x.taken !== y.taken) {
+    if (
+      x.id !== y.id ||
+      x.hits !== y.hits ||
+      x.trigger !== y.trigger ||
+      x.x !== y.x ||
+      x.y !== y.y ||
+      x.taken !== y.taken ||
+      x.pressed !== y.pressed ||
+      x.clock !== y.clock ||
+      x.since !== y.since
+    ) {
       return false;
     }
   }

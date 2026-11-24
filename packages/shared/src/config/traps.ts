@@ -76,6 +76,14 @@ export interface TrapTuning {
     /** Solid body, spikes included. Touching it hurts. */
     size: number;
   };
+  button: {
+    /**
+     * The cap (the pressed-down art): solid, low enough to walk up onto. Things standing or
+     * resting on it press it.
+     */
+    width: number;
+    height: number;
+  };
   box: {
     width: number;
     height: number;
@@ -96,6 +104,7 @@ export const TRAP_TUNING: Readonly<TrapTuning> = {
   rockHead: { size: 32, accel: 1400, maxSpeed: 420, waitMs: 900 },
   spikeHead: { size: 42 },
   box: { width: 20, height: 20, hits: [1, 2, 3], hitCooldownMs: 200 },
+  button: { width: 14, height: 3 },
 };
 
 /** Trap tuning in simulation units: times in ticks, everything else as authored. */
@@ -126,6 +135,7 @@ export interface CompiledTraps {
   rockHead: { size: number; accel: number; maxSpeed: number; waitTicks: number };
   spikeHead: TrapTuning['spikeHead'];
   box: { width: number; height: number; hits: readonly [number, number, number]; hitCooldownTicks: number };
+  button: TrapTuning['button'];
 }
 
 export function compileTraps(t: TrapTuning): CompiledTraps {
@@ -176,6 +186,7 @@ export function compileTraps(t: TrapTuning): CompiledTraps {
       hits: [...t.box.hits] as [number, number, number],
       hitCooldownTicks: Math.max(1, msToTicks(t.box.hitCooldownMs)),
     },
+    button: { ...t.button },
   };
 }
 

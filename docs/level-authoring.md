@@ -90,6 +90,30 @@ Times are in milliseconds, distances in pixels. Every property is optional.
 | `rockHead` | 32×32 | Point or rect | `axis` (`x` default, `y`), `dir` (first move: `right`/`down` default, or `left`/`up`), `waitMs` (900), `phaseMs` | Solid. Scans the tiles for the walls it hits on its axis, then waits, accelerates, slams into a wall, waits, and goes back. You can ride it. Pinned between it and a wall: crushed (instant death). Needs walls on its axis: map edges count horizontally, but a vertical one needs a real floor and ceiling. |
 | `spikeHead` | 42×42 | Point or rect | – | Solid and static; touching any side costs a heart. |
 | `box` | 20×20 | Point on the floor, or rect | `variant` (1–3: hits to break, and the art) | Solid; players can stand on it. An attack hits it (one hit per swing, 200 ms apart). On the last hit it bursts. Broken boxes stay broken for the rest of the run. |
+| `button` (or `pressurePlate`) | 14×3 (the cap) | Point on the floor | `target` (required; see below), `action` (`on` default, `off`) | A pressure plate. Its cap is solid but low: players walk up onto it and off it (no jump, no fall) and stand 3 px up. Pressed while a player stands on it or a box rests on it. Pressing it switches the traps it links to on (`action = "on"`) or off (`action = "off"`). |
+
+### Buttons
+
+A button switches the traps it links to. Its `action` property says how:
+
+- `on` (the default): they only work while it is pressed, and start switched off.
+- `off`: they work until it is pressed, and switch off while it is held down.
+
+A switched-off trap is greyed out and harmless. Link the traps with a property named `target` (or anything starting with `target` or `link`, for several: `target2`, `links`…):
+
+- an **object** property (Tiled's object reference: pick the trap in the map), or
+- a **string** of trap names or ids separated by commas: `trampoline1`, `trampoline1, saw2`. A name links every trap with that name.
+
+A trap linked to several buttons works while any of its `on` buttons is pressed (or it has none) and none of its `off` buttons is. A button can link to spikes, trampolines, saws, falling platforms, fans, rock-heads and spike-heads (not boxes or other buttons). Switched off:
+
+| Trap | Does |
+|---|---|
+| `trampoline` | Nothing: a one-way ledge, no launch. |
+| `spikes`, `spikeHead` | No damage (a spike-head stays solid). |
+| `saw`, `rockHead`, `fan` | Stops where it is, harmless (a rock-head stays solid). Pressed again, it carries on from there: these run on their own clock, which only counts while they are on. |
+| `fallingPlatform` | Doesn't fall when stood on. |
+
+When the level starts nothing is pressed, so a trap with any `on` button starts switched off and one with only `off` buttons starts on. A button that links to nothing, or names a trap that doesn't exist or can't be switched, fails the level. Players press a button by standing on it (jumping past doesn't count); a box resting on it (or placed over it) keeps it down. To start a level with a box on a button, put the box's point 3 px above the floor, on the cap. Foes don't press buttons.
 
 Damage, knockback, invulnerability, speeds and the falling and fan timings are in `TRAP_TUNING` (`config/traps.ts`). An object that can't work fails the level with a message naming it: a rock-head with no wall on its axis or placed inside one, an unknown `dir`, `axis` or `variant`, a saw with `speed` 0, a non-number property.
 

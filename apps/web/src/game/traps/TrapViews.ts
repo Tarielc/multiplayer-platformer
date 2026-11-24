@@ -1,9 +1,8 @@
 import {
-  fanOn,
   rockHeadImpacts,
   rockHeadRect,
-  sawCenter,
   type BoxTrap,
+  type ButtonTrap,
   type Dir4,
   type FallingPhase,
   type FallingPlatformTrap,
@@ -36,7 +35,43 @@ type Cue = (event: WorldCueEvent) => void;
 interface TrapView {
   /** `tick` = fractional simulation tick to draw at (the local player's predicted tick). */
   update(tick: number, frameMs: number): void;
+  /** What turns grey while a button switches the trap off. */
+  readonly parts: readonly PowerPart[];
+  /** Switched on or off by a button (only called for linked traps, when it changes). */
+  powered?(on: boolean): void;
   destroy(): void;
+}
+
+type PowerPart = Phaser.GameObjects.Sprite | Phaser.GameObjects.TileSprite | Phaser.GameObjects.Graphics;
+
+/** Grey-out filters, made the first time a part is switched off (null: no filters, e.g. Canvas). */
+const grayFilters = new WeakMap<PowerPart, Phaser.Filters.ColorMatrix | null>();
+
+/** Greys a switched-off trap out (and freezes its animation); `on` restores it. */
+function setPowered(parts: readonly PowerPart[], on: boolean): void {
+  for (const part of parts) {
+    let filter = grayFilters.get(part);
+    if (filter === undefined && !on) {
+      filter = null;
+      try {
+        part.enableFilters();
+        filter = part.filters?.internal.addColorMatrix() ?? null;
+        filter?.colorMatrix.grayscale(1).brightness(0.75, true);
+      } catch {
+        filter = null;
+      }
+      grayFilters.set(part, filter);
+    }
+    if (filter) filter.active = !on;
+    else if ('setTint' in part) {
+      if (on) part.clearTint();
+      else part.setTint(0x8a8a8a);
+    }
+    if ('anims' in part) {
+      if (on) part.anims.resume();
+      else part.anims.pause();
+    }
+  }
 }
 
 /**
@@ -52,6 +87,8 @@ export class TrapViews {
   private readonly debris: Debris[] = [];
   /** Boxes the ability prop views are drawing right now (their trap view stays hidden). */
   private readonly props = new Set<number>();
+  /** Linked traps: whether each was last drawn switched on. */
+  private readonly powered = new Map<number, boolean>();
   private lastTick = 0;
 
   constructor(
@@ -64,6 +101,14 @@ export class TrapViews {
 
   update(tick: number, frameMs: number): void {
     this.lastTick = tick;
+    for (const [id, view] of this.views) {
+      if (!this.field.isSwitched(id)) continue;
+      const on = this.field.isActive(id);
+      if (this.powered.get(id) === on) continue;
+      this.powered.set(id, on);
+      setPowered(view.parts, on);
+      view.powered?.(on);
+    }
     for (const view of this.views.values()) view.update(tick, frameMs);
     for (let i = this.debris.length - 1; i >= 0; i--) {
       if (this.debris[i]!.update(frameMs)) continue;
@@ -133,17 +178,19 @@ export class TrapViews {
       case 'trampoline':
         return new TrampolineView(scene, trap, cue);
       case 'saw':
-        return new SawView(scene, trap);
+        return new SawView(scene, trap, field);
       case 'fallingPlatform':
         return new FallingPlatformView(scene, trap, field, cue);
       case 'fan':
-        return new FanView(scene, trap);
+        return new FanView(scene, trap, field);
       case 'rockHead':
-        return new HeadView(scene, trap, 'rockHead', cue);
+        return new HeadView(scene, trap, 'rockHead', cue, field);
       case 'spikeHead':
-        return new HeadView(scene, trap, 'spikeHead', cue);
+        return new HeadView(scene, trap, 'spikeHead', cue, field);
       case 'box':
         return new BoxView(scene, trap, field, cue, (id) => this.props.has(id));
+      case 'button':
+        return new ButtonView(scene, trap, field, cue);
     }
   }
 }
@@ -182,6 +229,10 @@ class SpikesView implements TrapView {
       .setDepth(TRAP_DEPTH - 0.1);
   }
 
+  get parts(): readonly PowerPart[] {
+    return [this.strip];
+  }
+
   update(): void {}
 
   destroy(): void {
@@ -206,6 +257,10 @@ class TrampolineView implements TrapView {
     this.cue({ cue: 'bounce', x: this.trap.x + this.trap.width / 2, y: this.trap.y, isSelf });
   }
 
+  get parts(): readonly PowerPart[] {
+    return [this.sprite];
+  }
+
   update(): void {}
 
   destroy(): void {
@@ -220,6 +275,7 @@ class SawView implements TrapView {
   constructor(
     scene: Phaser.Scene,
     private readonly trap: SawTrap,
+    private readonly field: TrapField,
   ) {
     if (trap.ax !== trap.bx || trap.ay !== trap.by) {
       // Dotted rail between the two ends, with a stud at each end.
@@ -239,8 +295,12 @@ class SawView implements TrapView {
     play(this.sprite, 'saw:spin');
   }
 
+  get parts(): readonly PowerPart[] {
+    return this.track ? [this.sprite, this.track] : [this.sprite];
+  }
+
   update(tick: number): void {
-    const c = sawCenter(this.trap, tick);
+    const c = this.field.sawCenter(this.trap, tick);
     this.sprite.setPosition(c.x, c.y);
   }
 
@@ -264,6 +324,10 @@ class FallingPlatformView implements TrapView {
   ) {
     this.sprite = bodySprite(scene, 'fallingPlatform', trap.x, trap.y);
     play(this.sprite, 'fallingPlatform:fly');
+  }
+
+  get parts(): readonly PowerPart[] {
+    return [this.sprite];
   }
 
   update(tick: number, frameMs: number): void {
@@ -307,6 +371,7 @@ class FanView implements TrapView {
   constructor(
     scene: Phaser.Scene,
     private readonly trap: FanTrap,
+    private readonly field: TrapField,
   ) {
     this.sprite = scene.add
       .sprite(trap.x + trap.width / 2, trap.y + trap.height / 2, TRAP_SHEETS.fan.key, 0)
@@ -321,8 +386,12 @@ class FanView implements TrapView {
     }
   }
 
+  get parts(): readonly PowerPart[] {
+    return [this.sprite];
+  }
+
   update(tick: number, frameMs: number): void {
-    const on = fanOn(this.trap, tick);
+    const on = this.field.fanOn(this.trap, tick);
     if (on !== this.on) {
       this.on = on;
       if (on) play(this.sprite, 'fan:on');
@@ -363,12 +432,15 @@ class HeadView implements TrapView {
   private readonly fsm: StateMachine<HeadState, HeadSignals>;
   private pending: Dir4 | null = null;
   private lastTick: number | null = null;
+  /** False while a button switches it off: it stays still, eyes and all. */
+  private on = true;
 
   constructor(
     scene: Phaser.Scene,
     private readonly trap: RockHeadTrap | SpikeHeadTrap,
     private readonly sheet: 'rockHead' | 'spikeHead',
     private readonly cue: Cue,
+    private readonly field: TrapField,
   ) {
     this.sprite = bodySprite(scene, sheet, trap.x, trap.y);
     const { sprite } = this;
@@ -380,6 +452,15 @@ class HeadView implements TrapView {
     });
   }
 
+  get parts(): readonly PowerPart[] {
+    return [this.sprite];
+  }
+
+  powered(on: boolean): void {
+    this.on = on;
+    if (!on) this.sprite.stop().setFrame(trapFrame(this.sheet, 0, 0));
+  }
+
   impact(side: Dir4): void {
     this.pending = side;
   }
@@ -387,9 +468,11 @@ class HeadView implements TrapView {
   update(tick: number, frameMs: number): void {
     const { trap, sprite } = this;
     if (trap.kind === 'rockHead') {
-      const rect = rockHeadRect(trap, tick);
+      // A switched-off rock-head's clock stands still, so it neither moves nor slams.
+      const local = this.field.trapTick(trap.id, tick);
+      const rect = rockHeadRect(trap, local);
       sprite.setPosition(rect.x - TRAP_SHEETS.rockHead.bodyX, rect.y - TRAP_SHEETS.rockHead.bodyY);
-      const now = Math.floor(tick);
+      const now = Math.floor(local);
       // Wall slams scheduled since the last frame (skipped after a long gap, e.g. a hidden tab).
       if (this.lastTick !== null && now > this.lastTick && now - this.lastTick < 30) {
         const impacts = rockHeadImpacts(trap, this.lastTick, now);
@@ -401,7 +484,7 @@ class HeadView implements TrapView {
       }
       if (this.lastTick === null || now > this.lastTick || now < this.lastTick - 30) this.lastTick = now;
     }
-    this.fsm.update({ impact: this.pending }, frameMs);
+    if (this.on) this.fsm.update({ impact: this.pending }, frameMs);
     this.pending = null;
   }
 
@@ -425,6 +508,10 @@ class BoxView implements TrapView {
     this.sheet = sheetForTrap('box', trap.variant);
     this.sprite = bodySprite(scene, this.sheet, trap.x, trap.y);
     settleOnComplete(this.sprite, 0);
+  }
+
+  get parts(): readonly PowerPart[] {
+    return [this.sprite];
   }
 
   hit(isSelf: boolean): void {
@@ -471,6 +558,41 @@ class BoxView implements TrapView {
   private center(): { x: number; y: number } {
     const rect = this.field.boxRect(this.trap.id) ?? this.trap;
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  }
+}
+
+/** A pressure plate: up or pressed, from the replicated trap state. */
+class ButtonView implements TrapView {
+  private readonly sprite: Phaser.GameObjects.Sprite;
+  private pressed: boolean;
+
+  constructor(
+    scene: Phaser.Scene,
+    private readonly trap: ButtonTrap,
+    private readonly field: TrapField,
+    private readonly cue: Cue,
+  ) {
+    // Under traps standing on the same floor.
+    this.sprite = bodySprite(scene, 'button', trap.x, trap.y).setDepth(TRAP_DEPTH - 0.2);
+    this.pressed = field.isPressed(trap.id);
+    this.sprite.setFrame(trapFrame('button', 0, this.pressed ? 1 : 0));
+  }
+
+  get parts(): readonly PowerPart[] {
+    return [this.sprite];
+  }
+
+  update(): void {
+    const pressed = this.field.isPressed(this.trap.id);
+    if (pressed === this.pressed) return;
+    this.pressed = pressed;
+    this.sprite.setFrame(trapFrame('button', 0, pressed ? 1 : 0));
+    const { trap } = this;
+    this.cue({ cue: pressed ? 'buttonOn' : 'buttonOff', x: trap.x + trap.width / 2, y: trap.y + trap.height, isSelf: false });
+  }
+
+  destroy(): void {
+    this.sprite.destroy();
   }
 }
 
