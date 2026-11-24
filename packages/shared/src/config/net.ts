@@ -1,5 +1,5 @@
 /** Bumped whenever the wire protocol changes incompatibly. Checked on join. */
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 export interface NetConfig {
   /** Fixed simulation rate shared by server authority and client prediction. */
@@ -23,6 +23,8 @@ export interface NetConfig {
   room: {
     countdownMs: number;
     levelCompleteMs: number;
+    /** How long the "wiped out" screen stays up before the level restarts. */
+    levelFailedMs: number;
     /** Disconnected players keep their slot this long (refresh, flaky network, Strict Mode). */
     reconnectGraceMs: number;
     /** Empty rooms are deleted after this long. */
@@ -65,6 +67,7 @@ export const NET_CONFIG: Readonly<NetConfig> = {
   room: {
     countdownMs: 3000,
     levelCompleteMs: 4000,
+    levelFailedMs: 3000,
     reconnectGraceMs: 15000,
     emptyRoomTtlMs: 60000,
     codeLength: 5,

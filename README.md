@@ -78,7 +78,7 @@ Pausing only stops the game when **every** connected player has the menu open. S
 
 - **The server owns the game.** Clients send one small input frame (a button bitmask) per tick. The server simulates every room, then broadcasts 20 snapshots per second, as full keyframes or field-level deltas.
 - **Clients predict their own player** by running the same `stepPlayerBody` function (movement plus attack and stun timers) as the server, and reconcile when authoritative state arrives. **Other players are interpolated** 100 ms in the past. Details are in [docs/netcode.md](docs/netcode.md).
-- **Room flow:** `lobby → countdown → playing → levelComplete → next level … → lobby (campaign complete)`. The first player is host and picks the game mode and the level. A refresh or a dropped connection keeps your slot for 15 s.
+- **Room flow:** `lobby → countdown → playing → levelComplete → next level … → lobby (campaign complete)`; a co-op team wipe goes `playing → levelFailed → countdown` on the same level. The first player is host and picks the game mode and the level. A refresh or a dropped connection keeps your slot for 15 s.
 
 ```
 apps/
@@ -145,6 +145,7 @@ The host picks a mode in the lobby; it applies to the whole campaign. Solo play 
 | End of level | When every player stands in the trophy | When everyone has finished, or 20 s after the first finish |
 | Score | Fruit and foes, with a team total | Placement points only (1st 300, 2nd 200, 3rd 100, 4th 50); fruit and foes don't count |
 | Foes | Tougher for every extra player (below) | As tuned |
+| Team wipe | If every player is down at once (2+ players), the level restarts after 3 s | Never: each racer just respawns |
 
 In a race, a player who reaches the trophy gets a place and leaves play, and their camera follows a player still racing. The HUD shows places and the time left. The rules are in `packages/shared/src/config/modes.ts`.
 
@@ -176,7 +177,7 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 
 Players have **3 hearts** (`PLAYER_CONFIG.maxHp`), shown in the HUD. Spikes, saws and spike-heads cost one heart, with a stun, a knockback away from the trap and about a second of invulnerability (the player blinks). At 0 hearts the player dies and respawns with full hearts. Lava, pits and being crushed by a rock-head kill outright.
 
-**Respawning takes longer with every death in a level:** 5 s after the first, 10 s after the second, 20 s after the third, then 30 s each time (`PLAYER_CONFIG.respawnDelaysMs`). The count starts over on each new level. Playing alone, the wait never goes past 5 s (`soloMaxRespawnDelayMs`). While you wait, a countdown shows how long is left and what the next death will cost, and the camera follows the lowest-slot teammate still in play.
+**Respawning takes longer with every death in a level:** 5 s after the first, 10 s after the second, 20 s after the third, then 30 s each time (`PLAYER_CONFIG.respawnDelaysMs`). In co-op with two or more players, a death while every teammate is already waiting to respawn wipes out the team: the level restarts from the start (new run, fruit and foes back, death counts reset), and the scores already earned in the campaign are kept. The count starts over on each new level. Playing alone, the wait never goes past 5 s (`soloMaxRespawnDelayMs`). While you wait, a countdown shows how long is left and what the next death will cost, and the camera follows the lowest-slot teammate still in play.
 
 | Trap | Behaviour | Sheet (`packages/shared/data/sprites/traps/`) |
 |---|---|---|

@@ -387,6 +387,38 @@ describe('Room: level flow', () => {
     expect(room.info().players[0]!.ready).toBe(false); // everyone readies up again for a new campaign
   });
 
+  it('restarts the level after a co-op team wipe, keeping campaign scores', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    const b = join(room, 'B');
+    startPlaying(room, [a, b]);
+    const run = room.info().level!.run;
+    room.handle(a.id, { t: 'dev', cmd: 'respawn' }); // kills A
+    room.tick();
+    expect(room.currentPhase).toBe('playing');
+    room.handle(b.id, { t: 'dev', cmd: 'respawn' }); // and B, while A waits
+    room.tick();
+    expect(room.currentPhase).toBe('levelFailed');
+    expect(room.info().countdownMs).toBeGreaterThan(0);
+    expect(room.info().results).toBeNull();
+    expect(a.conn.sent.some((m) => (m.t === 'delta' || m.t === 'snapshot') && m.events.some((e) => e.type === 'teamWipe'))).toBe(true);
+
+    const waited = tickUntil(room, () => room.currentPhase === 'countdown');
+    expect(waited).toBe(msToTicks(NET_CONFIG.room.levelFailedMs));
+    expect(room.info().level).toMatchObject({ id: 'first', run: run + 1 });
+    expect(room.info().players.map((p) => p.campaignScore)).toEqual([0, 0]);
+    tickUntil(room, () => room.currentPhase === 'playing');
+  });
+
+  it('a solo player never wipes out', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    startPlaying(room, [a]);
+    room.handle(a.id, { t: 'dev', cmd: 'respawn' });
+    ticks(room, 10);
+    expect(room.currentPhase).toBe('playing');
+  });
+
   it('refuses dev commands when they are disabled', () => {
     const room = createRoom(false);
     const a = join(room, 'A');

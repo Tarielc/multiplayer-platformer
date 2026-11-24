@@ -7,7 +7,8 @@ import { FOE_TUNING, type FoeCommon, type FoeTuning } from './foes';
  *
  *  - `coop`: play together. Shared checkpoints, everyone has to reach the trophy, and swings
  *    still shove teammates around, but nothing another player does costs hearts. Foes get
- *    tougher for every player after the first (see `CoopScaling`).
+ *    tougher for every player after the first (see `CoopScaling`). If the whole team is down
+ *    at once (two or more players), the level restarts (`teamWipe`).
  *  - `race`: first to the trophy. Checkpoints are your own. The first finish starts a short
  *    countdown for everyone else; each finisher gets a place and leaves play. Only placement
  *    points count for the campaign: fruit and foes score nothing in a race.
@@ -58,12 +59,18 @@ export interface ModeConfig {
   race: RaceRules | null;
   /** How foes scale with the team; `null`: always as tuned. */
   scaling: CoopScaling | null;
+  /**
+   * With two or more players in the level, everyone dead at the same time (all waiting to
+   * respawn) fails the level and it restarts. Never alone: a solo player just respawns.
+   */
+  teamWipe: boolean;
 }
 
 export const MODE_CONFIG: Readonly<Record<GameMode, Readonly<ModeConfig>>> = {
   coop: {
     name: 'Co-op',
-    summary: 'Play together: shared checkpoints, everyone reaches the trophy, no friendly damage. Foes toughen up for bigger teams.',
+    summary:
+      'Play together: shared checkpoints, everyone reaches the trophy, no friendly damage. Foes toughen up for bigger teams, and if everyone is down at once the level restarts.',
     checkpointScope: 'team',
     playerHits: true,
     playerDamage: false,
@@ -72,6 +79,7 @@ export const MODE_CONFIG: Readonly<Record<GameMode, Readonly<ModeConfig>>> = {
     // Four: mushrooms and wasps take two hits, the rhino 34 (about two dazes for four
     // players, as 12 is for one).
     scaling: { foeHpPerPlayer: 0.4, bossHpPerPlayer: 0.6, attackRatePerPlayer: 0.15 },
+    teamWipe: true,
   },
   race: {
     name: 'Race',
@@ -82,6 +90,7 @@ export const MODE_CONFIG: Readonly<Record<GameMode, Readonly<ModeConfig>>> = {
     race: { finishWindowMs: 20_000, placePoints: [300, 200, 100, 50] },
     // Rivals share the same foes, so a bigger field doesn't need tougher ones.
     scaling: null,
+    teamWipe: false,
   },
 };
 
@@ -170,6 +179,7 @@ export interface ModeWorldOptions {
   playerDamage: boolean;
   race: { finishWindowMs: number } | null;
   foes: Readonly<FoeTuning>;
+  teamWipe: boolean;
 }
 
 /** `players`: the team a level starts with (co-op scales its foes to it). */
@@ -185,6 +195,7 @@ export function modeWorldOptions(
     playerDamage: config.playerDamage,
     race: config.race ? { finishWindowMs: config.race.finishWindowMs } : null,
     foes: modeFoes(mode, players),
+    teamWipe: config.teamWipe,
   };
 }
 

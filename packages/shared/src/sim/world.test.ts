@@ -4,7 +4,7 @@ import { CHARACTER_IDS } from '../config/characters';
 import { resolveCombat, type CompiledCombat } from '../config/combat';
 import { ENTITY_CONFIG, type EntityConfig } from '../config/entities';
 import { resolveMovement } from '../config/movement';
-import { modeWorldOptions } from '../config/modes';
+import { modeWorldOptions, type GameMode } from '../config/modes';
 import { msToTicks } from '../config/net';
 import { PLAYER_CONFIG, respawnDelayMs } from '../config/players';
 import { asciiToLevel } from '../dev/asciiMap';
@@ -321,6 +321,57 @@ describe('GameWorld: exit rule', () => {
     world.complete();
     world.complete();
     expect(world.drainEvents()).toEqual([{ type: 'levelComplete' }]);
+  });
+});
+
+describe('GameWorld: co-op team wipe', () => {
+  const FLAT = ['            ', '            ', ' 1          ', '############'];
+  function coop(players: number, mode: GameMode = 'coop') {
+    const world = new GameWorld({ level: asciiToLevel({ rows: FLAT }), movement: resolveMovement(), ...modeWorldOptions(mode, players) });
+    for (let i = 0; i < players; i++) world.addPlayer(String.fromCharCode(97 + i), i);
+    tick(world);
+    return world;
+  }
+  const kill = (world: GameWorld, id: string) => {
+    world.killPlayer(id, 'dev');
+    return tick(world);
+  };
+
+  it('fails the level when everyone is down at once', () => {
+    const world = coop(3);
+    expect(kill(world, 'a')).not.toContainEqual({ type: 'teamWipe' });
+    expect(kill(world, 'b')).not.toContainEqual({ type: 'teamWipe' });
+    expect(world.failed).toBe(false);
+    expect(kill(world, 'c')).toContainEqual({ type: 'teamWipe' });
+    expect(world.failed).toBe(true);
+    expect(world.completed).toBe(false);
+    // Once only.
+    expect(ticks(world, 5)).not.toContainEqual({ type: 'teamWipe' });
+  });
+
+  it('a teammate who respawned in time saves the level', () => {
+    const world = coop(2);
+    kill(world, 'a');
+    ticks(world, RESPAWN_TICKS);
+    expect(world.getPlayer('a')!.body.alive).toBe(true);
+    kill(world, 'b');
+    expect(world.failed).toBe(false);
+  });
+
+  it('never fails alone, with only reconnecting teammates left, or in a race', () => {
+    const solo = coop(1);
+    kill(solo, 'a');
+    expect(solo.failed).toBe(false);
+
+    const away = coop(2);
+    away.setPresent('b', false);
+    kill(away, 'a');
+    expect(away.failed).toBe(false);
+
+    const race = coop(2, 'race');
+    kill(race, 'a');
+    kill(race, 'b');
+    expect(race.failed).toBe(false);
   });
 });
 

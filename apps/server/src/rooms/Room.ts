@@ -196,7 +196,9 @@ export class Room {
         : null,
       paused: this.isPaused(),
       countdownMs:
-        this.phase === 'countdown' || this.phase === 'levelComplete' ? Math.round(ticksToMs(this.phaseTicks)) : 0,
+        this.phase === 'countdown' || this.phase === 'levelComplete' || this.phase === 'levelFailed'
+          ? Math.round(ticksToMs(this.phaseTicks))
+          : 0,
       raceEndsInMs: this.raceEndsInMs(),
       scaledFor: this.level ? this.scaledFor : null,
       results: this.results,
@@ -356,6 +358,9 @@ export class Room {
       case 'levelComplete':
         this.updateLevelComplete();
         break;
+      case 'levelFailed':
+        this.updateLevelFailed();
+        break;
     }
 
     this.flushRoom();
@@ -443,6 +448,21 @@ export class Room {
     if (events.some((e) => e.type === 'finish')) this.markRoomDirty();
     this.pendingEvents.push(...events);
     if (world.completed) this.finishLevel(world);
+    else if (world.failed) this.failLevel();
+  }
+
+  /** Co-op team wipe: a short "wiped out" pause, then the same level from the start (no points). */
+  private failLevel(): void {
+    this.broadcastNow = true; // final positions + the teamWipe event
+    this.setPhase('levelFailed', Math.max(1, msToTicks(this.net.room.levelFailedMs)));
+    this.log.info(`team wiped out on "${this.level?.entry.id}"; restarting it`);
+  }
+
+  private updateLevelFailed(): void {
+    this.phaseTicks -= 1;
+    if (this.phaseTicks > 0) return;
+    if (this.level) this.startLevel(this.level.entry.id, false);
+    else this.returnToLobby(false);
   }
 
   private finishLevel(world: GameWorld): void {
@@ -560,7 +580,7 @@ export class Room {
     switch (cmd) {
       case 'skipLevel':
         if (this.phase === 'playing') this.world?.complete();
-        else if (this.phase === 'countdown' || this.phase === 'levelComplete') this.phaseTicks = 1;
+        else if (this.phase === 'countdown' || this.phase === 'levelComplete' || this.phase === 'levelFailed') this.phaseTicks = 1;
         break;
       case 'respawn':
         if (this.phase === 'playing') this.world?.killPlayer(player.id, 'dev');

@@ -10,6 +10,8 @@ export type GameEvent =
   | { type: 'respawn'; playerId: string }
   | { type: 'checkpoint'; playerId: string; checkpointId: number }
   | { type: 'levelComplete' }
+  /** Co-op: the whole team was down at once; the level restarts. */
+  | { type: 'teamWipe' }
   /** Race: a player reached the trophy in `place` (1-based), `timeMs` after the level started. */
   | { type: 'finish'; playerId: string; place: number; timeMs: number; x: number; y: number }
   /** A trap cost a heart (`hp` left). `side`: where the player touched it (spike-head squash). */

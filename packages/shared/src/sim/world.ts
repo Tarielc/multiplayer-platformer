@@ -99,6 +99,8 @@ export interface GameWorldOptions {
    * or `finishWindowMs` after the first finish.
    */
   race?: { finishWindowMs: number } | null;
+  /** Co-op: two or more players all dead at once fails the level (`failed`). Default off. */
+  teamWipe?: boolean;
 }
 
 /**
@@ -112,6 +114,8 @@ export class GameWorld {
   readonly level: LevelData;
   tick = 0;
   completed = false;
+  /** The whole team was down at once (`teamWipe`): the level is lost and the host restarts it. */
+  failed = false;
 
   private readonly ctx: MovementContext;
   private readonly playerConfig: Readonly<PlayerConfig>;
@@ -187,6 +191,7 @@ export class GameWorld {
     const copy = new GameWorld(this.options);
     copy.tick = this.tick;
     copy.completed = this.completed;
+    copy.failed = this.failed;
     copy.teamCheckpoint = this.teamCheckpoint;
     copy.finishCount = this.finishCount;
     copy.firstFinishTick = this.firstFinishTick;
@@ -361,6 +366,7 @@ export class GameWorld {
       player.respawnTicks -= 1;
       if (player.respawnTicks <= 0) this.respawn(player);
     }
+    if (this.options.teamWipe && !this.completed && !this.failed) this.checkTeamWipe();
     if (!this.completed && this.level.exits.length > 0) {
       if (this.raceWindowTicks !== null) this.updateRace(this.raceWindowTicks);
       else {
@@ -416,6 +422,17 @@ export class GameWorld {
   }
 
   /** Dev/debug helpers. */
+  /**
+   * Co-op: with two or more players here (reconnecting ones don't count), everyone waiting to
+   * respawn at the same time loses the level.
+   */
+  private checkTeamWipe(): void {
+    const present = [...this.players.values()].filter((p) => p.present);
+    if (present.length < 2 || present.some((p) => p.body.alive)) return;
+    this.failed = true;
+    this.events.push({ type: 'teamWipe' });
+  }
+
   complete(): void {
     if (this.completed) return;
     this.completed = true;

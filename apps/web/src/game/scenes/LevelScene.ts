@@ -688,6 +688,10 @@ export class LevelScene extends Phaser.Scene {
         this.presentation.emit('world', { cue: 'levelComplete', x: camera.midPoint.x, y: camera.midPoint.y, isSelf: true });
         break;
       }
+      case 'teamWipe':
+        // React shows the "wiped out" overlay; the level restarts as a new run.
+        this.cameras.main.shake(260, 0.008);
+        break;
     }
   }
 

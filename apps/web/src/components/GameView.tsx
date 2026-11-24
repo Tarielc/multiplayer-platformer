@@ -15,6 +15,7 @@ import { useTouchDevice } from '@/hooks/useTouchDevice';
 import type { RoomView } from '@/net/RoomStore';
 import { CountdownOverlay } from './CountdownOverlay';
 import { RespawnOverlay } from './RespawnOverlay';
+import { LevelFailedOverlay } from './LevelFailedOverlay';
 import { GameCanvas } from './GameCanvas';
 import { Hud } from './Hud';
 import { LevelCompleteOverlay } from './LevelCompleteOverlay';
@@ -123,6 +124,7 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
         {room.phase === 'playing' && <AbilityButton self={view.hud.find((p) => p.isSelf)} />}
         {room.phase === 'playing' && <RespawnOverlay players={view.hud} />}
         {room.phase === 'countdown' && <CountdownOverlay room={room} receivedAt={view.roomReceivedAt} />}
+        {room.phase === 'levelFailed' && <LevelFailedOverlay room={room} receivedAt={view.roomReceivedAt} />}
         {room.phase === 'levelComplete' && (
           <LevelCompleteOverlay room={room} receivedAt={view.roomReceivedAt} selfId={view.selfId} />
         )}

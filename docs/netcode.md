@@ -22,7 +22,7 @@ Client and server use the same rules: movement and actions (`stepPlayerBody`, wh
 One `Room.tick()`:
 
 1. Releases the slots of players whose reconnect grace ran out.
-2. Advances the room phase. In the lobby, it starts the campaign if every connected player is ready. In countdown and level-complete, it counts down.
+2. Advances the room phase. In the lobby, it starts the campaign if every connected player is ready. In countdown, level-complete and level-failed, it counts down.
 3. While **playing** and not paused, steps every player in slot order:
    - A connected player is stepped with the frames its `InputQueue` hands out (0–3 per tick).
    - A disconnected player is stepped with neutral input, so it falls to the ground instead of hanging in the air.
@@ -60,7 +60,7 @@ The world state is small: `{ tick, players[], collected[], traps[] }`. Each play
 - **Why deltas are safe:** WebSockets deliver every message, in order. All clients of a room hold the same base, so one encoded delta serves everyone.
 - **Gap detection:** the client's `WorldStateStore` applies a delta only if its `baseTick` equals the tick of the state it already holds. Otherwise it sends `resync` and waits for the keyframe.
 - **Run counter:** `run` increments with every new `GameWorld` (level start or restart) and is part of the room's level info. Snapshots and deltas from an older run are dropped, so a slow packet can never leak the previous level into the next one.
-- **Events:** `collect` (with `recharged`: the seconds the pickup took off the collector's special cooldown), `foeHurt` (with `score`, and `recharged` when the hit beat the foe), `death`, `respawn`, `checkpoint`, `finish` (race), `levelComplete`, `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
+- **Events:** `collect` (with `recharged`: the seconds the pickup took off the collector's special cooldown), `foeHurt` (with `score`, and `recharged` when the hit beat the foe), `death`, `respawn`, `checkpoint`, `finish` (race), `levelComplete`, `teamWipe` (co-op), `trapHit`, `bounce` and `boxHit` ride along with the next broadcast. The client uses them for effects only. State changes always come from the state itself.
 
 ## Prediction and reconciliation (own player)
 
@@ -139,6 +139,8 @@ lobby ──(all connected players ready)──► countdown (3 s) ──► pla
   ▲          (un-ready / new player cancels)                    │ pause rule                  │
   │                                                             ▼                             ▼
   └──────────── lobby + campaignComplete ◄── last level ── next level? ── countdown (next level)
+
+playing ──(co-op: every present player dead at once)──► levelFailed (3 s) ──► countdown (same level, new run)
 ```
 
 - **Slots:** a new player gets the lowest free slot (P1–P4) and its color. A fifth player gets `ROOM_FULL`.
@@ -147,6 +149,7 @@ lobby ──(all connected players ready)──► countdown (3 s) ──► pla
   - **Co-op:** team checkpoints, every present player must stand in the exit, and swings still shove teammates, but giant swings and spat projectiles cost no hearts (`playerDamage: false`). Foes scale to the team: `startLevel` counts the room's players and passes `modeFoes('coop', n)` as the world's `foes` tuning (more health, shorter attack cooldowns). `RoomInfo.scaledFor` carries `n` for the running level, so clients rebuild the same tuning for the boss bar and the rhino's rage look (at half its *scaled* health). The count is fixed for the level; drop-ins only affect the next one.
   - **Race:** checkpoints are per player. A player who reaches the exit gets a `place`, a `finish` event and leaves play: their body is `alive: false` with no respawn, so nothing can hit or grab them, and clients hide them instead of playing the Death clip. The first finish starts the finish window (20 s, `RoomInfo.raceEndsInMs`); the level ends when every present player has a place or the window runs out. Results carry `place`, `timeMs` and `placePoints`, and `campaignScore` adds only the placement points (`campaignPoints`): fruit and foes score nothing in a race.
 - **Start:** when every connected player is ready (at least `minPlayersToStart`, default 1), a 3 s countdown starts. It is cancelled if someone un-readies or a new, unready player joins. Countdowns between levels can't be cancelled.
+- **Team wipe (co-op):** with `teamWipe` on (`modeWorldOptions`, co-op only), `GameWorld` checks at the end of each tick, after respawns, whether two or more players are present and none is alive. If so it sets `world.failed` and emits `teamWipe`. The room switches to `levelFailed` for `levelFailedMs`, then restarts the same level with a new `run` (`startLevel(id)`): a fresh world, so pickups, foes and death counts reset, while `campaignScore` keeps what earlier levels added. A solo player never wipes out; they just respawn.
 - **Level complete:** results show for 4 s, then the next level (`next` in the manifest) counts down. After the last level, the room returns to the lobby with `campaignComplete`, and everyone is un-readied.
 - **Pause:** the world is simulated only when the phase is `playing`, at least one player is connected, and **not every** connected player has the menu open. In solo, Esc really pauses. In multiplayer, the game pauses only when everyone has the menu open.
 - **Drop-in:** players can join during a level (`allowDropIn`). They appear at the team checkpoint, or at their slot's spawn, and get a keyframe.
@@ -249,7 +252,7 @@ To go binary (MessagePack, or bit-packing with quantized positions):
 | `interpolationDelayMs` | 100 | Must exceed one snapshot interval (50 ms); the rest is jitter tolerance. 100 ms copes with snapshots arriving up to about 50 ms later than the fastest ones. |
 | `keyframeEverySnapshots` | 60 | Full state every 3 s. |
 | `input.maxQueue` / `burstBudget` / `maxPerTick` / `stallTicks` | 30 / 6 / 3 / 15 | See [Inputs](#inputs). |
-| `room.countdownMs` / `levelCompleteMs` | 3000 / 4000 | |
+| `room.countdownMs` / `levelCompleteMs` / `levelFailedMs` | 3000 / 4000 / 3000 | |
 | `room.reconnectGraceMs` / `emptyRoomTtlMs` | 15000 / 60000 | |
 | `room.minPlayersToStart` / `allowDropIn` | 1 / true | |
 | `client.snapDistance` / `correctionHalfLifeMs` | 64 px / 60 ms | Prediction corrections. |

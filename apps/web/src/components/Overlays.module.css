@@ -125,6 +125,11 @@
   background: radial-gradient(ellipse at center, rgb(5 11 8 / 40%), rgb(5 11 8 / 0%) 60%);
 }
 
+/* Co-op team wipe: a heavier dim than a single knockout. */
+.failed {
+  background: radial-gradient(ellipse at center, rgb(5 11 8 / 70%), rgb(5 11 8 / 35%) 75%);
+}
+
 .respawnTag {
   display: inline-flex;
   align-items: center;

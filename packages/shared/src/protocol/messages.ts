@@ -5,7 +5,8 @@ import type { NetFoeState, NetShotState } from '../sim/foes/types';
 import type { NetTrapState } from '../sim/traps/types';
 import type { NetPlayerPatch, NetPropState, NetWorldState } from './state';
 
-export type RoomPhase = 'lobby' | 'countdown' | 'playing' | 'levelComplete';
+/** `levelFailed`: a co-op team wipe; after a short pause the same level starts over. */
+export type RoomPhase = 'lobby' | 'countdown' | 'playing' | 'levelComplete' | 'levelFailed';
 
 export interface RoomPlayerInfo {
   id: string;
