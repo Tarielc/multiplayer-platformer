@@ -4,8 +4,9 @@ import type { CharacterId } from './characters';
  * Special abilities, one per character (the Special button):
  *
  *  - Bunny Man (`heal`): pulls the nearest teammate in, hugs and kisses them back to health.
- *  - Virtual Guy (`drone`): sits down and flies a drone with a claw that picks up players and
- *    boxes; Special grabs / drops, Attack recalls it.
+ *  - Virtual Guy (`drone`): sits down and flies a drone with a claw that picks up players,
+ *    boxes, foes and Virtual Guy himself (fly the claw over him); Special grabs / drops, Attack
+ *    recalls it. Other players can stand on the drone and ride it.
  *  - Mask Dude (`giant`): grows big for a while: extra hearts, swings that cost hearts, more
  *    reach and knockback, and less knockback taken.
  *  - Ninja Frog (`tongue`): free-aimed tongue that grabs a player or a box, swallows it, and
@@ -86,8 +87,11 @@ export const Held = {
 } as const;
 export type HeldId = (typeof Held)[keyof typeof Held];
 
-/** What the drone's claw holds (`MovementBody.cargo`; drives its collision box): a player, a box or a foe (by kind). */
-export const Cargo = { NONE: 0, PLAYER: 1, BOX: 2, MUSHROOM: 3, CHICKEN: 4, WASP: 5, MONKEY: 6, BULL: 7, RHINO: 8 } as const;
+/**
+ * What the drone's claw holds (`MovementBody.cargo`; drives its collision box): a player, a box,
+ * a foe (by kind), or `SELF`: its own pilot, which the pilot's own step places (so it is predicted).
+ */
+export const Cargo = { NONE: 0, PLAYER: 1, BOX: 2, MUSHROOM: 3, CHICKEN: 4, WASP: 5, MONKEY: 6, BULL: 7, RHINO: 8, SELF: 9 } as const;
 
 export interface AbilityTuning {
   heal: {
@@ -151,6 +155,11 @@ export interface AbilityTuning {
     gripY: number;
     /** Grab area under the claw (centred on the drone, from the grip down). */
     grab: { width: number; height: number };
+    /**
+     * Width of the drone's top that other players can stand on (a one-way platform at the top of
+     * its collision box, there while it is being flown). Riders move with it.
+     */
+    deckWidth: number;
   };
   giant: {
     growMs: number;
@@ -248,10 +257,12 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     deceleration: 700,
     maxSpeed: 160,
     carrySpeed: 115,
-    leash: 320,
+    // Far enough to scout a screen ahead, or fly its pilot across a wide gap.
+    leash: 800,
     size: { width: 16, height: 12 },
     gripY: 20,
     grab: { width: 26, height: 18 },
+    deckWidth: 28,
   },
   giant: {
     growMs: 680,
@@ -382,6 +393,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
       size: { ...drone.size },
       gripY: drone.gripY,
       grab: { ...drone.grab },
+      deckWidth: drone.deckWidth,
       deploy: s(drone.deployMs),
       spawnAt: s(drone.spawnAtMs),
       sit: s(drone.sitMs),

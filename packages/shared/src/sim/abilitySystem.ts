@@ -5,7 +5,8 @@ import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/
 import {
   abilityConfig,
   CARRIED_FEET_BELOW_GRIP,
-  droneBox,
+  cargoLift,
+  clawZone,
   droneGrip,
   feetOf,
   foeCargo,
@@ -88,10 +89,24 @@ export interface AbilityPlayerState {
   flightHits: number;
   flightBoxes: Set<number>;
   flightFoes: Set<number>;
+  /**
+   * The drone's deck as it was at the end of the last tick (null: not flown). Other players
+   * land on it during the tick; `GameWorld` then carries them to where the deck went.
+   */
+  deck: Rect | null;
 }
 
 export function newAbilityPlayerState(): AbilityPlayerState {
-  return { grab: null, specialSeen: 0, healed: false, thrownBy: null, flightHits: 0, flightBoxes: new Set(), flightFoes: new Set() };
+  return {
+    grab: null,
+    specialSeen: 0,
+    healed: false,
+    thrownBy: null,
+    flightHits: 0,
+    flightBoxes: new Set(),
+    flightFoes: new Set(),
+    deck: null,
+  };
 }
 
 export function cloneAbilityPlayerState(s: AbilityPlayerState): AbilityPlayerState {
@@ -407,10 +422,9 @@ export class AbilitySystem {
 
   private clawGrab(p: WorldPlayer): void {
     const b = p.body;
-    const c = this.c.drone;
     const hitbox = this.host.ctx.hitbox;
     const grip = droneGrip(b, this.c);
-    const zone: Rect = { x: grip.x - c.grab.width / 2, y: grip.y - 4, width: c.grab.width, height: c.grab.height + 4 };
+    const zone = clawZone(b, this.c);
     const dist = (r: Rect) => Math.hypot(r.x + r.width / 2 - grip.x, r.y - grip.y);
     let best: { target: WorldPlayer | null; box: number | null; foe: Foe | null; d: number } | null = null;
     for (const other of this.host.listPlayers()) {
@@ -440,7 +454,7 @@ export class AbilitySystem {
     // The cargo has to fit where it will hang: the drone hops up a little to lift it off the
     // ground, and the grab fails if there is no room.
     const cargo = best.target ? Cargo.PLAYER : best.foe ? foeCargo(best.foe.kind) : Cargo.BOX;
-    const lift = this.liftFor(b.droneX, b.droneY, cargo);
+    const lift = cargoLift(b.droneX, b.droneY, cargo, this.host.ctx);
     if (lift === null) return;
     b.droneY -= lift;
     if (lift > 0) b.droneVy = Math.min(0, b.droneVy);
@@ -459,15 +473,6 @@ export class AbilitySystem {
     b.cargo = cargo;
     this.placeCargo(p);
     this.host.emit({ type: 'grab', playerId: p.id, targetId: best.target?.id ?? null, boxId: best.box, foeId: best.foe?.id ?? null });
-  }
-
-  /** Smallest upward shift (px) that makes the drone with `cargo` fit, or null. */
-  private liftFor(droneX: number, droneY: number, cargo: number): number | null {
-    const max = this.c.drone.grab.height + 8;
-    for (let lift = 0; lift <= max; lift++) {
-      if (!rectHitsSolid(droneBox({ droneX, droneY: droneY - lift, cargo }, this.host.ctx), this.host.ctx)) return lift;
-    }
-    return null;
   }
 
   private placeCargo(p: WorldPlayer): void {

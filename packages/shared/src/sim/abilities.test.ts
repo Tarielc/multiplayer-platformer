@@ -8,7 +8,7 @@ import { asciiToLevel } from '../dev/asciiMap';
 import type { TiledObject } from '../level/tiled';
 import { bodyFromNetState } from '../protocol/state';
 import { diffWorld } from '../protocol/delta';
-import { droneGrip, tongueTip } from './abilities';
+import { droneDeck, droneGrip, tongueTip } from './abilities';
 import { stepPlayerBody } from './actions';
 import type { GameEvent } from './events';
 import { aimFromButtons, Button, sanitizeButtons, withAim } from './input';
@@ -266,6 +266,140 @@ describe('drone (Virtual Guy)', () => {
     const after = world.toNetState(() => 0);
     expect(after.props).toEqual([]);
     expect(diffWorld(before, after).traps).toEqual([{ id: boxId, x: rect.x, y: rect.y }]);
+  });
+
+  it('picks up its own pilot, flies them (predicted exactly) and drops them', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    flyTo(world, 100, GROUND - HITBOX.height + 4);
+    const seq = a.specialSeq;
+    const events = press(world, 'a');
+    // The pilot's own business: no server grab.
+    expect(events.filter((e) => e.type === 'grab')).toEqual([]);
+    expect(a.specialSeq).toBe(seq);
+    expect(a.cargo).toBe(Cargo.SELF);
+
+    const start = bodyFromNetState(world.toNetState(() => 0).players[0]!);
+    const replay = { ...start };
+    for (let i = 0; i < 60; i++) {
+      const buttons = i < 20 ? Button.JUMP : Button.RIGHT;
+      tick(world, { a: buttons });
+      stepPlayerBody(replay, buttons, world.movementContext);
+    }
+    expect(replay).toEqual(bodyFromNetState(world.toNetState(() => 0).players[0]!));
+    expect(a.phase).toBe(Phase.DRONE_PILOT);
+    expect(a.x + HITBOX.width / 2).toBeCloseTo(droneGrip(a).x, 5);
+    expect(a.y + HITBOX.height).toBeCloseTo(droneGrip(a).y + 26, 5);
+    expect(a.y + HITBOX.height).toBeLessThan(GROUND - 30);
+    expect(a.x).toBeGreaterThan(start.x + 60);
+
+    // Special again lets go: the pilot drops and keeps flying the drone from where they land.
+    press(world, 'a');
+    expect(a.cargo).toBe(Cargo.NONE);
+    ticks(world, 60);
+    expect(a.grounded).toBe(true);
+    expect(a.y + HITBOX.height).toBe(GROUND);
+    expect(a.phase).toBe(Phase.DRONE_PILOT);
+  });
+
+  it('flies up to the leash, much further than a screen half', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    ticks(world, seconds(6), { a: Button.RIGHT });
+    const feetX = a.x + HITBOX.width / 2;
+    expect(ABILITIES.drone.leash).toBeGreaterThanOrEqual(600);
+    expect(a.droneX - feetX).toBeGreaterThan(ABILITIES.drone.leash - 30);
+    expect(Math.hypot(a.droneX - feetX, a.droneY - (a.y + HITBOX.height / 2))).toBeLessThanOrEqual(ABILITIES.drone.leash + 1e-6);
+  });
+
+  it('lets other players stand on the drone and ride it', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    const b = world.getPlayer('b')!.body;
+    flyTo(world, 250, 90);
+    const deck = droneDeck(a)!;
+    place(world, 'b', a.droneX, deck.y - 12);
+    ticks(world, 20);
+    expect(b.grounded).toBe(true);
+    expect(b.y + HITBOX.height).toBeCloseTo(droneDeck(a)!.y, 5);
+
+    // Rides along sideways and up, staying on the deck.
+    const offset = b.x - a.droneX;
+    ticks(world, 30, { a: Button.RIGHT });
+    ticks(world, 20, { a: Button.JUMP });
+    expect(b.grounded).toBe(true);
+    expect(b.y + HITBOX.height).toBeCloseTo(droneDeck(a)!.y, 5);
+    expect(b.x - a.droneX).toBeCloseTo(offset, 5);
+    expect(a.droneX).toBeGreaterThan(280);
+
+    // Can walk off it.
+    ticks(world, 30, { b: Button.RIGHT });
+    ticks(world, 60);
+    expect(b.y + HITBOX.height).toBe(GROUND);
+  });
+
+  it('carries a rider the same whether they step before or after the pilot', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    const b = world.getPlayer('b')!.body;
+    flyTo(world, 250, 90);
+    place(world, 'b', a.droneX, droneDeck(a)!.y - 12);
+    ticks(world, 20);
+    // The rider's input first, then the pilot's.
+    const reversed = (buttons: number) => {
+      world.stepPlayer('b', 0);
+      world.stepPlayer('a', buttons);
+      world.endTick();
+      world.drainEvents();
+    };
+    const offset = b.x - a.droneX;
+    for (let i = 0; i < 30; i++) reversed(Button.RIGHT | Button.JUMP);
+    for (let i = 0; i < 20; i++) reversed(Button.DOWN);
+    expect(b.grounded).toBe(true);
+    expect(b.y + HITBOX.height).toBeCloseTo(droneDeck(a)!.y, 5);
+    expect(b.x - a.droneX).toBeCloseTo(offset, 5);
+  });
+
+  it('a deck is one-way: jumping up through it lands on top', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    const b = world.getPlayer('b')!.body;
+    flyTo(world, 400, GROUND - 60);
+    tick(world, { b: Button.JUMP });
+    ticks(world, 60, { b: Button.JUMP });
+    expect(b.grounded).toBe(true);
+    expect(b.y + HITBOX.height).toBeCloseTo(droneDeck(a)!.y, 5);
+  });
+
+  it('its pilot does not stand on their own drone', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    const b = world.getPlayer('b')!.body;
+    tick(world);
+    const platforms = world.movementContext.platforms!;
+    expect(platforms.platformsFor(a)).toEqual([]);
+    expect(platforms.platformsFor(b)).toEqual([expect.objectContaining({ ...droneDeck(a)!, oneWay: true })]);
+  });
+
+  it('a rider on a still deck is predicted exactly from the replicated drone', () => {
+    const world = pilotWorld();
+    const a = world.getPlayer('a')!.body;
+    flyTo(world, 250, 90);
+    ticks(world, 60); // the drone stops drifting
+    place(world, 'b', a.droneX, droneDeck(a)!.y - 4);
+    ticks(world, 10);
+    const net = world.toNetState(() => 0);
+    const pilot = net.players.find((p) => p.id === 'a')!;
+    const deck = droneDeck(bodyFromNetState(pilot))!;
+    const ctx = { ...world.movementContext, platforms: { platformsFor: () => [{ ...deck, id: -1, oneWay: true, bounce: 0 }] } };
+    const replay = bodyFromNetState(net.players.find((p) => p.id === 'b')!);
+    const inputs = [Button.RIGHT, 0, Button.LEFT, Button.LEFT, Button.JUMP, 0, 0, Button.RIGHT];
+    for (let i = 0; i < 40; i++) {
+      const buttons = inputs[i % inputs.length]!;
+      tick(world, { b: buttons });
+      stepPlayerBody(replay, buttons, ctx);
+    }
+    expect(replay).toEqual(bodyFromNetState(world.toNetState(() => 0).players.find((p) => p.id === 'b')!));
   });
 });
 

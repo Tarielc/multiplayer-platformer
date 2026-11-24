@@ -84,6 +84,24 @@ export interface HitboxSize {
   height: number;
 }
 
+/** Something a body collides with besides tiles: a trap collider or a drone's deck. */
+export interface Collider extends Rect {
+  id: number;
+  /** Only blocks bodies falling onto its top. */
+  oneWay: boolean;
+  /** Landing on top launches the body upward at this speed; 0 = none. */
+  bounce: number;
+}
+
+/**
+ * Platforms that are not traps (drone decks, flown by players): where they are for `body`'s
+ * step. They are one-way and do not move during a tick; the server carries whoever stands on
+ * one after every player stepped (`rideAlong`).
+ */
+export interface PlatformSource {
+  platformsFor(body: Readonly<MovementBody>): readonly Collider[];
+}
+
 export interface MovementContext {
   level: LevelData;
   movement: CompiledMovement;
@@ -95,6 +113,8 @@ export interface MovementContext {
   traps?: TrapField | null;
   /** Special ability tuning (defaults to `ABILITIES`). */
   abilities?: CompiledAbilities;
+  /** Drone decks other players can stand on. */
+  platforms?: PlatformSource | null;
 }
 
 /**
@@ -119,7 +139,7 @@ const EPS = 1e-6;
 const RIDE_EPS = 0.5;
 /** Overlap (px) tolerated before a pushed body counts as crushed. */
 const CRUSH_TOLERANCE = 1;
-const NO_COLLIDERS: readonly TrapCollider[] = [];
+const NO_COLLIDERS: readonly Collider[] = [];
 
 /**
  * Creates a body standing with its feet at (feetX, feetY). `stepTick` is the tick before its
@@ -224,9 +244,11 @@ export function stepPlayerMovement(
     return contacts;
   }
   const traps = ctx.traps ?? null;
-  const colliders = traps ? traps.colliders(tick) : NO_COLLIDERS;
+  const trapColliders = traps ? traps.colliders(tick) : [];
   // Several inputs applied on one server tick (catch-up) follow the platforms only once.
-  if (traps && colliders.length > 0 && tick > body.stepTick) followColliders(body, ctx, traps, colliders, contacts);
+  if (traps && trapColliders.length > 0 && tick > body.stepTick) followColliders(body, ctx, traps, trapColliders, contacts);
+  const decks = ctx.platforms?.platformsFor(body) ?? NO_COLLIDERS;
+  const colliders: readonly Collider[] = decks.length > 0 ? [...trapColliders, ...decks] : trapColliders;
 
   const m = ctx.movement;
   const dt = ctx.dt;
@@ -313,7 +335,7 @@ export function moveAndCollide(
   dx: number,
   dy: number,
   ctx: MovementContext,
-  colliders: readonly TrapCollider[],
+  colliders: readonly Collider[],
   contacts: StepContacts,
 ): void {
   const half = ctx.level.tileSize * 0.5;
@@ -327,7 +349,7 @@ export function moveAndCollide(
   }
 }
 
-function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: readonly TrapCollider[]): boolean {
+function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: readonly Collider[]): boolean {
   const { level, hitbox } = ctx;
   const ts = level.tileSize;
   const w = hitbox.width;
@@ -380,7 +402,7 @@ function moveY(
   body: MovementBody,
   dy: number,
   ctx: MovementContext,
-  colliders: readonly TrapCollider[],
+  colliders: readonly Collider[],
   contacts: StepContacts,
 ): boolean {
   const { level, hitbox } = ctx;
@@ -407,7 +429,7 @@ function moveY(
         break;
       }
     }
-    let landedOn: TrapCollider | null = null;
+    let landedOn: Collider | null = null;
     for (const c of colliders) {
       if (!overlapsX(c) || prevBottom > c.y + EPS || body.y + h <= c.y + EPS) continue;
       if (c.oneWay && body.drop > 0) continue;
@@ -453,7 +475,7 @@ function moveY(
   return true;
 }
 
-function standingOnOneWayOnly(body: MovementBody, ctx: MovementContext, colliders: readonly TrapCollider[]): boolean {
+function standingOnOneWayOnly(body: MovementBody, ctx: MovementContext, colliders: readonly Collider[]): boolean {
   const { level, hitbox } = ctx;
   const ts = level.tileSize;
   const feet = body.y + hitbox.height;
@@ -527,12 +549,31 @@ function followColliders(
   }
 }
 
+/**
+ * Moves a body standing on a drone's deck along with it (`dx`, `dy` px), stopped by tiles. It
+ * keeps standing, unless a ceiling holds it back while the deck rises.
+ */
+export function rideAlong(body: MovementBody, dx: number, dy: number, ctx: MovementContext): void {
+  const half = ctx.level.tileSize * 0.5;
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / half));
+  const contacts = noContacts();
+  let sx = dx / steps;
+  let sy = dy / steps;
+  for (let i = 0; i < steps; i++) {
+    if (sx !== 0 && moveX(body, sx, ctx, NO_COLLIDERS)) sx = 0;
+    if (sy !== 0 && moveY(body, sy, ctx, NO_COLLIDERS, contacts)) {
+      if (sy < 0) body.grounded = false;
+      sy = 0;
+    }
+  }
+}
+
 /** Moves the body down with a sinking platform, stopping on tiles or the platform itself. */
 function carryDown(
   body: MovementBody,
   dy: number,
   ctx: MovementContext,
-  colliders: readonly TrapCollider[],
+  colliders: readonly Collider[],
   contacts: StepContacts,
 ): void {
   const half = ctx.level.tileSize * 0.5;
@@ -557,7 +598,7 @@ function overlaps(x: number, y: number, w: number, h: number, c: Rect, margin: n
 }
 
 /** Whether the body (shrunk by the crush tolerance) is inside solid tiles or another solid collider. */
-function overlapsSolid(body: MovementBody, ctx: MovementContext, colliders: readonly TrapCollider[], exceptId: number): boolean {
+function overlapsSolid(body: MovementBody, ctx: MovementContext, colliders: readonly Collider[], exceptId: number): boolean {
   const { level, hitbox } = ctx;
   const ts = level.tileSize;
   const t = CRUSH_TOLERANCE;

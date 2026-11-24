@@ -388,6 +388,8 @@ export class AbilityView {
       case Phase.DRONE_SIT:
         return this.pose(key, 'sit_down', ms, f);
       case Phase.DRONE_PILOT:
+        // Hanging from his own claw, like any carried player.
+        if (f.cargo === Cargo.SELF) return this.pose(reactionSheet(this.characterId).key, 'carried', this.clock - this.cargoSince, f);
         return this.pose(key, f.cargo !== Cargo.NONE ? 'pilot_excited' : 'pilot', this.clock, f);
       case Phase.DRONE_RECALL:
         return this.pose(key, 'pilot', this.clock, f);

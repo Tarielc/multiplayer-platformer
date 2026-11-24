@@ -69,6 +69,12 @@ export function stepPlayerBody(
   }
 
   const control = stepAbility(body, buttons, ctx, specialPressed, attackPressed);
+  if (control === 'carried') {
+    // Hanging from its own drone's claw: the ability placed the body.
+    body.jumpHeld = jumpDown;
+    body.stepTick = tick;
+    return contacts;
+  }
   const busy = body.phase !== Phase.NONE; // no swings while the ability is going (mouth full, sitting, ...)
   const started = control === 'free' && !busy && attackPressed && body.attackCooldown <= 0 && body.hurt <= 0;
   if (started) {

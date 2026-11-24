@@ -17,6 +17,7 @@ import {
   TypedEmitter,
   attackReachBox,
   defaultCharacterForSlot,
+  droneDeck,
   droneGrip,
   healHugFeet,
   healPullCenter,
@@ -31,6 +32,7 @@ import {
   slotStyle,
   tongueOrigin,
   tongueTip,
+  type Collider,
   type CompiledCombat,
   type GameEvent,
   type LevelData,
@@ -38,6 +40,7 @@ import {
   type MovementBody,
   type MovementContext,
   type NetWorldState,
+  type Rect,
   type RoomInfo,
   type RoomLevelInfo,
   type TiledMap,
@@ -81,6 +84,11 @@ interface Attachments {
 const NO_ATTACHMENTS: Attachments = { players: new Map(), props: new Map(), foes: new Map() };
 const HITBOX = PLAYER_CONFIG.hitbox;
 
+/** Whether feet at (x, y) stand on a drone's `deck` (within `tolerance` px of its top). */
+function onDeck(x: number, y: number, deck: Rect, tolerance = 1.5): boolean {
+  return Math.abs(y - deck.y) <= tolerance && x + HITBOX.width / 2 > deck.x && x - HITBOX.width / 2 < deck.x + deck.width;
+}
+
 const tilesetKey = (def: TiledTileset) => `tileset:${def.name ?? 'tileset'}:${def.image ?? ''}`;
 
 /**
@@ -111,6 +119,9 @@ export class LevelScene extends Phaser.Scene {
   private views = new Map<string, PlayerView>();
   private entityViews: EntityViews | null = null;
   private traps: TrapField | null = null;
+  /** Other players' drone decks in the latest server state: what the prediction can stand on. */
+  private readonly decks = new Map<string, Rect>();
+  private deckColliders: Collider[] = [];
   private trapViews: TrapViews | null = null;
   private propViews: PropViews | null = null;
   private foeViews: FoeViews | null = null;
@@ -218,6 +229,7 @@ export class LevelScene extends Phaser.Scene {
       combat: this.combat,
       dt: TICK_DT,
       traps: level.traps.length > 0 ? traps : null,
+      platforms: { platformsFor: () => this.deckColliders },
     };
     this.predictor = new LocalPredictor(ctx);
     const sound = new SoundController(this, bridge.audio);
@@ -328,8 +340,22 @@ export class LevelScene extends Phaser.Scene {
       local.setInvulnerable(server !== null && server.invulnUntil > server.stepTick);
       // Held by someone else's ability: the server places us, in step with the (interpolated) captor.
       const self = body.held !== Held.NONE && selfId ? samples.get(selfId) : undefined;
-      const feetX = self ? self.x + HITBOX.width / 2 : position.x + HITBOX.width / 2;
-      const feetY = self ? self.y + HITBOX.height : position.y + HITBOX.height;
+      let feetX = self ? self.x + HITBOX.width / 2 : position.x + HITBOX.width / 2;
+      let feetY = self ? self.y + HITBOX.height : position.y + HITBOX.height;
+      // Riding someone's drone: stand on it where it is drawn (100 ms behind), not where the
+      // server had it last.
+      if (!self && body.grounded) {
+        for (const [id, deck] of this.decks) {
+          if (!onDeck(feetX, feetY, deck)) continue;
+          const sample = samples.get(id);
+          const drawn = sample ? droneDeck(sample, ABILITIES) : null;
+          if (drawn) {
+            feetX = drawn.x + (feetX - deck.x);
+            feetY = drawn.y;
+          }
+          break;
+        }
+      }
       const ability = CHARACTER_ABILITY[local.characterId];
       const ahead = body.facing > 0 ? 0 : Math.PI;
       const preview =
@@ -350,13 +376,20 @@ export class LevelScene extends Phaser.Scene {
       }
     }
 
+    // Players riding the local drone stand on it where the prediction has it.
+    const ownSample = selfId ? samples.get(selfId) : undefined;
+    const ownDeckThen = ownSample ? droneDeck(ownSample, ABILITIES) : null;
+    const ownDeckNow = body ? droneDeck(body, ABILITIES) : null;
     for (const [id, view] of this.views) {
       if (id === selfId) continue;
       const s = samples.get(id);
       if (!s) continue;
       view.setInvulnerable(s.invulnUntil > renderTick);
       view.setFinished(s.place > 0);
-      const feet = attached.players.get(id) ?? { x: s.x + HITBOX.width / 2, y: s.y + HITBOX.height };
+      let feet = attached.players.get(id) ?? { x: s.x + HITBOX.width / 2, y: s.y + HITBOX.height };
+      if (ownDeckThen && ownDeckNow && s.grounded && !attached.players.has(id) && onDeck(feet.x, feet.y, ownDeckThen)) {
+        feet = { x: ownDeckNow.x + (feet.x - ownDeckThen.x), y: ownDeckNow.y };
+      }
       view.render(feet.x, feet.y, s.facing, signalsFromSample(s), frameMs);
       if (debug) {
         boxes.push({ x: s.x, y: s.y, color: this.slotColor(id) });
@@ -420,6 +453,12 @@ export class LevelScene extends Phaser.Scene {
 
     const selfId = this.services.client.playerId;
     const me = selfId ? state.players.find((p) => p.id === selfId) : undefined;
+    this.decks.clear();
+    for (const player of state.players) {
+      const deck = player.id === selfId ? null : droneDeck(player, ABILITIES);
+      if (deck) this.decks.set(player.id, deck);
+    }
+    this.deckColliders = [...this.decks.values()].map((deck) => ({ ...deck, id: -1, oneWay: true, bounce: 0 }));
     if (me) predictor.reconcile(me, state.traps);
     else this.traps?.applyNet(state.traps);
 

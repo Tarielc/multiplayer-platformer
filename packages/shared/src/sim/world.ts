@@ -12,12 +12,21 @@ import type { NetPlayerState, NetWorldState } from '../protocol/state';
 import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/math';
 import { cellAt } from './collision';
 import type { DeathCause, GameEvent } from './events';
-import { giantActive } from './abilities';
+import { droneDeck, giantActive } from './abilities';
 import { AbilitySystem, cloneAbilityPlayerState, newAbilityPlayerState, type AbilityHit, type AbilityPlayerState } from './abilitySystem';
 import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
 import { FoeField, type Foe } from './foes/FoeField';
 import type { FoeStrike, FoeTarget } from './foes/types';
-import { cloneBody, createBody, resetBody, type MovementBody, type MovementContext, type StepContacts } from './movement';
+import {
+  cloneBody,
+  createBody,
+  resetBody,
+  rideAlong,
+  type Collider,
+  type MovementBody,
+  type MovementContext,
+  type StepContacts,
+} from './movement';
 import { TrapField } from './traps/TrapField';
 import type { Dir4, TrapHazard } from './traps/types';
 
@@ -135,6 +144,7 @@ export class GameWorld {
       dt: options.dt ?? TICK_DT,
       traps: this.traps.traps.length > 0 ? this.traps : null,
       abilities: options.abilities ?? ABILITIES,
+      platforms: { platformsFor: (body) => this.decksFor(body) },
     };
     this.abilities = new AbilitySystem(this.abilityHost());
     this.respawnDelayTicks = Math.max(1, msToTicks(this.playerConfig.respawnDelayMs));
@@ -299,6 +309,38 @@ export class GameWorld {
     if (player) player.present = present;
   }
 
+  /** Drone decks `body` can land on this tick: everyone else's, where they were when the tick began. */
+  private decksFor(body: Readonly<MovementBody>): Collider[] {
+    const out: Collider[] = [];
+    for (const p of this.players.values()) {
+      const deck = p.ability.deck;
+      if (deck && p.body !== body) out.push({ ...deck, id: -1, oneWay: true, bounce: 0 });
+    }
+    return out;
+  }
+
+  /**
+   * Players standing on a drone's deck move with it (after every player stepped, so the order
+   * of the steps doesn't matter); then each deck is kept where it is now for the next tick.
+   */
+  private rideDecks(): void {
+    const c = this.ctx.abilities ?? ABILITIES;
+    const { width, height } = this.ctx.hitbox;
+    for (const pilot of this.players.values()) {
+      const before = pilot.ability.deck;
+      const now = droneDeck(pilot.body, c);
+      if (before && now && (now.x !== before.x || now.y !== before.y)) {
+        for (const rider of this.players.values()) {
+          const b = rider.body;
+          if (rider === pilot || !b.alive || !b.grounded || b.held !== Held.NONE || b.flight > 0) continue;
+          if (Math.abs(b.y + height - before.y) > 0.5 || b.x >= before.x + before.width || b.x + width <= before.x) continue;
+          rideAlong(b, now.x - before.x, now.y - before.y, this.ctx);
+        }
+      }
+      pilot.ability.deck = now;
+    }
+  }
+
   /** Applies one input frame to one player: actions + movement first, then interactions. */
   stepPlayer(id: string, buttons: number): void {
     const player = this.players.get(id);
@@ -310,6 +352,7 @@ export class GameWorld {
   /** World-level rules that run once per tick regardless of input (hits, respawns, exit rule). */
   endTick(): void {
     this.abilities.update();
+    this.rideDecks();
     if (this.ctx.combat.playerHits) this.resolveAttacks();
     this.resolveBoxAttacks();
     this.resolveFoes();

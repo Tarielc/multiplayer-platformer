@@ -1,6 +1,6 @@
 import { ABILITIES, Ability, Cargo, Phase, type CompiledAbilities } from '../config/abilities';
 import { FOE_TUNING, type FoeKind } from '../config/foes';
-import { clamp, approach, type Rect, type Vec2 } from '../util/math';
+import { clamp, approach, rectsOverlap, type Rect, type Vec2 } from '../util/math';
 import { cellAt, isSolidCell } from './collision';
 import { CellFlag } from '../level/types';
 import { aimFromButtons, Button } from './input';
@@ -17,8 +17,11 @@ import type { HitboxSize, MovementBody, MovementContext } from './movement';
  * client picks up on the next reconcile.
  */
 
-/** How the body itself moves this step. */
-export type AbilityControl = 'free' | 'locked';
+/**
+ * How the body itself moves this step: on its own (`free`), uncontrolled (`locked`: momentum and
+ * gravity), or not at all (`carried`: the ability placed it, the drone's pilot in its own claw).
+ */
+export type AbilityControl = 'free' | 'locked' | 'carried';
 
 /** Height (px) of the carried player's feet below the claw grip (`carried` reaction art). */
 export const CARRIED_FEET_BELOW_GRIP = 26;
@@ -165,14 +168,14 @@ export function cargoFoe(cargo: number): FoeKind | null {
 
 /** Height of the drone's cargo below the claw grip. */
 export function cargoHeight(cargo: number, ctx: Pick<MovementContext, 'traps'>): number {
-  if (cargo === Cargo.PLAYER) return CARRIED_FEET_BELOW_GRIP;
+  if (cargo === Cargo.PLAYER || cargo === Cargo.SELF) return CARRIED_FEET_BELOW_GRIP;
   if (cargo === Cargo.BOX) return ctx.traps?.config.box.height ?? DEFAULT_BOX;
   const foe = cargoFoe(cargo);
   return foe ? FOE_TUNING[foe].height : 0;
 }
 
 function cargoWidth(cargo: number, ctx: Pick<MovementContext, 'traps' | 'hitbox'>): number {
-  if (cargo === Cargo.PLAYER) return ctx.hitbox.width;
+  if (cargo === Cargo.PLAYER || cargo === Cargo.SELF) return ctx.hitbox.width;
   if (cargo === Cargo.BOX) return ctx.traps?.config.box.width ?? DEFAULT_BOX;
   const foe = cargoFoe(cargo);
   return foe ? FOE_TUNING[foe].width : 0;
@@ -193,6 +196,38 @@ export function droneBox(
 /** Where the claw grips, in world px. */
 export function droneGrip(body: Pick<MovementBody, 'droneX' | 'droneY'>, c: Readonly<CompiledAbilities> = ABILITIES): Vec2 {
   return { x: body.droneX, y: body.droneY + c.drone.gripY };
+}
+
+/** The claw's grab area: under the grip, a little above it. */
+export function clawZone(body: Pick<MovementBody, 'droneX' | 'droneY'>, c: Readonly<CompiledAbilities> = ABILITIES): Rect {
+  const grip = droneGrip(body, c);
+  const g = c.drone.grab;
+  return { x: grip.x - g.width / 2, y: grip.y - 4, width: g.width, height: g.height + 4 };
+}
+
+/**
+ * Smallest upward shift (px) that makes the drone at (droneX, droneY) fit with `cargo` hanging
+ * from its claw, or null when there is no room. A grab hops the drone up by it.
+ */
+export function cargoLift(droneX: number, droneY: number, cargo: number, ctx: MovementContext): number | null {
+  const max = abilityConfig(ctx).drone.grab.height + 8;
+  for (let lift = 0; lift <= max; lift++) {
+    if (!boxHitsSolid(droneBox({ droneX, droneY: droneY - lift, cargo }, ctx), ctx)) return lift;
+  }
+  return null;
+}
+
+/**
+ * The drone's deck: the top of its collision box that other players can stand on while it is
+ * flown (`DRONE_PILOT`), or null. A one-way platform, `deckWidth` wide.
+ */
+export function droneDeck(
+  body: Pick<MovementBody, 'alive' | 'phase' | 'droneX' | 'droneY'>,
+  c: Readonly<CompiledAbilities> = ABILITIES,
+): Rect | null {
+  if (!body.alive || body.phase !== Phase.DRONE_PILOT) return null;
+  const d = c.drone;
+  return { x: body.droneX - d.deckWidth / 2, y: body.droneY - d.size.height / 2, width: d.deckWidth, height: d.size.height };
 }
 
 /** Where the drone goes back to when recalled (the pilot's hands). */
@@ -252,7 +287,7 @@ export function interruptAbility(body: MovementBody, c: Readonly<CompiledAbiliti
       return;
     case Phase.DRONE_PILOT:
       enter(body, Phase.DRONE_RECALL);
-      body.cargo = Cargo.NONE;
+      dropCargo(body);
       return;
     case Phase.TONGUE_WINDUP:
     case Phase.TONGUE_SHOOT:
@@ -348,12 +383,21 @@ export function stepAbility(
     case Phase.DRONE_PILOT:
       if (attackPressed || t >= c.drone.battery) {
         enter(body, Phase.DRONE_RECALL);
-        body.cargo = Cargo.NONE; // the server drops whatever the claw held
+        dropCargo(body); // the server drops whatever else the claw held
         body.droneVx = body.droneVy = 0;
         break;
       }
-      if (specialPressed) body.specialSeq += 1; // grab / drop, decided by the server
+      if (specialPressed) {
+        // The pilot in the claw is the pilot's own business (predicted); anything else is the
+        // server's: it grabs or drops on the press.
+        if (body.cargo === Cargo.SELF) dropCargo(body);
+        else if (body.cargo !== Cargo.NONE || !grabSelf(body, ctx)) body.specialSeq += 1;
+      }
       stepDrone(body, buttons, ctx, c);
+      if (body.cargo === Cargo.SELF) {
+        hangFromClaw(body, ctx);
+        return 'carried';
+      }
       break;
     case Phase.DRONE_RECALL: {
       if (t >= c.drone.recall) {
@@ -453,6 +497,46 @@ function start(body: MovementBody, buttons: number): void {
       return;
   }
   body.specialSeq += 1;
+}
+
+/**
+ * Lets go of what the claw holds. The pilot falls from the claw with its motion (never thrown
+ * upward); anything else the server drops.
+ */
+function dropCargo(body: MovementBody): void {
+  if (body.cargo === Cargo.SELF) {
+    body.vx = body.droneVx;
+    body.vy = Math.max(0, body.droneVy);
+    body.grounded = false;
+    body.jumping = false;
+  }
+  body.cargo = Cargo.NONE;
+}
+
+/** The claw closes on its own pilot if they are under it (and fit); true when it did. */
+function grabSelf(body: MovementBody, ctx: MovementContext): boolean {
+  const c = abilityConfig(ctx);
+  const r = { x: body.x, y: body.y, width: ctx.hitbox.width, height: ctx.hitbox.height };
+  if (!rectsOverlap(clawZone(body, c), r)) return false;
+  const lift = cargoLift(body.droneX, body.droneY, Cargo.SELF, ctx);
+  if (lift === null) return false;
+  body.droneY -= lift;
+  if (lift > 0) body.droneVy = Math.min(0, body.droneVy);
+  body.cargo = Cargo.SELF;
+  hangFromClaw(body, ctx);
+  return true;
+}
+
+/** The pilot hangs from the claw by the hands, like a carried player. */
+function hangFromClaw(body: MovementBody, ctx: MovementContext): void {
+  const grip = droneGrip(body, abilityConfig(ctx));
+  body.x = grip.x - ctx.hitbox.width / 2;
+  body.y = grip.y + CARRIED_FEET_BELOW_GRIP - ctx.hitbox.height;
+  body.vx = body.droneVx;
+  body.vy = body.droneVy;
+  body.grounded = false;
+  body.jumping = false;
+  body.coyote = 0;
 }
 
 /** Drone flight: 8-way thrust from the pilot's input, tile collision, a leash to the pilot. */

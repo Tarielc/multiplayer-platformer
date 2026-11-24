@@ -164,9 +164,11 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 | Character | Ability | Cooldown | After a miss |
 |---|---|---|---|
 | Mask Dude | Giant Form: 10 s of armour, damaging swings and 2 bonus hearts | 30 s | – |
-| Virtual Guy | Claw Drone: 15 s of flight that carries players, boxes and foes | 22 s | – |
+| Virtual Guy | Claw Drone: 15 s of flight up to 800 px away; the claw carries players, boxes, foes or Virtual Guy himself, and players can ride on top | 22 s | – |
 | Ninja Frog | Tongue Spit: grab, hold and spit a damaging projectile | 15 s | 3 s |
 | Bunny Man | Healing Hug: heals 2 hearts, plus 1 for the healer | 12 s | 3 s |
+
+**Flying with the drone.** Press Special with the claw over Virtual Guy to pick himself up: he hangs from the claw and flies wherever the drone goes, and Special again lets go. Other players can land on the drone's top (a one-way platform, jump up through it) and ride it while it is flown. Down + Jump drops through it.
 
 **Fruit recharges abilities.** Each point of a pickup takes 1% of the ability's full cooldown off: an apple, strawberry or coin (10 pts) 10%, a pineapple 20%, a melon or gem (50 pts) half. **Beating a foe recharges them too**, by twice its score: a mushroom (10 pts) 20%, a chicken or wasp 30%, a monkey 40%, a bull 60%, and the rhino boss refills it. Only the player who lands the final hit gets it (a frog's spit counts for the frog). Both work in both modes, so fruit and foes still matter in a race. The HUD shows your ability as a large badge in the bottom-left corner, and each player's chip shows a smaller one. The ring around the icon fills as it recharges, glows when it is ready, and flashes when fruit or a kill tops it up.
 
