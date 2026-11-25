@@ -22,6 +22,9 @@ import {
   cloneBody,
   createBody,
   resetBody,
+  bodyRect,
+  hitboxOf,
+  playerHead,
   rideAlong,
   type Collider,
   type MovementBody,
@@ -74,6 +77,12 @@ export interface WorldPlayer {
   swingFoes: Set<number>;
   /** Server-only special ability bookkeeping (what it holds, flights, ...). */
   ability: AbilityPlayerState;
+  /**
+   * Server-only: the player's head as a one-way platform, where it was at the end of the last
+   * tick (null: it can't carry anyone). Others land on it during the tick; `GameWorld` then
+   * carries them to where the head went.
+   */
+  head: Rect | null;
   /** Race: finishing place (1-based) once the player reached the trophy; 0 while still racing. */
   place: number;
   /** Race: tick the player finished on (valid when `place > 0`). */
@@ -216,6 +225,7 @@ export class GameWorld {
         swingBoxes: new Set(p.swingBoxes),
         swingFoes: new Set(p.swingFoes),
         ability: cloneAbilityPlayerState(p.ability),
+        head: p.head ? { ...p.head } : null,
       });
     }
     copy.traps = this.traps.clone();
@@ -275,6 +285,7 @@ export class GameWorld {
       foeSwingSeq: 0,
       swingFoes: new Set(),
       ability: newAbilityPlayerState(),
+      head: null,
       place: 0,
       finishTick: 0,
     };
@@ -325,14 +336,47 @@ export class GameWorld {
     if (player) player.present = present;
   }
 
-  /** Drone decks `body` can land on this tick: everyone else's, where they were when the tick began. */
+  /**
+   * One-way platforms `body` can land on this tick: everyone else's drone deck and head, where
+   * they were when the tick began.
+   */
   private decksFor(body: Readonly<MovementBody>): Collider[] {
     const out: Collider[] = [];
     for (const p of this.players.values()) {
-      const deck = p.ability.deck;
-      if (deck && p.body !== body) out.push({ ...deck, id: -1, oneWay: true, bounce: 0 });
+      if (p.body === body) continue;
+      if (p.ability.deck) out.push({ ...p.ability.deck, id: -1, oneWay: true, bounce: 0 });
+      if (p.head) out.push({ ...p.head, id: -1, oneWay: true, bounce: 0 });
     }
     return out;
+  }
+
+  /**
+   * A head is a plain one-way ledge, not a lift: whoever stands on it is not carried sideways
+   * (the one underneath walks out from under them) and not pulled down (they fall on their own).
+   * Only a head rising into its riders' feet pushes them up, so a jump doesn't pass through them.
+   * Runs after every player stepped and the decks carried their riders; then each head is kept
+   * where it is now for the next tick. The bottom of a stack goes first, so a push goes all the
+   * way up.
+   */
+  private rideHeads(): void {
+    const carriers = [...this.players.values()].sort((a, b) => bottomOf(b, this.ctx) - bottomOf(a, this.ctx) || a.slot - b.slot);
+    for (const carrier of carriers) {
+      const before = carrier.head;
+      const now = playerHead(carrier.body, this.ctx);
+      if (before && now && now.y < before.y) {
+        for (const rider of this.players.values()) {
+          const b = rider.body;
+          if (rider === carrier || !b.alive || !b.grounded || b.held !== Held.NONE || b.flight > 0) continue;
+          const { width, height } = hitboxOf(b, this.ctx);
+          if (Math.abs(b.y + height - before.y) > 0.5) continue;
+          // On the head before and still over it now (one teleported in from elsewhere pushes no one).
+          if (b.x >= before.x + before.width || b.x + width <= before.x) continue;
+          if (b.x >= now.x + now.width || b.x + width <= now.x) continue;
+          rideAlong(b, 0, now.y - before.y, this.ctx);
+        }
+      }
+      carrier.head = now;
+    }
   }
 
   /**
@@ -341,7 +385,6 @@ export class GameWorld {
    */
   private rideDecks(): void {
     const c = this.ctx.abilities ?? ABILITIES;
-    const { width, height } = this.ctx.hitbox;
     for (const pilot of this.players.values()) {
       const before = pilot.ability.deck;
       const now = droneDeck(pilot.body, c);
@@ -349,6 +392,7 @@ export class GameWorld {
         for (const rider of this.players.values()) {
           const b = rider.body;
           if (rider === pilot || !b.alive || !b.grounded || b.held !== Held.NONE || b.flight > 0) continue;
+          const { width, height } = hitboxOf(b, this.ctx);
           if (Math.abs(b.y + height - before.y) > 0.5 || b.x >= before.x + before.width || b.x + width <= before.x) continue;
           rideAlong(b, now.x - before.x, now.y - before.y, this.ctx);
         }
@@ -369,6 +413,7 @@ export class GameWorld {
   endTick(): void {
     this.abilities.update();
     this.rideDecks();
+    this.rideHeads();
     if (this.ctx.combat.playerHits) this.resolveAttacks();
     this.resolveBoxAttacks();
     this.resolveFoes();
@@ -409,8 +454,9 @@ export class GameWorld {
   /** Race: the player reached the trophy. They get a place and leave play (no respawn). */
   private finish(player: WorldPlayer): void {
     const body = player.body;
-    const x = body.x + this.ctx.hitbox.width / 2;
-    const y = body.y + this.ctx.hitbox.height / 2;
+    const size = hitboxOf(body, this.ctx);
+    const x = body.x + size.width / 2;
+    const y = body.y + size.height / 2;
     this.abilities.onDeath(player); // drops whatever they hold, like a death would
     body.alive = false;
     body.vx = 0;
@@ -525,7 +571,7 @@ export class GameWorld {
       playerId: target.id,
       by: hit.by,
       hp: target.hp,
-      x: t.x + this.ctx.hitbox.width / 2,
+      x: t.x + hitboxOf(t, this.ctx).width / 2,
       y: t.y,
     });
     if (target.hp <= 0) {
@@ -554,8 +600,7 @@ export class GameWorld {
       playerId: target.id,
       by: hit.by,
       hp: target.hp,
-      x: t.x + this.ctx.hitbox.width / 2,
-      y: t.y + this.ctx.hitbox.height / 2,
+      ...centerOf(t, this.ctx),
     });
     if (target.hp <= 0) {
       this.kill(target, 'ability');
@@ -598,7 +643,7 @@ export class GameWorld {
 
   private resolveInteractions(player: WorldPlayer, contacts: StepContacts): void {
     const body = player.body;
-    const box: Rect = { x: body.x, y: body.y, width: this.ctx.hitbox.width, height: this.ctx.hitbox.height };
+    const box: Rect = bodyRect(body, this.ctx);
 
     if (body.y > this.level.heightPx + this.entityConfig.killPlaneMargin) {
       this.kill(player, 'fall');
@@ -643,7 +688,6 @@ export class GameWorld {
    */
   private resolveAttacks(): void {
     const combat = this.ctx.combat;
-    const hitbox = this.ctx.hitbox;
     const players = this.listPlayers();
     for (const player of players) {
       if (player.hitImmuneTicks > 0) player.hitImmuneTicks -= 1;
@@ -656,12 +700,12 @@ export class GameWorld {
     for (const attacker of players) {
       const a = attacker.body;
       if (!isAttackActive(a, combat)) continue;
-      const reach = attackReachBox(a, hitbox, combat, this.reachScale(a));
+      const reach = attackReachBox(a, hitboxOf(a, this.ctx), combat, this.reachScale(a));
       for (const target of players) {
         const t = target.body;
         if (target === attacker || !t.alive || t.hurt > 0 || target.hitImmuneTicks > 0 || t.held !== Held.NONE) continue;
         if (attacker.swingHits & (1 << target.slot)) continue;
-        if (!rectsOverlap(reach, { x: t.x, y: t.y, width: hitbox.width, height: hitbox.height })) continue;
+        if (!rectsOverlap(reach, bodyRect(t, this.ctx))) continue;
         if (!hits.has(target)) hits.set(target, attacker);
       }
     }
@@ -682,8 +726,7 @@ export class GameWorld {
           playerId: target.id,
           by: attacker.id,
           hp: target.hp,
-          x: t.x + hitbox.width / 2,
-          y: t.y + hitbox.height / 2,
+          ...centerOf(t, this.ctx),
         });
         if (target.hp <= 0) {
           this.kill(target, 'ability');
@@ -739,8 +782,8 @@ export class GameWorld {
       playerId: player.id,
       damage,
       hp: player.hp,
-      x: body.x + this.ctx.hitbox.width / 2,
-      y: body.y + this.ctx.hitbox.height,
+      x: body.x + hitboxOf(body, this.ctx).width / 2,
+      y: body.y + hitboxOf(body, this.ctx).height,
     });
     if (player.hp <= 0) {
       this.kill(player, 'fall');
@@ -807,10 +850,10 @@ export class GameWorld {
    */
   private updateButtons(): void {
     if (this.traps.buttons.length === 0) return;
-    const { width, height } = this.ctx.hitbox;
     const pressers: Rect[] = [];
     for (const p of this.players.values()) {
       const b = p.body;
+      const { width, height } = hitboxOf(b, this.ctx);
       if (b.alive && b.grounded) pressers.push({ x: b.x, y: b.y + height - 1, width, height: 2 });
     }
     for (const { rect } of this.traps.boxes()) pressers.push({ ...rect, height: rect.height + 1 });
@@ -829,7 +872,7 @@ export class GameWorld {
         player.swingBoxes.clear();
       }
       if (!isAttackActive(body, combat)) continue;
-      const reach = attackReachBox(body, this.ctx.hitbox, combat, this.reachScale(body));
+      const reach = attackReachBox(body, hitboxOf(body, this.ctx), combat, this.reachScale(body));
       boxes ??= this.traps.colliders(this.tick).filter((c) => c.kind === 'box');
       const count = giantActive(body) ? this.abilityTuning.giant.boxHits : 1;
       for (const box of boxes) {
@@ -848,7 +891,6 @@ export class GameWorld {
     const foes = this.foes;
     if (foes.empty) return;
     const combat = this.ctx.combat;
-    const hitbox = this.ctx.hitbox;
     const tuning = foes.config;
     const players = this.listPlayers();
     // Swings hit each foe once per swing (giants harder) and knock shots out of the air.
@@ -859,6 +901,7 @@ export class GameWorld {
         player.swingFoes.clear();
       }
       if (!body.alive || !isAttackActive(body, combat)) continue;
+      const hitbox = hitboxOf(body, this.ctx);
       const reach = attackReachBox(body, hitbox, combat, this.reachScale(body));
       const damage = giantActive(body) ? this.abilityTuning.giant.swingDamage : tuning.swingDamage;
       for (const foe of foes.live()) {
@@ -919,10 +962,7 @@ export class GameWorld {
     const free = body.alive && body.held === Held.NONE;
     return {
       id: player.id,
-      x: body.x,
-      y: body.y,
-      width: this.ctx.hitbox.width,
-      height: this.ctx.hitbox.height,
+      ...bodyRect(body, this.ctx),
       vy: body.vy,
       visible: free,
       vulnerable: free && this.tick >= player.invulnUntil && body.hurt <= 0,
@@ -1040,8 +1080,7 @@ export class GameWorld {
       type: 'death',
       playerId: player.id,
       cause,
-      x: body.x + this.ctx.hitbox.width / 2,
-      y: body.y + this.ctx.hitbox.height / 2,
+      ...centerOf(body, this.ctx),
     });
   }
 
@@ -1053,6 +1092,17 @@ export class GameWorld {
     player.tp += 1;
     this.events.push({ type: 'respawn', playerId: player.id });
   }
+}
+
+/** Centre of a player's hitbox (a giant's is bigger). */
+function centerOf(body: MovementBody, ctx: MovementContext): { x: number; y: number } {
+  const { width, height } = hitboxOf(body, ctx);
+  return { x: body.x + width / 2, y: body.y + height / 2 };
+}
+
+/** Where a player's feet are. */
+function bottomOf(player: WorldPlayer, ctx: MovementContext): number {
+  return player.body.y + hitboxOf(player.body, ctx).height;
 }
 
 function toNetPlayer(p: WorldPlayer, ack: number, maxHp: number): NetPlayerState {

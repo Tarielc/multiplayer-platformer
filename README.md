@@ -170,7 +170,11 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 | Ninja Frog | Tongue Spit: grab, hold and spit a damaging projectile | 15 s | 3 s |
 | Bunny Man | Healing Hug: heals 2 hearts, plus 1 for the healer | 12 s | 3 s |
 
+**Giant Form is big.** Mask Dude's hitbox grows from 20×28 to 28×38 px around his feet (`giant.hitbox` in `config/abilities.ts`, matching the big-form art) for as long as the form lasts, so he needs more headroom, makes a taller and wider platform for others to stand on, and is easier to hit. He can't grow where the big hitbox wouldn't fit (under a low ceiling or in a narrow shaft); next to a wall he grows away from it.
+
 **Flying with the drone.** Press Special with the claw over Virtual Guy to pick himself up: he hangs from the claw and flies wherever the drone goes, and Special again lets go. Other players can land on the drone's top (a one-way platform, jump up through it) and ride it while it is flown. Down + Jump drops through it.
+
+**Standing on each other.** Every player's head is a one-way platform for the others: land on a teammate (or a rival in a race), jump up through them from below, and Down + Jump to drop off. A head is a ledge, not a lift: if the player underneath walks away, the one on top stays where they are and drops down, and if they fall, the one on top falls on their own. Only a jump pushes the one on top up with it. Stacks can be several players tall, and a jump from a teammate's head reaches a ledge one player-height higher. A dead player, one held by an ability (the claw, a tongue, a hug) or one flying from a spit can't carry anyone.
 
 **Fruit recharges abilities.** Each point of a pickup takes 1% of the ability's full cooldown off: an apple, strawberry or coin (10 pts) 10%, a pineapple 20%, a melon or gem (50 pts) half. **Beating a foe recharges them too**, by twice its score: a mushroom (10 pts) 20%, a chicken or wasp 30%, a monkey 40%, a bull 60%, and the rhino boss refills it. Only the player who lands the final hit gets it (a frog's spit counts for the frog). Both work in both modes, so fruit and foes still matter in a race. The HUD shows your ability as a large badge in the bottom-left corner, and each player's chip shows a smaller one. The ring around the icon fills as it recharges, glows when it is ready, and flashes when fruit or a kill tops it up.
 

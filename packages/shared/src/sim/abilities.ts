@@ -4,7 +4,7 @@ import { clamp, approach, rectsOverlap, type Rect, type Vec2 } from '../util/mat
 import { cellAt, isSolidCell } from './collision';
 import { CellFlag } from '../level/types';
 import { aimFromButtons, Button } from './input';
-import type { HitboxSize, MovementBody, MovementContext } from './movement';
+import { isGiant, type HitboxSize, type MovementBody, type MovementContext } from './movement';
 
 /**
  * Owner-side ability logic: the part of every special ability that only depends on the owner's
@@ -238,7 +238,25 @@ export function droneHome(body: Pick<MovementBody, 'x' | 'y' | 'facing'>, hitbox
 
 /** Giant form is on (growing, big, or shrinking back): the bonus hearts count. */
 export function giantActive(body: Pick<MovementBody, 'giant' | 'phase'>): boolean {
-  return body.giant > 0 || body.phase === Phase.GIANT_GROW || body.phase === Phase.GIANT_SHRINK;
+  return isGiant(body);
+}
+
+/**
+ * Where a body can grow into a giant: the big hitbox's left edge, centred on the feet if it
+ * fits there, else pushed off a wall on one side; null when there is no room (low ceiling,
+ * narrow shaft). Tiles and solid traps count.
+ */
+function giantRoom(body: MovementBody, ctx: MovementContext, c: Readonly<CompiledAbilities>): number | null {
+  const small = ctx.hitbox;
+  const big = c.giant.hitbox;
+  const spare = big.width - small.width;
+  const y = body.y + small.height - big.height;
+  const solids = ctx.traps ? ctx.traps.colliders(body.stepTick + 1).filter((t) => !t.oneWay) : [];
+  for (const x of [body.x - spare / 2, body.x, body.x - spare]) {
+    const r = { x, y, width: big.width, height: big.height };
+    if (!boxHitsSolid(r, ctx) && !solids.some((t) => rectsOverlap(r, t))) return x;
+  }
+  return null;
 }
 
 function enter(body: MovementBody, phase: number): void {
@@ -331,7 +349,7 @@ export function stepAbility(
 
   if (body.phase === Phase.NONE) {
     if (specialPressed && body.specialCooldown <= 0 && body.hurt <= 0 && body.attack <= 0 && body.giant <= 0) {
-      start(body, buttons);
+      start(body, buttons, ctx, c);
     }
     return isLockedPhase(body.phase) ? 'locked' : 'free';
   }
@@ -470,7 +488,7 @@ export function stepAbility(
   return isLockedPhase(body.phase) ? 'locked' : 'free';
 }
 
-function start(body: MovementBody, buttons: number): void {
+function start(body: MovementBody, buttons: number, ctx: MovementContext, c: Readonly<CompiledAbilities>): void {
   switch (body.ability) {
     case Ability.HEAL:
       if (!body.grounded) return;
@@ -484,9 +502,15 @@ function start(body: MovementBody, buttons: number): void {
       enter(body, Phase.DRONE_DEPLOY);
       body.cargo = Cargo.NONE;
       break;
-    case Ability.GIANT:
+    case Ability.GIANT: {
+      // No room to grow: nothing happens (the ability stays ready).
+      const x = giantRoom(body, ctx, c);
+      if (x === null) return;
+      // Off a wall: shift so that growing around the feet (`stepPlayerBody`) lands at `x`.
+      body.x += x - (body.x - (c.giant.hitbox.width - ctx.hitbox.width) / 2);
       enter(body, Phase.GIANT_GROW);
       break;
+    }
     case Ability.TONGUE:
       body.aim = aimFromButtons(buttons, body.facing);
       body.facing = facingForAim(body.aim, body.facing);

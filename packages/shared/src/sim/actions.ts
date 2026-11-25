@@ -4,8 +4,11 @@ import { Button, NEUTRAL_INPUT } from './input';
 import { Phase } from '../config/abilities';
 import { stepAbility } from './abilities';
 import {
+  hitboxOf,
   moveAndCollide,
   noContacts,
+  resizeBody,
+  sizedFor,
   stepPlayerMovement,
   type HitboxSize,
   type MovementBody,
@@ -68,7 +71,11 @@ export function stepPlayerBody(
     return contacts;
   }
 
+  const sizeBefore = hitboxOf(body, ctx);
   const control = stepAbility(body, buttons, ctx, specialPressed, attackPressed);
+  // Giant form started or ended: the hitbox grows or shrinks around the feet.
+  const sizeAfter = hitboxOf(body, ctx);
+  if (sizeAfter !== sizeBefore) resizeBody(body, sizeBefore, sizeAfter);
   if (control === 'carried') {
     // Hanging from its own drone's claw: the ability placed the body.
     body.jumpHeld = jumpDown;
@@ -102,7 +109,8 @@ export function stepPlayerBody(
  * Spat by the frog: a straight, uncontrolled flight along the launch velocity. Hitting a wall,
  * floor or ceiling (or running out of time) ends it with a short stun.
  */
-function stepFlight(body: MovementBody, ctx: MovementContext, tick: number, contacts: StepContacts): void {
+function stepFlight(body: MovementBody, base: MovementContext, tick: number, contacts: StepContacts): void {
+  const ctx = sizedFor(body, base);
   const vx = body.vx;
   const vy = body.vy;
   body.flight = Math.max(0, body.flight - ctx.dt);

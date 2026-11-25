@@ -321,6 +321,154 @@ describe('GameWorld: fall damage', () => {
   });
 });
 
+describe('GameWorld: players stand on each other', () => {
+  // 32 px tiles; the floor's top is at y = 7 * 32, with plenty of headroom.
+  const ROOM = [...Array.from({ length: 6 }, () => '                    '), ' 1234               ', '####################'];
+  const FLOOR = 7 * 32;
+  const H = HITBOX.height;
+
+  /**
+   * Players `ids` settled on the floor apart (heads registered), then each dropped onto the one
+   * before at x = 200. (Teleporting someone who stood under another would carry that one along.)
+   */
+  function stack(...ids: string[]): GameWorld {
+    const world = makeWorld(ROOM);
+    ids.forEach((id, slot) => world.addPlayer(id, slot));
+    ids.forEach((id, i) => place(world, id, 200 + 100 * i, FLOOR));
+    ticks(world, 3);
+    ids.forEach((id, i) => {
+      if (i === 0) return;
+      place(world, id, 200, FLOOR - H * i - 24);
+      world.getPlayer(id)!.body.grounded = false;
+      for (let t = 0; t < 60 && !world.getPlayer(id)!.body.grounded; t++) tick(world);
+    });
+    return world;
+  }
+
+  const feet = (world: GameWorld, id: string) => world.getPlayer(id)!.body.y + H;
+  const top = (world: GameWorld, id: string) => world.getPlayer(id)!.body.y;
+
+  it('lands on another player\'s head and stands there', () => {
+    const world = stack('a', 'b');
+    const b = world.getPlayer('b')!.body;
+    expect(b.grounded).toBe(true);
+    expect(feet(world, 'b')).toBe(top(world, 'a'));
+    expect(top(world, 'a')).toBe(FLOOR - H);
+    ticks(world, 30);
+    expect(feet(world, 'b')).toBe(top(world, 'a'));
+  });
+
+  it('is not carried along: the one underneath walks out from under them', () => {
+    const world = stack('a', 'b');
+    const a = world.getPlayer('a')!.body;
+    const b = world.getPlayer('b')!.body;
+    const x = b.x;
+    const ax = a.x;
+    tick(world, { a: Button.RIGHT });
+    expect(a.x).toBeGreaterThan(ax);
+    expect(b.x).toBe(x); // still standing there, on a's head
+    expect(feet(world, 'b')).toBe(top(world, 'a'));
+    ticks(world, 30, { a: Button.RIGHT });
+    expect(a.x).toBeGreaterThan(x + HITBOX.width);
+    expect(b.x).toBe(x); // a walked away, b dropped down where it stood
+    expect(feet(world, 'b')).toBe(FLOOR);
+    expect(world.getPlayer('b')!.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+
+  it('a jump pushes the one on top up, but does not pull them back down', () => {
+    const world = stack('a', 'b');
+    const a = world.getPlayer('a')!.body;
+    const b = world.getPlayer('b')!.body;
+    const x = b.x;
+    let rising = true;
+    let pushed = false;
+    for (let i = 0; i < 90; i++) {
+      const was = a.y;
+      tick(world, { a: i < 15 ? Button.JUMP : 0 });
+      expect(b.x).toBe(x);
+      if (rising && a.y < was) {
+        expect(feet(world, 'b')).toBeCloseTo(top(world, 'a'), 6); // never inside a
+        pushed = pushed || top(world, 'a') < FLOOR - H - 60;
+      } else rising = false;
+    }
+    expect(pushed).toBe(true); // a really jumped, lifting b
+    expect(feet(world, 'b')).toBe(top(world, 'a')); // both fell back, b landed on a again
+    expect(world.getPlayer('b')!.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+
+  it('is not pulled down when the one underneath drops through a plank', () => {
+    // a stands on a one-way plank with b on top, then drops through it (down + jump).
+    const PLANK = [...Array.from({ length: 5 }, () => '                    '), '    ------          ', '                    ', '####################'];
+    const world = makeWorld(PLANK);
+    world.addPlayer('a', 0);
+    world.addPlayer('b', 1);
+    place(world, 'a', 200, 5 * 32 - 4);
+    place(world, 'b', 100, FLOOR);
+    world.getPlayer('a')!.body.grounded = false;
+    ticks(world, 20);
+    const plank = feet(world, 'a');
+    expect(plank).toBeLessThan(FLOOR);
+    place(world, 'b', 200, plank - H - 24);
+    world.getPlayer('b')!.body.grounded = false;
+    ticks(world, 40);
+    expect(feet(world, 'b')).toBe(top(world, 'a'));
+    const b = world.getPlayer('b')!.body;
+    const x = b.x;
+    tick(world, { a: Button.DOWN | Button.JUMP });
+    ticks(world, 8);
+    expect(top(world, 'a')).toBeGreaterThan(plank - H + 16); // a is falling through the plank...
+    expect(feet(world, 'b')).toBeLessThan(top(world, 'a') - 8); // ...and b is not stuck to a's head
+    ticks(world, 60);
+    expect(feet(world, 'a')).toBe(FLOOR);
+    expect(feet(world, 'b')).toBe(plank); // b didn't drop, so the plank caught it
+    expect(b.x).toBe(x);
+  });
+
+  it('heads are one-way: a player jumps up through another and lands on top', () => {
+    const world = makeWorld(ROOM);
+    world.addPlayer('a', 0);
+    world.addPlayer('b', 1);
+    place(world, 'a', 200, FLOOR);
+    place(world, 'b', 200, FLOOR); // overlapping, both on the floor: neither is in the way
+    ticks(world, 3);
+    expect(feet(world, 'a')).toBe(FLOOR);
+    expect(feet(world, 'b')).toBe(FLOOR);
+    ticks(world, 15, { a: Button.JUMP });
+    ticks(world, 60);
+    expect(feet(world, 'a')).toBe(top(world, 'b'));
+    expect(feet(world, 'b')).toBe(FLOOR);
+  });
+
+  it('down + jump drops off a head', () => {
+    const world = stack('a', 'b');
+    tick(world, { b: Button.DOWN | Button.JUMP });
+    ticks(world, 60);
+    expect(feet(world, 'b')).toBe(FLOOR);
+  });
+
+  it('stacks: a tower of three, pushed up all the way by a jump at the bottom', () => {
+    const world = stack('a', 'b', 'c');
+    expect(feet(world, 'b')).toBe(top(world, 'a'));
+    expect(feet(world, 'c')).toBe(top(world, 'b'));
+    const a = world.getPlayer('a')!.body;
+    for (let i = 0; i < 6; i++) {
+      tick(world, { a: Button.JUMP });
+      expect(top(world, 'a')).toBeLessThan(FLOOR - H);
+      expect(feet(world, 'b')).toBeCloseTo(top(world, 'a'), 6);
+      expect(feet(world, 'c')).toBeCloseTo(top(world, 'b'), 6);
+    }
+    expect(a.vy).toBeLessThan(0);
+  });
+
+  it('a player who dies is no longer a platform', () => {
+    const world = stack('a', 'b');
+    world.killPlayer('a');
+    world.drainEvents();
+    ticks(world, 60);
+    expect(feet(world, 'b')).toBe(FLOOR);
+  });
+});
+
 describe('GameWorld: checkpoints', () => {
   // Checkpoint zone at x 192..224 (column 6).
   const CHECKPOINT = ['          ', '          ', ' 12   C   ', '##########'];

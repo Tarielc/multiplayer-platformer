@@ -16,6 +16,7 @@ import {
   TrapField,
   TypedEmitter,
   attackReachBox,
+  bodyRect,
   defaultCharacterForSlot,
   droneDeck,
   droneGrip,
@@ -26,6 +27,9 @@ import {
   levelChecksum,
   ordinal,
   parseTiledLevel,
+  playerHead,
+  hitboxOf,
+  giantActive,
   propertiesToRecord,
   resolveCombat,
   resolveMovement,
@@ -83,6 +87,8 @@ interface Attachments {
 }
 const NO_ATTACHMENTS: Attachments = { players: new Map(), props: new Map(), foes: new Map() };
 const HITBOX = PLAYER_CONFIG.hitbox;
+/** Sizes players' hitboxes (a giant's is bigger), as the simulation does. */
+const SIZES = { hitbox: HITBOX, abilities: ABILITIES };
 
 /** Whether feet at (x, y) stand on a drone's `deck` (within `tolerance` px of its top). */
 function onDeck(x: number, y: number, deck: Rect, tolerance = 1.5): boolean {
@@ -119,8 +125,9 @@ export class LevelScene extends Phaser.Scene {
   private views = new Map<string, PlayerView>();
   private entityViews: EntityViews | null = null;
   private traps: TrapField | null = null;
-  /** Other players' drone decks in the latest server state: what the prediction can stand on. */
+  /** Other players' drone decks and heads in the latest server state: what the prediction can stand on. */
   private readonly decks = new Map<string, Rect>();
+  private readonly heads = new Map<string, Rect>();
   private deckColliders: Collider[] = [];
   private trapViews: TrapViews | null = null;
   private propViews: PropViews | null = null;
@@ -340,20 +347,19 @@ export class LevelScene extends Phaser.Scene {
       local.setInvulnerable(server !== null && server.invulnUntil > server.stepTick);
       // Held by someone else's ability: the server places us, in step with the (interpolated) captor.
       const self = body.held !== Held.NONE && selfId ? samples.get(selfId) : undefined;
-      let feetX = self ? self.x + HITBOX.width / 2 : position.x + HITBOX.width / 2;
-      let feetY = self ? self.y + HITBOX.height : position.y + HITBOX.height;
-      // Riding someone's drone: stand on it where it is drawn (100 ms behind), not where the
-      // server had it last.
+      const size = hitboxOf(body, SIZES);
+      let feetX = self ? self.x + HITBOX.width / 2 : position.x + size.width / 2;
+      let feetY = self ? self.y + HITBOX.height : position.y + size.height;
+      // Riding someone's drone or standing on someone's head: stand on it where it is drawn
+      // (100 ms behind), not where the server had it last. A head doesn't carry anyone along,
+      // so only the height follows it.
       if (!self && body.grounded) {
-        for (const [id, deck] of this.decks) {
-          if (!onDeck(feetX, feetY, deck)) continue;
-          const sample = samples.get(id);
-          const drawn = sample ? droneDeck(sample, ABILITIES) : null;
-          if (drawn) {
-            feetX = drawn.x + (feetX - deck.x);
-            feetY = drawn.y;
-          }
-          break;
+        const riding = this.ridden(feetX, feetY);
+        const sample = riding ? samples.get(riding.id) : undefined;
+        const drawn = riding && sample ? (riding.kind === 'deck' ? droneDeck(sample, ABILITIES) : playerHead(sample, SIZES)) : null;
+        if (riding && drawn) {
+          if (riding.kind === 'deck') feetX = drawn.x + (feetX - riding.rect.x);
+          feetY = drawn.y;
         }
       }
       const ability = CHARACTER_ABILITY[local.characterId];
@@ -370,30 +376,36 @@ export class LevelScene extends Phaser.Scene {
       }
       if (debug) {
         const color = slotStyle(client.slot ?? 0).color;
-        boxes.push({ x: position.x, y: position.y, color });
+        boxes.push({ x: position.x, y: position.y, ...size, color });
         this.pushReachBox(boxes, { ...body, x: position.x, y: position.y }, color);
         const ghost = predictor.lastServer;
-        if (ghost) boxes.push({ x: ghost.x, y: ghost.y, color: 0xffffff, ghost: true });
+        if (ghost) boxes.push({ ...bodyRect(ghost, SIZES), color: 0xffffff, ghost: true });
       }
     }
 
-    // Players riding the local drone stand on it where the prediction has it.
+    // Players riding the local drone stand on it where the prediction has it; those on the local
+    // player's head are only pushed up by it (as the server does), never carried or pulled down.
     const ownSample = selfId ? samples.get(selfId) : undefined;
     const ownDeckThen = ownSample ? droneDeck(ownSample, ABILITIES) : null;
     const ownDeckNow = body ? droneDeck(body, ABILITIES) : null;
+    const ownHeadThen = ownSample ? playerHead(ownSample, SIZES) : null;
+    const ownHeadNow = body && position ? playerHead({ ...body, x: position.x, y: position.y }, SIZES) : null;
     for (const [id, view] of this.views) {
       if (id === selfId) continue;
       const s = samples.get(id);
       if (!s) continue;
       view.setInvulnerable(s.invulnUntil > renderTick);
       view.setFinished(s.place > 0);
-      let feet = attached.players.get(id) ?? { x: s.x + HITBOX.width / 2, y: s.y + HITBOX.height };
+      const size = hitboxOf(s, SIZES);
+      let feet = attached.players.get(id) ?? { x: s.x + size.width / 2, y: s.y + size.height };
       if (ownDeckThen && ownDeckNow && s.grounded && !attached.players.has(id) && onDeck(feet.x, feet.y, ownDeckThen)) {
         feet = { x: ownDeckNow.x + (feet.x - ownDeckThen.x), y: ownDeckNow.y };
+      } else if (ownHeadThen && ownHeadNow && s.grounded && !attached.players.has(id) && onDeck(feet.x, feet.y, ownHeadThen)) {
+        feet = { x: feet.x, y: Math.min(feet.y, ownHeadNow.y) };
       }
       view.render(feet.x, feet.y, s.facing, signalsFromSample(s), frameMs);
       if (debug) {
-        boxes.push({ x: s.x, y: s.y, color: this.slotColor(id) });
+        boxes.push({ x: s.x, y: s.y, ...size, color: this.slotColor(id) });
         this.pushReachBox(boxes, s, this.slotColor(id));
       }
     }
@@ -455,11 +467,15 @@ export class LevelScene extends Phaser.Scene {
     const selfId = this.services.client.playerId;
     const me = selfId ? state.players.find((p) => p.id === selfId) : undefined;
     this.decks.clear();
+    this.heads.clear();
     for (const player of state.players) {
-      const deck = player.id === selfId ? null : droneDeck(player, ABILITIES);
+      if (player.id === selfId) continue;
+      const deck = droneDeck(player, ABILITIES);
       if (deck) this.decks.set(player.id, deck);
+      const head = playerHead(player, SIZES);
+      if (head) this.heads.set(player.id, head);
     }
-    this.deckColliders = [...this.decks.values()].map((deck) => ({ ...deck, id: -1, oneWay: true, bounce: 0 }));
+    this.deckColliders = [...this.decks.values(), ...this.heads.values()].map((rect) => ({ ...rect, id: -1, oneWay: true, bounce: 0 }));
     if (me) predictor.reconcile(me, state.traps);
     else this.traps?.applyNet(state.traps);
 
@@ -487,6 +503,13 @@ export class LevelScene extends Phaser.Scene {
     this.views.set(id, view);
     if (isSelf) this.follow(view.container);
     return view;
+  }
+
+  /** The drone deck or head (in the latest server state) that feet at (x, y) stand on, if any. */
+  private ridden(x: number, y: number): { id: string; kind: 'deck' | 'head'; rect: Rect } | null {
+    for (const [id, rect] of this.decks) if (onDeck(x, y, rect)) return { id, kind: 'deck', rect };
+    for (const [id, rect] of this.heads) if (onDeck(x, y, rect)) return { id, kind: 'head', rect };
+    return null;
   }
 
   /** Who to watch while out of play: the lowest-slot other player alive and still in the level (or their drone), if any. */
@@ -736,11 +759,12 @@ export class LevelScene extends Phaser.Scene {
   /** F3: the area a swing hits, while it can hit. */
   private pushReachBox(
     boxes: DebugBox[],
-    body: { x: number; y: number; facing: 1 | -1; alive: boolean; attack: number },
+    body: { x: number; y: number; facing: 1 | -1; alive: boolean; attack: number; giant: number; phase: number },
     color: number,
   ): void {
     if (!isAttackActive(body, this.combat)) return;
-    const reach = attackReachBox(body, HITBOX, this.combat);
+    const scale = giantActive(body) ? ABILITIES.giant.reachMultiplier : 1;
+    const reach = attackReachBox(body, hitboxOf(body, SIZES), this.combat, scale);
     boxes.push({ ...reach, color, ghost: true });
   }
 

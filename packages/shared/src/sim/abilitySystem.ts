@@ -24,7 +24,7 @@ import {
 import { cellAt } from './collision';
 import type { GameEvent } from './events';
 import type { Foe, FoeField } from './foes/FoeField';
-import type { MovementBody, MovementContext } from './movement';
+import { bodyRect, hitboxOf, resizeBody, type MovementBody, type MovementContext } from './movement';
 import type { TrapField } from './traps/TrapField';
 import type { WorldPlayer } from './world';
 
@@ -194,6 +194,7 @@ export class AbilitySystem {
   onDeath(p: WorldPlayer): void {
     if (p.ability.grab) this.release(p, false);
     const b = p.body;
+    const size = hitboxOf(b, this.host.ctx);
     b.phase = Phase.NONE;
     b.phaseTime = 0;
     b.reach = 0;
@@ -202,6 +203,7 @@ export class AbilitySystem {
     b.flight = 0;
     b.giant = 0;
     p.ability.thrownBy = null;
+    resizeBody(b, size, hitboxOf(b, this.host.ctx)); // a giant dies back at normal size, feet in place
   }
 
   /** The player left the world. */
@@ -641,7 +643,6 @@ export class AbilitySystem {
 
   private updateFlights(players: WorldPlayer[]): void {
     const c = this.c.tongue;
-    const hitbox = this.host.ctx.hitbox;
     for (const f of players) {
       const state = f.ability;
       if (!state.thrownBy) continue;
@@ -650,12 +651,12 @@ export class AbilitySystem {
         continue;
       }
       const fb = f.body;
-      const rect = { x: fb.x, y: fb.y, width: hitbox.width, height: hitbox.height };
+      const rect = bodyRect(fb, this.host.ctx);
       const dirX = fb.vx !== 0 ? Math.sign(fb.vx) : fb.facing;
       for (const other of players) {
         const o = other.body;
         if (other === f || !o.alive || o.held !== Held.NONE || state.flightHits & bit(other.slot)) continue;
-        if (!rectsOverlap(rect, { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height })) continue;
+        if (!rectsOverlap(rect, bodyRect(o, this.host.ctx))) continue;
         state.flightHits |= bit(other.slot);
         this.host.hurt(other, { damage: c.damage, dirX, knockbackX: c.knockbackX, knockbackY: c.knockbackY, by: state.thrownBy });
       }
@@ -681,7 +682,6 @@ export class AbilitySystem {
   private updateFlyingFoes(players: WorldPlayer[]): void {
     const field = this.host.foes;
     const c = this.c.tongue;
-    const hitbox = this.host.ctx.hitbox;
     for (const foe of field.foes) {
       if (foe.state !== 'flying') continue;
       const thrower = this.host.getPlayer(foe.owner) ?? null;
@@ -691,7 +691,7 @@ export class AbilitySystem {
       for (const other of players) {
         const o = other.body;
         if (other === thrower || !o.alive || o.held !== Held.NONE) continue;
-        if (!rectsOverlap(rect, { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height })) continue;
+        if (!rectsOverlap(rect, bodyRect(o, this.host.ctx))) continue;
         this.host.hurt(other, { damage: c.damage, dirX: dir, knockbackX: c.knockbackX, knockbackY: c.knockbackY, by: foe.owner });
         hit = true;
       }
@@ -749,7 +749,6 @@ export class AbilitySystem {
   }
 
   private placeCenter(grab: Grab, center: Vec2, propState: PropState): void {
-    const hitbox = this.host.ctx.hitbox;
     if (grab.kind === 'foe') {
       const foe = this.foe(grab.id);
       if (foe) {
@@ -761,8 +760,9 @@ export class AbilitySystem {
     if (grab.kind === 'player') {
       const target = this.host.getPlayer(grab.id);
       if (target) {
-        target.body.x = center.x - hitbox.width / 2;
-        target.body.y = center.y - hitbox.height / 2;
+        const size = hitboxOf(target.body, this.host.ctx);
+        target.body.x = center.x - size.width / 2;
+        target.body.y = center.y - size.height / 2;
       }
       return;
     }
@@ -815,7 +815,6 @@ export class AbilitySystem {
   private updateFlyingProp(prop: WorldProp): void {
     const { ctx } = this.host;
     const c = this.c.tongue;
-    const hitbox = ctx.hitbox;
     prop.life -= ctx.dt;
     prop.x += prop.vx * ctx.dt;
     prop.y += prop.vy * ctx.dt;
@@ -824,7 +823,7 @@ export class AbilitySystem {
     for (const other of this.host.listPlayers()) {
       const o = other.body;
       if (!o.alive || o.held !== Held.NONE || prop.hitSlots & bit(other.slot)) continue;
-      if (!rectsOverlap(prop, { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height })) continue;
+      if (!rectsOverlap(prop, bodyRect(o, ctx))) continue;
       prop.hitSlots |= bit(other.slot);
       const dirX = prop.vx !== 0 ? Math.sign(prop.vx) : 1;
       this.host.hurt(other, { damage: c.damage, dirX, knockbackX: c.knockbackX, knockbackY: c.knockbackY, by: prop.owner });
@@ -909,7 +908,6 @@ export class AbilitySystem {
     const crush = this.host.fall?.crush;
     if (!crush || top - prop.fallFrom < crush.minDrop) return false;
     const { ctx } = this.host;
-    const hitbox = ctx.hitbox;
     const prevBottom = top + prop.height;
     const slack = Math.max(6, prop.vy * ctx.dt + 2);
     const by = prop.droppedBy ? (this.host.getPlayer(prop.droppedBy) ?? null) : null;
@@ -919,10 +917,10 @@ export class AbilitySystem {
     for (const other of this.host.listPlayers()) {
       const o = other.body;
       if (!o.alive || o.held !== Held.NONE || prop.hitSlots & bit(other.slot)) continue;
-      const rect = { x: o.x, y: o.y, width: hitbox.width, height: hitbox.height };
+      const rect = bodyRect(o, ctx);
       if (!rectsOverlap(prop, rect) || prevBottom > rect.y + slack) continue;
       prop.hitSlots |= bit(other.slot);
-      const dirX = o.x + hitbox.width / 2 >= center ? 1 : -1;
+      const dirX = rect.x + rect.width / 2 >= center ? 1 : -1;
       this.host.crushPlayer(other, { damage: crush.damage, dirX, knockbackX: crush.knockbackX, knockbackY: crush.knockbackY, by: prop.droppedBy });
       headTop = Math.min(headTop, rect.y);
       away -= dirX;
@@ -998,7 +996,7 @@ export class AbilitySystem {
 
   /** Puts a body's feet at `feet`; with `safe`, not into walls (it stays where it was). */
   private placeFeet(body: MovementBody, feet: Vec2, safe: boolean): void {
-    const hitbox = this.host.ctx.hitbox;
+    const hitbox = hitboxOf(body, this.host.ctx);
     const x = feet.x - hitbox.width / 2;
     const y = feet.y - hitbox.height;
     if (safe && this.solidAt({ x, y, width: hitbox.width, height: hitbox.height })) return;

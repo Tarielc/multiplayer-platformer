@@ -1,4 +1,4 @@
-import type { CompiledAbilities } from '../config/abilities';
+import { ABILITIES, Held, Phase, type CompiledAbilities } from '../config/abilities';
 import type { CompiledCombat } from '../config/combat';
 import type { CompiledMovement } from '../config/movement';
 import { CellFlag, type LevelData } from '../level/types';
@@ -96,9 +96,10 @@ export interface Collider extends Rect {
 }
 
 /**
- * Platforms that are not traps (drone decks, flown by players): where they are for `body`'s
- * step. They are one-way and do not move during a tick; the server carries whoever stands on
- * one after every player stepped (`rideAlong`).
+ * Platforms that are not traps (drone decks, flown by players, and other players' heads):
+ * where they are for `body`'s step. They are one-way and do not move during a tick; after every
+ * player stepped, the server carries whoever stands on a deck, and pushes up whoever stands on a
+ * rising head (`rideAlong`).
  */
 export interface PlatformSource {
   platformsFor(body: Readonly<MovementBody>): readonly Collider[];
@@ -115,8 +116,55 @@ export interface MovementContext {
   traps?: TrapField | null;
   /** Special ability tuning (defaults to `ABILITIES`). */
   abilities?: CompiledAbilities;
-  /** Drone decks other players can stand on. */
+  /** Drone decks and heads other players can stand on. */
   platforms?: PlatformSource | null;
+}
+
+/** Giant form is on (growing, big, or shrinking back): the body is big. */
+export function isGiant(body: Pick<MovementBody, 'giant' | 'phase'>): boolean {
+  return body.giant > 0 || body.phase === Phase.GIANT_GROW || body.phase === Phase.GIANT_SHRINK;
+}
+
+/** What sizes a body: the player hitbox, and the giant's from the ability tuning. */
+export type HitboxSource = Pick<MovementContext, 'hitbox' | 'abilities'>;
+
+/** The body's hitbox size right now: the player's, or the giant's while giant form is on. */
+export function hitboxOf(body: Pick<MovementBody, 'giant' | 'phase'>, ctx: HitboxSource): HitboxSize {
+  return isGiant(body) ? (ctx.abilities ?? ABILITIES).giant.hitbox : ctx.hitbox;
+}
+
+/** The body's hitbox in world px. */
+export function bodyRect(body: Pick<MovementBody, 'x' | 'y' | 'giant' | 'phase'>, ctx: HitboxSource): Rect {
+  const { width, height } = hitboxOf(body, ctx);
+  return { x: body.x, y: body.y, width, height };
+}
+
+/** Resizes a body's hitbox from `from` to `to` around its feet (bottom-centre stays put). */
+export function resizeBody(body: Pick<MovementBody, 'x' | 'y'>, from: HitboxSize, to: HitboxSize): void {
+  body.x += (from.width - to.width) / 2;
+  body.y += from.height - to.height;
+}
+
+/** `ctx` with the body's own hitbox (the same object unless it is a giant). */
+export function sizedFor<T extends HitboxSource>(body: Pick<MovementBody, 'giant' | 'phase'>, ctx: T): T {
+  const hitbox = hitboxOf(body, ctx);
+  return hitbox === ctx.hitbox ? ctx : { ...ctx, hitbox };
+}
+
+/** Depth of a head platform (a one-way top has no real depth; this is only its drawn/ridden band). */
+export const HEAD_DEPTH = 4;
+
+/**
+ * A player's head as a one-way platform the other players can stand on (as wide as their
+ * hitbox, so a giant's is wider and higher), or null while it can't carry anyone: dead (or
+ * finished a race), held by an ability, or spat.
+ */
+export function playerHead(
+  body: Pick<MovementBody, 'x' | 'y' | 'alive' | 'held' | 'flight' | 'giant' | 'phase'>,
+  ctx: HitboxSource,
+): Rect | null {
+  if (!body.alive || body.held !== Held.NONE || body.flight > 0) return null;
+  return { x: body.x, y: body.y, width: hitboxOf(body, ctx).width, height: HEAD_DEPTH };
 }
 
 /**
@@ -237,10 +285,11 @@ export function cloneBody(body: MovementBody): MovementBody {
 export function stepPlayerMovement(
   body: MovementBody,
   buttons: number,
-  ctx: MovementContext,
+  base: MovementContext,
   tick = body.stepTick + 1,
   contacts: StepContacts = noContacts(),
 ): StepContacts {
+  const ctx = sizedFor(body, base);
   const jump = (buttons & Button.JUMP) !== 0;
   if (!body.alive) {
     body.jumpHeld = jump;
@@ -594,10 +643,12 @@ function followColliders(
 }
 
 /**
- * Moves a body standing on a drone's deck along with it (`dx`, `dy` px), stopped by tiles. It
- * keeps standing, unless a ceiling holds it back while the deck rises.
+ * Moves a body standing on a drone's deck along with it (`dx`, `dy` px), or pushes one up with a
+ * rising head, stopped by tiles. It keeps standing, unless a ceiling holds it back while the
+ * platform rises.
  */
-export function rideAlong(body: MovementBody, dx: number, dy: number, ctx: MovementContext): void {
+export function rideAlong(body: MovementBody, dx: number, dy: number, base: MovementContext): void {
+  const ctx = sizedFor(body, base);
   const half = ctx.level.tileSize * 0.5;
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / half));
   const contacts = noContacts();

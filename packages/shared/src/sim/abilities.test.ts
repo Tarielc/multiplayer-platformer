@@ -14,6 +14,7 @@ import { stepPlayerBody } from './actions';
 import type { GameEvent } from './events';
 import type { Foe } from './foes/FoeField';
 import { aimFromButtons, Button, sanitizeButtons, withAim } from './input';
+import { bodyRect, hitboxOf } from './movement';
 import { GameWorld, type GameWorldOptions } from './world';
 
 const HITBOX = PLAYER_CONFIG.hitbox;
@@ -379,8 +380,11 @@ describe('drone (Virtual Guy)', () => {
     const b = world.getPlayer('b')!.body;
     tick(world);
     const platforms = world.movementContext.platforms!;
-    expect(platforms.platformsFor(a)).toEqual([]);
-    expect(platforms.platformsFor(b)).toEqual([expect.objectContaining({ ...droneDeck(a)!, oneWay: true })]);
+    const deck = expect.objectContaining({ ...droneDeck(a)!, oneWay: true });
+    // Each gets the other's head too (players are platforms); only b gets the drone.
+    expect(platforms.platformsFor(a)).not.toContainEqual(deck);
+    expect(platforms.platformsFor(a)).toEqual([expect.objectContaining({ x: b.x, y: b.y, oneWay: true })]);
+    expect(platforms.platformsFor(b)).toContainEqual(deck);
   });
 
   it('a rider on a still deck is predicted exactly from the replicated drone', () => {
@@ -662,6 +666,122 @@ describe('giant (Mask Dude)', () => {
     expect(a.body.giant).toBe(0);
     expect(a.body.phase).toBe(Phase.NONE);
     expect(a.hp).toBeLessThanOrEqual(PLAYER_CONFIG.maxHp);
+  });
+
+  describe('its hitbox', () => {
+    const BIG = ABILITIES.giant.hitbox;
+    /** Mask Dude ('a') standing with his feet at (feetX, GROUND) in a level made of `rows`. */
+    function maskDude(feetX: number, rows = FLOOR): GameWorld {
+      const world = new GameWorld({ level: asciiToLevel({ rows }), movement: resolveMovement() });
+      world.addPlayer('a', 0, 'mask-dude');
+      ticks(world, 5);
+      place(world, 'a', feetX);
+      ticks(world, 5);
+      return world;
+    }
+    const feetOf = (world: GameWorld) => {
+      const b = world.getPlayer('a')!.body;
+      const size = hitboxOf(b, { hitbox: HITBOX });
+      return { x: b.x + size.width / 2, y: b.y + size.height };
+    };
+
+    it('grows around the feet as the form starts, and shrinks back when it ends', () => {
+      expect(BIG.width).toBeGreaterThan(HITBOX.width);
+      expect(BIG.height).toBeGreaterThan(HITBOX.height);
+      const world = maskDude(100);
+      const a = world.getPlayer('a')!.body;
+      tick(world, { a: Button.SPECIAL });
+      expect(a.phase).toBe(Phase.GIANT_GROW);
+      expect(bodyRect(a, { hitbox: HITBOX })).toEqual({ x: 100 - BIG.width / 2, y: GROUND - BIG.height, ...BIG });
+      ticks(world, seconds(ABILITIES.giant.grow + ABILITIES.giant.duration) + 2);
+      expect(a.phase).toBe(Phase.GIANT_SHRINK);
+      expect(bodyRect(a, { hitbox: HITBOX }).height).toBe(BIG.height); // big until it has shrunk
+      ticks(world, seconds(ABILITIES.giant.shrink) + 2);
+      expect(a.phase).toBe(Phase.NONE);
+      expect(bodyRect(a, { hitbox: HITBOX })).toEqual({ x: 100 - HITBOX.width / 2, y: GROUND - HITBOX.height, ...HITBOX });
+      expect(a.grounded).toBe(true);
+    });
+
+    it('cannot grow under a ceiling too low for the giant (the ability stays ready)', () => {
+      // A block over columns 2-5 leaves a 32 px gap: room for Mask Dude, not for the giant.
+      const LOW = [...FLOOR.slice(0, 3), '  ####                        ', ...FLOOR.slice(4)];
+      const world = maskDude(150, LOW);
+      const a = world.getPlayer('a')!;
+      expect(feetOf(world)).toEqual({ x: 150, y: GROUND });
+      const events = press(world, 'a');
+      expect(events.some((e) => e.type === 'special')).toBe(false);
+      expect(a.body.phase).toBe(Phase.NONE);
+      expect(a.body.specialCooldown).toBe(0);
+      expect(a.hp).toBe(PLAYER_CONFIG.maxHp);
+      // Out in the open, it works.
+      place(world, 'a', 400);
+      ticks(world, 5);
+      press(world, 'a');
+      expect(a.body.phase).toBe(Phase.GIANT_GROW);
+    });
+
+    it('next to a wall, grows away from it instead of into it', () => {
+      // A wall in column 2 (x 64-96) on the floor; Mask Dude stands against its right side.
+      const WALL = [...FLOOR.slice(0, 4), ' 1#                           ', ...FLOOR.slice(5)];
+      const world = maskDude(96 + HITBOX.width / 2, WALL);
+      const a = world.getPlayer('a')!.body;
+      expect(a.x).toBe(96);
+      tick(world, { a: Button.SPECIAL });
+      expect(a.phase).toBe(Phase.GIANT_GROW);
+      expect(a.x).toBe(96); // flush with the wall, not inside it
+      expect(a.y).toBe(GROUND - BIG.height);
+      ticks(world, 10, { a: Button.LEFT });
+      expect(a.x).toBe(96);
+    });
+
+    it('a giant head is a bigger platform: others stand higher on it', () => {
+      const world = maskDude(200);
+      world.addPlayer('b', 1);
+      place(world, 'b', 300);
+      press(world, 'a');
+      ticks(world, 5);
+      place(world, 'b', 200, GROUND - BIG.height - 20);
+      world.getPlayer('b')!.body.grounded = false;
+      ticks(world, 40);
+      const b = world.getPlayer('b')!.body;
+      expect(b.grounded).toBe(true);
+      expect(b.y + HITBOX.height).toBe(GROUND - BIG.height);
+    });
+
+    it('swings hit the whole giant body', () => {
+      /** Whether a swing by 'b', reaching to 2 px past Mask Dude's normal left edge, hits him. */
+      const hitsMaskDude = (giant: boolean) => {
+        const world = maskDude(200);
+        world.addPlayer('b', 1);
+        if (giant) press(world, 'a');
+        ticks(world, 5);
+        const reachPx = world.movementContext.combat.reach.width; // past the swinger's front edge
+        const b = world.getPlayer('b')!.body;
+        place(world, 'b', 200 - HITBOX.width / 2 - 2 - reachPx - HITBOX.width / 2);
+        b.facing = 1;
+        ticks(world, 3);
+        const a = world.getPlayer('a')!.body;
+        let hit = false;
+        tick(world, { b: Button.ATTACK });
+        for (let i = 0; i < 30; i++) {
+          tick(world);
+          hit ||= a.hurt > 0;
+        }
+        return hit;
+      };
+      expect(hitsMaskDude(false)).toBe(false);
+      expect(hitsMaskDude(true)).toBe(true);
+    });
+
+    it('a giant who dies is back to normal size, feet where they were', () => {
+      const world = maskDude(200);
+      press(world, 'a');
+      ticks(world, 5);
+      world.killPlayer('a');
+      const a = world.getPlayer('a')!.body;
+      expect(a.giant).toBe(0);
+      expect(bodyRect(a, { hitbox: HITBOX })).toEqual({ x: 200 - HITBOX.width / 2, y: GROUND - HITBOX.height, ...HITBOX });
+    });
   });
 });
 

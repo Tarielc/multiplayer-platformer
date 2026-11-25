@@ -175,6 +175,12 @@ export interface AbilityTuning {
     knockbackTaken: number;
     /** Hits a giant swing deals to boxes. */
     boxHits: number;
+    /**
+     * The giant's hitbox, px (normally `PLAYER_CONFIG.hitbox`, 20×28), matching the big-form
+     * art. It grows around the feet (bottom-centre) the moment the form starts and shrinks back
+     * when it is over; Mask Dude can't grow where the big box doesn't fit.
+     */
+    hitbox: { width: number; height: number };
   };
   tongue: {
     windupMs: number;
@@ -276,6 +282,7 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     knockbackMultiplier: 1.7,
     knockbackTaken: 0.5,
     boxHits: 3,
+    hitbox: { width: 28, height: 38 },
   },
   tongue: {
     windupMs: 170,
@@ -411,6 +418,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
       knockbackMultiplier: giant.knockbackMultiplier,
       knockbackTaken: giant.knockbackTaken,
       boxHits: giant.boxHits,
+      hitbox: { width: giant.hitbox.width, height: giant.hitbox.height },
       grow: s(giant.growMs),
       duration: s(giant.durationMs),
       shrink: s(giant.shrinkMs),

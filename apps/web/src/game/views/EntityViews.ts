@@ -1,4 +1,4 @@
-import { PLAYER_CONFIG, type LevelData, type LevelZone, type NetWorldState } from '@platformer/shared';
+import { PLAYER_CONFIG, hitboxOf, type LevelData, type LevelZone, type NetWorldState } from '@platformer/shared';
 import * as Phaser from 'phaser';
 import { TEXTURES } from '../art/textures';
 import { VIEW_CONFIG } from '../config';
@@ -183,16 +183,17 @@ export class EntityViews {
 
     const start = this.start;
     if (start && this.synced && !start.anims.isPlaying) {
-      const { width, height } = PLAYER_CONFIG.hitbox;
       const { left, right } = this.startSpan;
-      const brushed = state.players.some(
-        (p) =>
+      const brushed = state.players.some((p) => {
+        const { width, height } = hitboxOf(p, PLAYER_CONFIG);
+        return (
           p.alive &&
           Math.abs(p.vx) >= START_BRUSH_SPEED &&
           p.x + width / 2 >= left &&
           p.x + width / 2 <= right &&
-          Math.abs(p.y + height - start.y) <= 8,
-      );
+          Math.abs(p.y + height - start.y) <= 8
+        );
+      });
       if (brushed) start.play(trapAnimKey('start:moving'));
     }
     this.synced = true;

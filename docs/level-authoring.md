@@ -241,6 +241,7 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | Coyote time | 100 ms after walking off a ledge (after that, a press spends the air jump) |
 | Jump buffer | 120 ms before landing, once the air jump is spent |
 | Drop-through | One-way tiles are ignored for 220 ms after Down + Jump |
+| Standing on players | Each player's head is a one-way platform for the others (a rising head pushes them up, but they are never carried sideways or pulled down; Down + Jump drops off), so in multiplayer a jump from a teammate's head reaches 28 px (1.75 tiles) higher. The level solver plays solo, so required routes must not depend on it; it suits optional co-op shortcuts and secrets. |
 | Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom (`hazardTileHitbox`, tuned for 32 px spike tiles; the terrain tileset has no hazard tiles, so the samples use lava zones) |
 | Kill plane | 96 px below the bottom of the map |
 | Fall damage | Drops of more than 256 px = 16 tiles (8) cost a heart, plus one for every further 128 px = 8 tiles (4); 32 tiles (16) or more is fatal. Measured from the top of the airtime, and a double jump, trampoline or stomp on the way down resets it. Keep required drops within 16 tiles, or give players a trampoline or a ledge to break the fall. Foes are hurt past 8 tiles and boxes past 6, a box falling 2 tiles or more onto a player, foe or box hurts it, and so does a foe falling that far onto another foe (`FALL_DAMAGE_TUNING`). |
