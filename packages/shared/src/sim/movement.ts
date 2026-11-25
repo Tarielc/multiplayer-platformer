@@ -288,6 +288,8 @@ export function stepPlayerMovement(
   base: MovementContext,
   tick = body.stepTick + 1,
   contacts: StepContacts = noContacts(),
+  /** No control, but keep the horizontal speed (an ability used in the air). */
+  coast = false,
 ): StepContacts {
   const ctx = sizedFor(body, base);
   const jump = (buttons & Button.JUMP) !== 0;
@@ -323,7 +325,7 @@ export function stepPlayerMovement(
     const turning = body.vx !== 0 && Math.sign(body.vx) !== dir;
     body.vx = approach(body.vx, dir * m.maxRunSpeed, accel * (turning ? m.turnMultiplier : 1) * dt);
     body.facing = dir > 0 ? 1 : -1;
-  } else {
+  } else if (!coast) {
     const decel = body.grounded ? m.groundDeceleration : m.airDeceleration;
     body.vx = approach(body.vx, 0, decel * dt);
   }

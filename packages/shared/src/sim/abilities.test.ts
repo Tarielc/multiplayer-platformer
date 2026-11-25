@@ -161,16 +161,11 @@ describe('heal (Bunny Man)', () => {
     expect(a.reach).toBeLessThan(128 - 100 - ABILITIES.heal.shoulder.x + 10);
   });
 
-  it('needs the ground and respects the cooldown', () => {
+  it('respects the cooldown', () => {
     const world = makeWorld();
     world.addPlayer('a', 0, 'bunny-man');
-    ticks(world, 5);
-    const a = world.getPlayer('a')!.body;
-    tick(world, { a: Button.JUMP });
-    ticks(world, 3);
-    press(world, 'a');
-    expect(a.phase).toBe(Phase.NONE);
     ticks(world, 60);
+    const a = world.getPlayer('a')!.body;
     press(world, 'a');
     expect(a.phase).toBe(Phase.HEAL_WINDUP);
     ticks(world, 120);
@@ -1003,6 +998,88 @@ describe('abilities and foes', () => {
     expect(chicken.grounded).toBe(true);
     expect(chicken.hp).toBe(FOE_TUNING.chicken.hp);
     expect(world.foeField.catchable(chicken)).toBe(true);
+  });
+});
+
+describe('special abilities in the air', () => {
+  const RUN = resolveMovement().maxRunSpeed;
+  const characters = [
+    ['bunny-man', Phase.HEAL_WINDUP],
+    ['virtual-guy', Phase.DRONE_DEPLOY],
+    ['mask-dude', Phase.GIANT_GROW],
+    ['ninja-frog', Phase.TONGUE_WINDUP],
+  ] as const;
+
+  /** A world with `character` ('a') standing alone on the floor at x = 100. */
+  function alone(character: (typeof characters)[number][0]): GameWorld {
+    const world = makeWorld();
+    world.addPlayer('a', 0, character);
+    ticks(world, 5);
+    place(world, 'a', 100);
+    ticks(world, 5);
+    return world;
+  }
+
+  for (const [character, phase] of characters) {
+    it(`${character} can use the ability mid-jump`, () => {
+      const world = alone(character);
+      const a = world.getPlayer('a')!.body;
+      ticks(world, 10, { a: Button.JUMP });
+      expect(a.grounded).toBe(false);
+      const events = tick(world, { a: Button.JUMP | Button.SPECIAL });
+      expect(a.grounded).toBe(false);
+      expect(a.phase).toBe(phase);
+      if (character !== 'virtual-guy' && character !== 'bunny-man') {
+        expect(events).toContainEqual(expect.objectContaining({ type: 'special', playerId: 'a' }));
+      }
+    });
+  }
+
+  it('the body keeps its jump arc and run speed while the ability plays in the air', () => {
+    /** Peak height and speed at the peak of a running jump, with the tongue fired on the way up. */
+    const jump = (tongue: boolean) => {
+      const world = alone('ninja-frog');
+      const a = world.getPlayer('a')!.body;
+      ticks(world, 20, { a: Button.RIGHT });
+      let peak = a.y;
+      let vxAtPeak = a.vx;
+      for (let i = 0; i < 40; i++) {
+        tick(world, { a: Button.RIGHT | Button.JUMP | (tongue && i === 6 ? Button.SPECIAL : 0) });
+        if (a.y < peak) {
+          peak = a.y;
+          vxAtPeak = a.vx;
+        }
+        if (tongue && i === 8) expect(a.phase).not.toBe(Phase.NONE);
+      }
+      return { peak, vxAtPeak };
+    };
+    const plain = jump(false);
+    const tongued = jump(true);
+    expect(tongued.peak).toBeCloseTo(plain.peak, 6); // the held jump wasn't cut short
+    expect(tongued.vxAtPeak).toBeCloseTo(RUN, 6); // nor did it lose its speed
+  });
+
+  it('on the ground an ability still stops the body', () => {
+    const world = alone('ninja-frog');
+    const a = world.getPlayer('a')!.body;
+    ticks(world, 20, { a: Button.RIGHT });
+    expect(a.vx).toBeCloseTo(RUN, 6);
+    tick(world, { a: Button.RIGHT | Button.SPECIAL });
+    ticks(world, 5, { a: Button.RIGHT });
+    expect(a.phase).not.toBe(Phase.NONE);
+    expect(Math.abs(a.vx)).toBeLessThan(RUN / 2);
+  });
+
+  it('a jump pressed during an ability in the air is not an air jump', () => {
+    const world = alone('ninja-frog');
+    const a = world.getPlayer('a')!.body;
+    ticks(world, 6, { a: Button.JUMP });
+    tick(world); // let go of jump
+    tick(world, { a: Button.SPECIAL });
+    expect(a.phase).not.toBe(Phase.NONE);
+    const airJumps = a.airJumpsLeft;
+    tick(world, { a: Button.JUMP }); // a fresh press while the tongue is out
+    expect(a.airJumpsLeft).toBe(airJumps);
   });
 });
 

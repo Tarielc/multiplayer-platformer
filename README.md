@@ -170,6 +170,8 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 | Ninja Frog | Tongue Spit: grab, hold and spit a damaging projectile | 15 s | 3 s |
 | Bunny Man | Healing Hug: heals 2 hearts, plus 1 for the healer | 12 s | 3 s |
 
+**Abilities work in the air.** Every special can be used mid-jump or mid-fall, not just on the ground. While it plays the character can't steer, but keeps its jump: a held jump still rises to its full height and the run speed carries on, so the ability plays out along the arc. On the ground, using one still brings the character to a stop.
+
 **Giant Form is big.** Mask Dude's hitbox grows from 20×28 to 28×38 px around his feet (`giant.hitbox` in `config/abilities.ts`, matching the big-form art) for as long as the form lasts, so he needs more headroom, makes a taller and wider platform for others to stand on, and is easier to hit. He can't grow where the big hitbox wouldn't fit (under a low ceiling or in a narrow shaft); next to a wall he grows away from it.
 
 **Flying with the drone.** Press Special with the claw over Virtual Guy to pick himself up: he hangs from the claw and flies wherever the drone goes, and Special again lets go. Other players can land on the drone's top (a one-way platform, jump up through it) and ride it while it is flown. Down + Jump drops through it.

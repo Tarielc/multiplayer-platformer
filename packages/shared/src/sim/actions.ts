@@ -90,10 +90,20 @@ export function stepPlayerBody(
     body.attackSeq += 1;
   }
 
-  if (body.hurt > 0 || control === 'locked') {
-    // Stunned or busy with the ability: no control, momentum and gravity carry the body. Keep
-    // tracking the real jump button so a jump held through it is not a fresh press afterwards.
+  if (body.hurt > 0) {
+    // Stunned: no control, momentum and gravity carry the body. Keep tracking the real jump
+    // button so a jump held through it is not a fresh press afterwards.
     stepPlayerMovement(body, NEUTRAL_INPUT, ctx, tick, contacts);
+    body.jumpHeld = jumpDown;
+    return contacts;
+  }
+  if (control === 'locked') {
+    // Busy with the ability: no control. On the ground the body slows to a stop; in the air it
+    // keeps its arc (a held jump is not cut short, the run speed is kept), so an ability used
+    // mid-jump plays out along the jump instead of stalling the body.
+    const airborne = !body.grounded;
+    const held = airborne && jumpDown && body.jumpHeld ? Button.JUMP : NEUTRAL_INPUT;
+    stepPlayerMovement(body, held, ctx, tick, contacts, airborne);
     body.jumpHeld = jumpDown;
     return contacts;
   }

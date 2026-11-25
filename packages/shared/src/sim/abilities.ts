@@ -491,14 +491,12 @@ export function stepAbility(
 function start(body: MovementBody, buttons: number, ctx: MovementContext, c: Readonly<CompiledAbilities>): void {
   switch (body.ability) {
     case Ability.HEAL:
-      if (!body.grounded) return;
       body.aim = aimFromButtons(buttons, body.facing);
       body.facing = facingForAim(body.aim, body.facing);
       body.reach = 0;
       enter(body, Phase.HEAL_WINDUP);
       break;
     case Ability.DRONE:
-      if (!body.grounded) return;
       enter(body, Phase.DRONE_DEPLOY);
       body.cargo = Cargo.NONE;
       break;
