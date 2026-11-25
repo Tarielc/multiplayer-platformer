@@ -56,6 +56,12 @@ function tickUntil(room: Room, done: () => boolean, max = 5000): number {
   return count;
 }
 
+/** Solo play: a lone player can't start co-op (it needs 2), so solo play runs the race campaign. */
+function startSolo(room: Room, client: TestClient): void {
+  room.handle(client.id, { t: 'selectMode', mode: 'race' });
+  startPlaying(room, [client]);
+}
+
 function startPlaying(room: Room, clients: TestClient[]): void {
   for (const client of clients) room.handle(client.id, { t: 'ready', ready: true });
   tickUntil(room, () => room.currentPhase === 'playing');
@@ -110,6 +116,23 @@ describe('Room: joining', () => {
     expect(guest.conn.last('room')?.room.selectedLevelId).toBe('second');
   });
 
+  it('keeps the level choice inside the selected mode campaign', () => {
+    const room = createRoom();
+    const host = join(room, 'A');
+    expect(room.info()).toMatchObject({ mode: 'coop', selectedLevelId: 'first' });
+    room.handle(host.id, { t: 'selectLevel', levelId: 'dash' });
+    expect(host.conn.last('error')).toMatchObject({ code: 'BAD_REQUEST' });
+    expect(room.info().selectedLevelId).toBe('first');
+
+    room.handle(host.id, { t: 'selectLevel', levelId: 'second' });
+    room.handle(host.id, { t: 'selectMode', mode: 'race' });
+    expect(room.info()).toMatchObject({ mode: 'race', selectedLevelId: 'sprint' });
+    room.handle(host.id, { t: 'selectLevel', levelId: 'dash' });
+    expect(room.info().selectedLevelId).toBe('dash');
+    room.handle(host.id, { t: 'selectMode', mode: 'coop' });
+    expect(room.info().selectedLevelId).toBe('first');
+  });
+
   it('sanitizes player names', () => {
     const room = createRoom();
     join(room, '  Ann​   Lee  ');
@@ -152,7 +175,7 @@ describe('Room: characters', () => {
   it('refuses character changes outside the lobby', () => {
     const room = createRoom();
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    startSolo(room, a);
     room.handle(a.id, { t: 'selectCharacter', characterId: 'ninja-frog' });
     expect(a.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED' });
     expect(characterOf(room, a.id)).toBe('bunny-man');
@@ -170,7 +193,7 @@ describe('Room: characters', () => {
   it('gives a drop-in player a free character', () => {
     const room = createRoom();
     const a = join(room, 'A', undefined, 'virtual-guy');
-    startPlaying(room, [a]);
+    startSolo(room, a);
     const late = join(room, 'Late'); // slot 1 default is taken by A
     expect(characterOf(room, late.id)).toBe('mask-dude');
   });
@@ -196,6 +219,8 @@ describe('Room: lobby and countdown', () => {
   it('cancels the countdown when someone un-readies or a new player joins', () => {
     const room = createRoom();
     const a = join(room, 'A');
+    const b = join(room, 'B');
+    room.handle(b.id, { t: 'ready', ready: true });
     room.handle(a.id, { t: 'ready', ready: true });
     room.tick();
     expect(room.currentPhase).toBe('countdown');
@@ -205,7 +230,8 @@ describe('Room: lobby and countdown', () => {
 
     room.handle(a.id, { t: 'ready', ready: true });
     room.tick();
-    join(room, 'B');
+    expect(room.currentPhase).toBe('countdown');
+    join(room, 'C');
     room.tick();
     expect(room.currentPhase).toBe('lobby');
   });
@@ -214,10 +240,28 @@ describe('Room: lobby and countdown', () => {
     const room = createRoom();
     const a = join(room, 'A');
     const b = join(room, 'B');
-    room.disconnect(b.id, b.conn);
+    const c = join(room, 'C');
+    room.disconnect(c.id, c.conn);
     room.handle(a.id, { t: 'ready', ready: true });
+    room.handle(b.id, { t: 'ready', ready: true });
     room.tick();
     expect(room.currentPhase).toBe('countdown');
+  });
+
+  it('co-op needs two connected players; race (solo play) starts alone', () => {
+    const room = createRoom();
+    const a = join(room, 'A');
+    room.handle(a.id, { t: 'ready', ready: true });
+    ticks(room, 5);
+    expect(room.currentPhase).toBe('lobby');
+    const b = join(room, 'B');
+    room.disconnect(b.id, b.conn); // a disconnected teammate doesn't count
+    ticks(room, 5);
+    expect(room.currentPhase).toBe('lobby');
+    room.handle(a.id, { t: 'selectMode', mode: 'race' });
+    room.tick();
+    expect(room.currentPhase).toBe('countdown');
+    expect(room.info().level).toMatchObject({ id: 'sprint' });
   });
 });
 
@@ -226,7 +270,7 @@ describe('Room: simulation', () => {
     const room = createRoom();
     const a = join(room, 'A');
     room.handle(a.id, { t: 'input', seq: 1, buttons: Button.RIGHT }); // ignored: not playing yet
-    startPlaying(room, [a]);
+    startSolo(room, a);
 
     const body = room.gameWorld!.getPlayer(a.id)!.body;
     const startX = body.x;
@@ -293,7 +337,7 @@ describe('Room: simulation', () => {
   it('lets players drop into a running level', () => {
     const room = createRoom();
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    startSolo(room, a);
     ticks(room, 10);
 
     const late = join(room, 'Late');
@@ -353,28 +397,33 @@ describe('Room: level flow', () => {
   it('finishes a level when players reach the exit and keeps campaign scores', () => {
     const room = createRoom();
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    const b = join(room, 'B');
+    startPlaying(room, [a, b]);
     for (let seq = 1; seq <= 240 && room.currentPhase === 'playing'; seq++) {
       room.handle(a.id, { t: 'input', seq, buttons: Button.RIGHT });
+      room.handle(b.id, { t: 'input', seq, buttons: Button.RIGHT });
       room.tick();
     }
     expect(room.currentPhase).toBe('levelComplete');
+    // B starts nearer the coin and takes it; both reached the trophy together.
     expect(room.info().results).toEqual([
-      { playerId: a.id, name: 'A', slot: 0, score: 10, collected: 1, deaths: 0, place: null, timeMs: null, placePoints: 0 },
+      { playerId: a.id, name: 'A', slot: 0, score: 0, collected: 0, deaths: 0, place: null, timeMs: null, placePoints: 0 },
+      { playerId: b.id, name: 'B', slot: 1, score: 10, collected: 1, deaths: 0, place: null, timeMs: null, placePoints: 0 },
     ]);
-    expect(room.info().players[0]!.campaignScore).toBe(10);
+    expect(room.info().players.map((p) => p.campaignScore)).toEqual([0, 10]);
     expect(a.conn.sent.some((m) => (m.t === 'delta' || m.t === 'snapshot') && m.events.some((e) => e.type === 'levelComplete'))).toBe(true);
   });
 
   it('runs level complete -> next level -> campaign complete -> lobby', () => {
     const room = createRoom();
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    const b = join(room, 'B');
+    startPlaying(room, [a, b]);
 
     room.handle(a.id, { t: 'dev', cmd: 'skipLevel' });
     room.tick();
     expect(room.currentPhase).toBe('levelComplete');
-    expect(room.info()).toMatchObject({ nextLevelId: 'second', results: [{ playerId: a.id }] });
+    expect(room.info()).toMatchObject({ nextLevelId: 'second', results: [{ playerId: a.id }, { playerId: b.id }] });
 
     tickUntil(room, () => room.currentPhase === 'countdown');
     expect(room.info().level).toMatchObject({ id: 'second', run: 2 });
@@ -410,10 +459,13 @@ describe('Room: level flow', () => {
     tickUntil(room, () => room.currentPhase === 'playing');
   });
 
-  it('a solo player never wipes out', () => {
+  it('a player left alone never wipes out', () => {
     const room = createRoom();
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    const b = join(room, 'B');
+    startPlaying(room, [a, b]);
+    room.handle(b.id, { t: 'leave' });
+    room.tick();
     room.handle(a.id, { t: 'dev', cmd: 'respawn' });
     ticks(room, 10);
     expect(room.currentPhase).toBe('playing');
@@ -422,7 +474,7 @@ describe('Room: level flow', () => {
   it('refuses dev commands when they are disabled', () => {
     const room = createRoom(false);
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    startSolo(room, a);
     room.handle(a.id, { t: 'dev', cmd: 'skipLevel' });
     room.tick();
     expect(room.currentPhase).toBe('playing');
@@ -481,7 +533,8 @@ describe('Room: game modes', () => {
   it('builds race worlds only in race mode', () => {
     const room = createRoom();
     const a = join(room, 'A');
-    startPlaying(room, [a]);
+    const a2 = join(room, 'A2');
+    startPlaying(room, [a, a2]);
     expect(room.gameWorld!.isRace).toBe(false);
 
     const racer = createRoom();

@@ -5,20 +5,26 @@ import { FOE_TUNING, type FoeCommon, type FoeTuning } from './foes';
 /**
  * Game modes, picked by the host in the lobby and kept for the whole campaign:
  *
- *  - `coop`: play together. Shared checkpoints, everyone has to reach the trophy, and swings
+ *  - `coop`: play together, two players or more (its levels have puzzles only a team can
+ *    solve). Shared checkpoints, everyone has to reach the trophy, and swings
  *    still shove teammates around, but nothing another player does costs hearts. Foes get
  *    tougher for every player after the first (see `CoopScaling`). If the whole team is down
  *    at once (two or more players), the level restarts (`teamWipe`).
  *  - `race`: first to the trophy. Checkpoints are your own. The first finish starts a short
  *    countdown for everyone else; each finisher gets a place and leaves play. Only placement
- *    points count for the campaign: fruit and foes score nothing in a race.
+ *    points count for the campaign: fruit and foes score nothing in a race. Also solo play.
+ *
+ * Each mode has its own campaign (`mode` in the level manifest).
  */
 export type GameMode = 'coop' | 'race';
 
 export const GAME_MODES: readonly GameMode[] = ['coop', 'race'];
 
-/** Solo play auto-readies past the lobby, so it always runs in this mode. */
+/** A new room starts in this mode. Solo play switches to Race (`SOLO_GAME_MODE`) before it readies up. */
 export const DEFAULT_GAME_MODE: GameMode = 'coop';
+
+/** The mode solo play runs in: a lone player can't do Co-op (it needs `minPlayers` 2). */
+export const SOLO_GAME_MODE: GameMode = 'race';
 
 export function isGameMode(value: unknown): value is GameMode {
   return typeof value === 'string' && (GAME_MODES as readonly string[]).includes(value);
@@ -49,6 +55,8 @@ export interface ModeConfig {
   name: string;
   /** One line for the lobby picker. */
   summary: string;
+  /** Players needed (connected and ready) before the campaign can start. */
+  minPlayers: number;
   /** `team`: one touch moves everyone's respawn point. `player`: only yours. */
   checkpointScope: EntityConfig['checkpointScope'];
   /** Swings shove other players. */
@@ -70,7 +78,8 @@ export const MODE_CONFIG: Readonly<Record<GameMode, Readonly<ModeConfig>>> = {
   coop: {
     name: 'Co-op',
     summary:
-      'Play together: shared checkpoints, everyone reaches the trophy, no friendly damage. Foes toughen up for bigger teams, and if everyone is down at once the level restarts.',
+      'Play together (2+ players): button puzzles only a team can solve, shared checkpoints, everyone reaches the trophy, no friendly damage. Foes toughen up for bigger teams, and if everyone is down at once the level restarts.',
+    minPlayers: 2,
     checkpointScope: 'team',
     playerHits: true,
     playerDamage: false,
@@ -83,7 +92,8 @@ export const MODE_CONFIG: Readonly<Record<GameMode, Readonly<ModeConfig>>> = {
   },
   race: {
     name: 'Race',
-    summary: 'First to the trophy wins. Shove, grab and spit your rivals out of the way.',
+    summary: 'First to the trophy wins: pick your route, and shove, grab and spit your rivals out of the way. Also the solo mode.',
+    minPlayers: 1,
     checkpointScope: 'player',
     playerHits: true,
     playerDamage: true,

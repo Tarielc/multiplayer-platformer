@@ -393,6 +393,16 @@
   color: var(--mist);
 }
 
+.campaign + .campaign {
+  margin-top: 40px;
+}
+
+.campaignTitle {
+  margin: 0 0 16px;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+
 .levels {
   margin: 0;
   padding: 0;

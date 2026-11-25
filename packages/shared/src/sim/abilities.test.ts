@@ -56,6 +56,8 @@ function place(world: GameWorld, id: string, feetX: number, feetY = GROUND): voi
 }
 
 const seconds = (s: number) => msToTicks(s * 1000);
+/** A held jump's height at the default tuning. */
+const world0JumpHeight = () => resolveMovement().jumpVelocity ** 2 / (2 * resolveMovement().gravity);
 
 describe('input: special + aim', () => {
   it('round-trips the aim through the button mask in 64 steps', () => {
@@ -741,6 +743,37 @@ describe('giant (Mask Dude)', () => {
       const b = world.getPlayer('b')!.body;
       expect(b.grounded).toBe(true);
       expect(b.y + HITBOX.height).toBe(GROUND - BIG.height);
+    });
+
+    it('a giant head is springy: jumping off it launches higher, landing on it does not bounce', () => {
+      /** b standing on a's head (a giant or not); returns how high b's feet rise on one held jump. */
+      const jumpOff = (giant: boolean) => {
+        const world = maskDude(200);
+        world.addPlayer('b', 1);
+        place(world, 'b', 300);
+        if (giant) press(world, 'a');
+        ticks(world, seconds(ABILITIES.giant.grow) + 2);
+        const top = world.getPlayer('a')!.body.y;
+        const b = world.getPlayer('b')!.body;
+        place(world, 'b', 200, top - 20);
+        b.grounded = false;
+        ticks(world, 40);
+        // Landed and stayed: no trampoline bounce.
+        expect(b.grounded).toBe(true);
+        expect(b.y + HITBOX.height).toBeCloseTo(top, 6);
+        let peak = 0;
+        for (let i = 0; i < 90; i++) {
+          tick(world, { b: Button.JUMP });
+          peak = Math.max(peak, top - (b.y + HITBOX.height));
+        }
+        return peak;
+      };
+      const normal = jumpOff(false);
+      const springy = jumpOff(true);
+      expect(normal).toBeCloseTo(world0JumpHeight(), 0);
+      const g = resolveMovement().gravity;
+      expect(springy).toBeCloseTo(ABILITIES.giant.headLaunch ** 2 / (2 * g), -1);
+      expect(springy).toBeGreaterThan(normal * 3);
     });
 
     it('swings hit the whole giant body', () => {

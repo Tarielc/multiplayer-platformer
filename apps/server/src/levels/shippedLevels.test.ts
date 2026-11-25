@@ -35,6 +35,35 @@ describe('shipped levels', () => {
     expect(events.filter((e) => e.type === 'death')).toEqual([]);
     for (const player of world.listPlayers()) expect(player.body, `slot ${player.slot}`).toMatchObject({ alive: true, grounded: true });
   });
+
+  /** Buttons of a level with what holds them when it starts (a box resting on one), after a few ticks. */
+  function buttonsAtStart(id: string) {
+    const level = repository.get(id)!;
+    const world = new GameWorld({ level: level.data, movement: level.movement });
+    for (let tick = 0; tick < 10; tick++) world.endTick();
+    const buttons = level.data.traps.flatMap((t) => (t.kind === 'button' ? [t] : []));
+    return { world, buttons, held: buttons.filter((b) => world.trapField.isPressed(b.id)) };
+  }
+
+  it.each(LEVELS.campaign('coop').map((e) => e.id))('%s: its team puzzles start locked', (id) => {
+    const { world, buttons, held } = buttonsAtStart(id);
+    const free = buttons.filter((b) => !held.includes(b));
+    // Every puzzle has two buttons nobody holds yet (the boss level has its two escape trampolines).
+    expect(free.length).toBeGreaterThanOrEqual(4);
+    for (const button of free) {
+      for (const target of button.targets) {
+        const others = buttons.filter((b) => b !== button && b.targets.includes(target));
+        if (others.some((b) => held.includes(b))) continue;
+        // `on`: off until someone stands on a button; `off`: armed until someone does.
+        expect(world.trapField.isActive(target), `trap ${target} linked to button ${button.id}`).toBe(button.action === 'off');
+      }
+    }
+  });
+
+  it.each(LEVELS.campaign('race').map((e) => e.id))('%s: a box holds every button, so nothing needs a teammate', (id) => {
+    const { buttons, held } = buttonsAtStart(id);
+    expect(held).toEqual(buttons);
+  });
 });
 
 describe('LevelRepository', () => {
@@ -52,9 +81,9 @@ describe('LevelRepository', () => {
   }
 
   const manifest = defineLevels([
-    { id: 'good', name: 'Good', map: 'maps/good.json', next: null },
-    { id: 'broken', name: 'Broken', map: 'maps/broken.json', next: null },
-    { id: 'missing', name: 'Missing', map: 'maps/missing.json', next: null },
+    { id: 'good', name: 'Good', mode: 'coop', map: 'maps/good.json', next: 'broken' },
+    { id: 'broken', name: 'Broken', mode: 'coop', map: 'maps/broken.json', next: 'missing' },
+    { id: 'missing', name: 'Missing', mode: 'coop', map: 'maps/missing.json', next: null },
   ]);
 
   it('reports unreadable or invalid maps without failing the valid ones', async () => {

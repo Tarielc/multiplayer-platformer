@@ -4,10 +4,18 @@
  * A best-first search over "macro" moves (run, jump with different holds and steering, double
  * jump, wait, attack) on the real `GameWorld`, cloned at every node: traps, their timing, boxes, wind and
  * falling platforms are all simulated exactly as on the server. Each macro plays its inputs,
- * then neutral input until the player stands on something. A branch ends when the player
+ * then neutral input until the player stands on something. Trampoline macros react to the
+ * bounce: they double jump a set time after the launch and stop steering once they land. A branch ends when the player
  * dies or loses a heart; the search succeeds when the level completes.
  *
- * Usage: npm run levels:solve [-- --level level-2] [-- --verbose]
+ * Co-op levels are built around puzzles that need a team (one player holds a button while
+ * another uses what it switches), which a single player can't do. There the search plays as if
+ * the team had done its part: every button counts as held, so traps linked to `on` buttons
+ * work and traps linked to `off` buttons are gone. That still proves the layout is passable.
+ * `--assume-buttons` does the same for any level; `--as-is` turns it off, to check that one
+ * player alone really can't get through a co-op level.
+ *
+ * Usage: npm run levels:solve [-- --level race-2] [-- --verbose] [-- --assume-buttons | --as-is]
  * Exits with code 1 if a level can't be solved within the budget.
  */
 import { readFileSync } from 'node:fs';
@@ -23,6 +31,7 @@ import {
   parseManifestLevel,
   resolveMovement,
   type LevelData,
+  type TrapDef,
 } from '@platformer/shared';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,6 +40,8 @@ const dataDir = join(root, 'packages', 'shared', 'data');
 const args = process.argv.slice(2);
 const onlyLevel = args.includes('--level') ? args[args.indexOf('--level') + 1] : undefined;
 const verbose = args.includes('--verbose');
+const assumeButtons = args.includes('--assume-buttons');
+const asIs = args.includes('--as-is');
 
 /** Search budget per level. */
 const MAX_EXPANSIONS = 60_000;
@@ -43,7 +54,12 @@ const { LEFT: L, RIGHT: R, JUMP: J, ATTACK: A } = Button;
 interface Macro {
   name: string;
   inputs: number[];
+  /** Played instead of the rest of `inputs` once a trampoline launches the player; the macro ends when they land. */
+  onBounce?: number[];
 }
+
+/** Upward speed (px/s) above which a launch from a standstill or a fall counts as a trampoline bounce. Set per level. */
+let bounceSpeed = Infinity;
 
 const seq = (...parts: Array<[number, number]>): number[] => parts.flatMap(([buttons, ticks]) => Array<number>(ticks).fill(buttons));
 
@@ -66,6 +82,21 @@ for (const [d, dir] of [
   MACROS.push({ name: `doubleJump${d}`, inputs: seq([J | dir, 24], [dir, 1], [J | dir, 22], [dir, 40]) });
   MACROS.push({ name: `doubleJump${d} early`, inputs: seq([J | dir, 12], [dir, 1], [J | dir, 22], [dir, 30]) });
   MACROS.push({ name: `doubleJump${d} late`, inputs: seq([J, 24], [0, 1], [J, 10], [J | dir, 12], [dir, 30]) });
+}
+// Trampolines: hop onto one ahead, then double jump some time into the launch, steering.
+for (const [d, dir] of [
+  ['R', R],
+  ['L', L],
+] as const) {
+  for (const approach of [0, 10, 24]) {
+    for (const dj of [16, 26, 36]) {
+      MACROS.push({
+        name: `bounce${d} a${approach} dj${dj}`,
+        inputs: seq([J | (approach ? dir : 0), 12], [approach > 12 ? dir : 0, Math.max(0, approach - 12)], [0, 60]),
+        onBounce: seq([dir, dj], [J | dir, 22], [dir, 60]),
+      });
+    }
+  }
 }
 MACROS.push({ name: 'jumpUp', inputs: seq([J, 26]) });
 MACROS.push({ name: 'doubleJumpUp', inputs: seq([J, 24], [0, 1], [J, 22]) });
@@ -133,9 +164,19 @@ function play(world: GameWorld, macro: Macro): Outcome {
     if (player.hp < PLAYER_CONFIG.maxHp) return { kind: 'lost', reason: 'hurt' };
     return null;
   };
-  for (const buttons of macro.inputs) {
-    const outcome = step(buttons);
+  let inputs = macro.inputs;
+  let bounced = -1;
+  for (let i = 0; i < inputs.length; i++) {
+    const vy = player.body.vy;
+    const outcome = step(inputs[i]!);
     if (outcome) return outcome;
+    if (macro.onBounce && bounced < 0 && vy >= 0 && player.body.vy < -bounceSpeed) {
+      inputs = macro.onBounce;
+      i = -1;
+      bounced = 0;
+      continue;
+    }
+    if (bounced >= 0 && ++bounced > 5 && player.body.grounded) break;
   }
   for (let t = 0; t < MAX_SETTLE_TICKS; t++) {
     if (player.body.grounded) return { kind: 'ok' };
@@ -173,6 +214,7 @@ function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): 
   const boss = level.foes.some((f) => isBoss(f.kind));
   if (boss) console.log('  (boss level: foes left out, checking the layout only)');
   const start = new GameWorld({ level, movement, ...(boss ? { foes: null } : {}) });
+  bounceSpeed = movement.jumpVelocity * 1.15;
   start.addPlayer('solo', 0);
   // Moving traps make the same spot safe or deadly depending on when you get there.
   const timed = level.traps.some((t) => t.kind !== 'spikes' && t.kind !== 'box' && t.kind !== 'trampoline');
@@ -229,6 +271,17 @@ function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): 
   return false;
 }
 
+/**
+ * The level as if every button were held: buttons are removed, traps they switch `off` are
+ * removed too, and traps they switch `on` are left unlinked (so always on).
+ */
+function withButtonsHeld(level: LevelData): LevelData {
+  const buttons = level.traps.filter((t): t is Extract<TrapDef, { kind: 'button' }> => t.kind === 'button');
+  if (buttons.length === 0) return level;
+  const off = new Set(buttons.filter((b) => b.action === 'off').flatMap((b) => b.targets));
+  return { ...level, traps: level.traps.filter((t) => t.kind !== 'button' && !off.has(t.id)) };
+}
+
 let failed = false;
 for (const entry of LEVELS.entries) {
   if (onlyLevel && entry.id !== onlyLevel) continue;
@@ -240,6 +293,8 @@ for (const entry of LEVELS.entries) {
     failed = true;
     continue;
   }
-  if (!solve(level, resolveMovement(MOVEMENT_TUNING, entry.tuning))) failed = true;
+  const team = assumeButtons || (entry.mode === 'coop' && !asIs);
+  if (team && level.traps.some((t) => t.kind === 'button')) console.log('  (team puzzles: every button counts as held)');
+  if (!solve(team ? withButtonsHeld(level) : level, resolveMovement(MOVEMENT_TUNING, entry.tuning))) failed = true;
 }
 if (failed) process.exitCode = 1;

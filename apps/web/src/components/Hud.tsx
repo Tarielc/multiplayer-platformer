@@ -21,7 +21,7 @@ import { useCountdown } from './useCountdown';
 export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats | null; onMenu: () => void }) {
   const room = view.room!;
   const touch = useTouchDevice();
-  const levelIndex = room.level ? LEVELS.entries.findIndex((e) => e.id === room.level!.id) : -1;
+  const levelIndex = room.level ? LEVELS.indexInCampaign(room.level.id) : -1;
   const mode = MODE_CONFIG[room.mode];
   const coop = room.mode === 'coop';
   const self = view.hud.find((p) => p.isSelf);
@@ -53,7 +53,7 @@ export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats |
           {room.level && (
             <span className={`${styles.line} px-outline-sm`}>
               {mode.name}
-              {levelIndex >= 0 ? ` · ${levelIndex + 1}/${LEVELS.entries.length}` : ''} · {room.level.name}
+              {levelIndex >= 0 ? ` · ${levelIndex + 1}/${LEVELS.campaign(room.mode).length}` : ''} · {room.level.name}
             </span>
           )}
           {coop && view.hud.length > 1 && <span className={`${styles.sub} px-outline-sm`}>Team score</span>}

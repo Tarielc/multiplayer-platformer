@@ -42,14 +42,16 @@ export class FakeConnection implements PlayerConnection {
 }
 
 /**
- * Two-level test campaign. Spawns 1-4 stand at columns 1-4, a coin floats at column 6 and the
+ * Two two-level test campaigns (co-op: first, second; race: sprint, dash). Spawns 1-4 stand at columns 1-4, a coin floats at column 6 and the
  * exit is at column 8, so a player holding RIGHT collects the coin and finishes in about a second.
  */
 export const TEST_ROWS = ['           ', ' 1234 o E  ', '###########'];
 
 export const TEST_MANIFEST: LevelManifest = defineLevels([
-  { id: 'first', name: 'First', map: 'maps/first.json', next: 'second' },
-  { id: 'second', name: 'Second', map: 'maps/second.json', next: null },
+  { id: 'first', name: 'First', mode: 'coop', map: 'maps/first.json', next: 'second' },
+  { id: 'second', name: 'Second', mode: 'coop', map: 'maps/second.json', next: null },
+  { id: 'sprint', name: 'Sprint', mode: 'race', map: 'maps/sprint.json', next: 'dash' },
+  { id: 'dash', name: 'Dash', mode: 'race', map: 'maps/dash.json', next: null },
 ]);
 
 export function testLevel(entry: LevelManifestEntry, rows: string[] = TEST_ROWS): ServerLevel {

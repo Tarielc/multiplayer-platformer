@@ -22,13 +22,15 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
   const bySlot = new Map(room.players.map((p) => [p.slot, p]));
   const connected = room.players.filter((p) => p.connected);
   const readyCount = connected.filter((p) => p.ready).length;
-  const levels = LEVELS.entries;
+  // Each mode has its own campaign; the picker only cycles through the current one.
+  const levels = LEVELS.campaign(room.mode);
   const levelIndex = Math.max(0, levels.findIndex((e) => e.id === room.selectedLevelId));
   const selected = levels[levelIndex];
   const finalScores = room.campaignComplete ? [...room.players].sort((a, b) => b.campaignScore - a.campaignScore) : [];
   const teamTotal = finalScores.reduce((sum, p) => sum + p.campaignScore, 0);
   const race = room.mode === 'race';
   const mode = MODE_CONFIG[room.mode];
+  const tooFew = connected.length < mode.minPlayers;
   // Everyone in the room counts when the level starts (see Room.startLevel).
   const scaling = scalingSummary(room.mode, room.players.length);
   const takenBy = new Map<CharacterId, string>(
@@ -139,6 +141,11 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
           <ModePicker value={room.mode} onChange={(next) => client.selectMode(next)} disabled={!isHost} title={hostOnly} />
           {scaling && <p className={styles.note}>{scaling}</p>}
           {race && mode.race && <p className={styles.note}>Points by place: {mode.race.placePoints.join(' · ')}</p>}
+          {tooFew && (
+            <p className={styles.note} role="status">
+              {mode.name} needs at least {mode.minPlayers} players. Invite a friend, or switch to Race to play alone.
+            </p>
+          )}
         </section>
 
         <section className={`${styles.card} px-panel`} aria-label="Starting level">
@@ -169,8 +176,9 @@ export function LobbyPanel({ session, view }: { session: GameSession; view: Room
             {readyCount}/{connected.length}
           </span>
           <span className={styles.hint}>
-            {mode.name} from “{selected?.name ?? room.selectedLevelId}” starts when everyone is ready. Share the invite
-            link or code — up to {MAX_PLAYERS} players.
+            {tooFew
+              ? `${mode.name} needs at least ${mode.minPlayers} players: share the invite link or code.`
+              : `${mode.name} from “${selected?.name ?? room.selectedLevelId}” starts when everyone is ready. Share the invite link or code — up to ${MAX_PLAYERS} players.`}
           </span>
         </div>
         <button className={`${styles.ready} ${me?.ready ? '' : 'primary'}`} onClick={() => client.setReady(!me?.ready)} disabled={!me}>

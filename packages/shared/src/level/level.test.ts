@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEBUG_TILES } from '../art/debugTileset';
 import { asciiToTiledMap } from '../dev/asciiMap';
 import { defineLevels } from '../levels/manifest';
+import type { GameMode } from '../config/modes';
 import { levelChecksum } from './checksum';
 import { LevelFormatError, parseTiledLevel } from './parse';
 import type { TiledMap, TiledObject, TiledObjectGroup, TiledTileLayer } from './tiled';
@@ -213,7 +214,7 @@ describe('levelChecksum', () => {
 });
 
 describe('defineLevels', () => {
-  const entry = (id: string, next: string | null = null) => ({ id, name: id, map: `maps/${id}.json`, next });
+  const entry = (id: string, next: string | null = null, mode: GameMode = 'coop') => ({ id, name: id, mode, map: `maps/${id}.json`, next });
 
   it('links levels and exposes the first one', () => {
     const levels = defineLevels([entry('a', 'b'), entry('b')]);
@@ -229,5 +230,25 @@ describe('defineLevels', () => {
     expect(() => defineLevels([entry('a', 'missing')])).toThrow(/not in the manifest/);
     expect(() => defineLevels([entry('bad id')])).toThrow(/Invalid level id/);
     expect(() => defineLevels([{ ...entry('a'), map: 'maps/a.tmx' }])).toThrow(/\.json/);
+  });
+
+  it('keeps one campaign per mode, in play order', () => {
+    const levels = defineLevels([entry('c2', null), entry('r1', 'r2', 'race'), entry('c1', 'c2'), entry('r2', null, 'race')]);
+    expect(levels.campaign('coop').map((e) => e.id)).toEqual(['c1', 'c2']);
+    expect(levels.campaign('race').map((e) => e.id)).toEqual(['r1', 'r2']);
+    expect(levels.firstLevelFor('coop')).toBe('c1');
+    expect(levels.firstLevelFor('race')).toBe('r1');
+    expect(levels.indexInCampaign('c2')).toBe(1);
+    expect(levels.indexInCampaign('r1')).toBe(0);
+    expect(levels.indexInCampaign('nope')).toBe(-1);
+    expect(defineLevels([entry('a')]).firstLevelFor('race')).toBeNull();
+  });
+
+  it('rejects campaigns that cross modes, fork, loop or leave levels out', () => {
+    expect(() => defineLevels([entry('a', 'b'), entry('b', null, 'race')])).toThrow(/race campaign/);
+    expect(() => defineLevels([entry('a', 'c'), entry('b', 'c'), entry('c')])).toThrow(/more than one level/);
+    expect(() => defineLevels([entry('a'), entry('b')])).toThrow(/exactly one first level/);
+    expect(() => defineLevels([entry('a', 'b'), entry('b', 'a')])).toThrow(/exactly one first level/);
+    expect(() => defineLevels([entry('a'), entry('b', 'c'), entry('c', 'b')])).toThrow(/never reaches/);
   });
 });

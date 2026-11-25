@@ -35,7 +35,7 @@ interface Health {
 type ServerState = { kind: 'checking' } | { kind: 'online'; health: Health } | { kind: 'offline' };
 
 const MODE_ART: Record<GameMode, { image: string; alt: string }> = {
-  coop: { image: '/ui/mode-coop.png', alt: "Four players face the rhino boss in Rhino's Den" },
+  coop: { image: '/ui/mode-coop.png', alt: "Four players face the rhino boss in the Rhino Coliseum" },
   race: { image: '/ui/mode-race.png', alt: 'Three racers run through Orchard Hills' },
 };
 
@@ -116,7 +116,10 @@ export function HomeScreen() {
     router.push(`/room/${normalized}`);
   };
 
+
   const levelCount = LEVELS.entries.length;
+  const coopCount = LEVELS.campaign('coop').length;
+  const raceCount = LEVELS.campaign('race').length;
 
   return (
     <div className={styles.page}>
@@ -167,8 +170,8 @@ export function HomeScreen() {
           <div id="top" className={styles.heroBody}>
             <h1 className={styles.logo}>{GAME_TITLE}</h1>
             <p className={`${styles.tagline} px-outline-sm`}>
-              An online platformer for 1–{MAX_PLAYERS} players. Team up to topple the rhino, or race your friends to the
-              trophy through {levelCount} overgrown levels.
+              An online platformer for 1–{MAX_PLAYERS} players. Team up through {coopCount} co-op levels to topple the rhino,
+              or race your friends (or the clock) to the trophy across {raceCount} more.
             </p>
 
             <div className={`${styles.play} px-panel`}>
@@ -286,18 +289,25 @@ export function HomeScreen() {
         <header className={styles.sectionHead}>
           <span className={styles.kicker}>Levels</span>
           <h2 id="levels-title" className="px-outline">
-            {levelCount} levels, played in order.
+            Two campaigns, played in order.
           </h2>
         </header>
-        <ol className={styles.levels}>
-          {LEVELS.entries.map((entry, index) => (
-            <li key={entry.id} className="px-notch" data-final={entry.next === null}>
-              <span className={`${styles.levelNo} px-outline`}>{index + 1}</span>
-              <span className={styles.levelName}>{entry.name}</span>
-              {entry.next === null && <span className={styles.levelTag}>Finale</span>}
-            </li>
-          ))}
-        </ol>
+        {GAME_MODES.map((mode) => (
+          <div key={mode} className={styles.campaign}>
+            <h3 className={`${styles.campaignTitle} px-outline-sm`}>
+              {mode === 'coop' ? 'Co-op · 2–4 players' : 'Race · solo or 2–4 players'}
+            </h3>
+            <ol className={styles.levels}>
+              {LEVELS.campaign(mode).map((entry, index) => (
+                <li key={entry.id} className="px-notch" data-final={entry.next === null}>
+                  <span className={`${styles.levelNo} px-outline`}>{index + 1}</span>
+                  <span className={styles.levelName}>{entry.name}</span>
+                  {entry.next === null && <span className={styles.levelTag}>{mode === 'coop' ? 'Boss' : 'Finale'}</span>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
       </section>
 
       <section id="controls" className={styles.section} aria-labelledby="controls-title">

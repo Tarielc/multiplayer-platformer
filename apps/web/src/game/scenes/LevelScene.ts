@@ -28,6 +28,7 @@ import {
   ordinal,
   parseTiledLevel,
   playerHead,
+  headCollider,
   hitboxOf,
   giantActive,
   propertiesToRecord,
@@ -468,14 +469,18 @@ export class LevelScene extends Phaser.Scene {
     const me = selfId ? state.players.find((p) => p.id === selfId) : undefined;
     this.decks.clear();
     this.heads.clear();
+    const headColliders: Collider[] = [];
     for (const player of state.players) {
       if (player.id === selfId) continue;
       const deck = droneDeck(player, ABILITIES);
       if (deck) this.decks.set(player.id, deck);
-      const head = playerHead(player, SIZES);
-      if (head) this.heads.set(player.id, head);
+      const head = headCollider(player, SIZES);
+      if (head) {
+        this.heads.set(player.id, playerHead(player, SIZES)!);
+        headColliders.push(head);
+      }
     }
-    this.deckColliders = [...this.decks.values(), ...this.heads.values()].map((rect) => ({ ...rect, id: -1, oneWay: true, bounce: 0 }));
+    this.deckColliders = [...[...this.decks.values()].map((rect): Collider => ({ ...rect, id: -1, oneWay: true, bounce: 0 })), ...headColliders];
     if (me) predictor.reconcile(me, state.traps);
     else this.traps?.applyNet(state.traps);
 

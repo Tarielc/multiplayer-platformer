@@ -38,7 +38,7 @@ export function LevelCompleteOverlay({
   const totals = new Map(room.players.map((p) => [p.id, p.campaignScore]));
   const characters = new Map(room.players.map((p) => [p.id, p.characterId]));
   const next = room.nextLevelId ? LEVELS.get(room.nextLevelId) : undefined;
-  const levelIndex = room.level ? LEVELS.entries.findIndex((e) => e.id === room.level!.id) : -1;
+  const levelIndex = room.level ? LEVELS.indexInCampaign(room.level.id) : -1;
   const winner = race ? results.find((r) => r.place === 1) : undefined;
   const podium = race ? results.filter((r) => r.place !== null && r.place <= 3) : [];
   const teamScore = results.reduce((sum, r) => sum + r.score, 0);
@@ -50,7 +50,7 @@ export function LevelCompleteOverlay({
       <header className={styles.resultsHead}>
         <span className={styles.kicker}>
           {MODE_CONFIG[room.mode].name}
-          {levelIndex >= 0 ? ` · ${levelIndex + 1}/${LEVELS.entries.length}` : ''} · {room.level?.name}{' '}
+          {levelIndex >= 0 ? ` · ${levelIndex + 1}/${LEVELS.campaign(room.mode).length}` : ''} · {room.level?.name}{' '}
           {race ? 'finished' : 'complete'}
         </span>
         <h2 className={`${styles.headline} px-outline`}>

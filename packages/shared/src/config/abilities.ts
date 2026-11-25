@@ -8,7 +8,8 @@ import type { CharacterId } from './characters';
  *    boxes, foes and Virtual Guy himself (fly the claw over him); Special grabs / drops, Attack
  *    recalls it. Other players can stand on the drone and ride it.
  *  - Mask Dude (`giant`): grows big for a while: extra hearts, swings that cost hearts, more
- *    reach and knockback, and less knockback taken.
+ *    reach and knockback, and less knockback taken. His big head is springy: teammates who
+ *    jump off it are launched far higher than a normal jump.
  *  - Ninja Frog (`tongue`): free-aimed tongue that grabs a player or a box, swallows it, and
  *    spits it along the aim as a projectile that hurts everyone in its path.
  *
@@ -181,6 +182,13 @@ export interface AbilityTuning {
      * when it is over; Mask Dude can't grow where the big box doesn't fit.
      */
     hitbox: { width: number; height: number };
+    /**
+     * Take-off speed (px/s) of a jump from a giant's head, instead of the normal jump speed:
+     * the giant is a springboard for teammates (landing on him doesn't bounce). 1000 px/s rises
+     * about 357 px, so with the double jump a teammate reaches about 30 tiles (16 px) above the
+     * floor the giant stands on: out of reach of plain stacking, the co-op puzzle ledges rely on it.
+     */
+    headLaunch: number;
   };
   tongue: {
     windupMs: number;
@@ -283,6 +291,7 @@ export const ABILITY_TUNING: Readonly<AbilityTuning> = {
     knockbackTaken: 0.5,
     boxHits: 3,
     hitbox: { width: 28, height: 38 },
+    headLaunch: 1000,
   },
   tongue: {
     windupMs: 170,
@@ -419,6 +428,7 @@ export function compileAbilities(t: Readonly<AbilityTuning>): CompiledAbilities 
       knockbackTaken: giant.knockbackTaken,
       boxHits: giant.boxHits,
       hitbox: { width: giant.hitbox.width, height: giant.hitbox.height },
+      headLaunch: giant.headLaunch,
       grow: s(giant.growMs),
       duration: s(giant.durationMs),
       shrink: s(giant.shrinkMs),

@@ -5,8 +5,10 @@ Levels are [Tiled](https://www.mapeditor.org/) JSON maps. The server and the bro
 **To add a level:**
 
 1. Save the map as `packages/shared/data/maps/<name>.json`.
-2. Add an entry to `packages/shared/src/levels/manifest.ts`, and point the previous level's `next` at it.
+2. Add an entry to `packages/shared/src/levels/manifest.ts` with its game `mode` (`coop` or `race`), and point the previous level of that campaign's `next` at it.
 3. Run `npm run levels:validate`.
+
+Each game mode has its own campaign: a chain of levels linked by `next`, starting at the one nothing points to. `defineLevels` refuses a `next` into the other mode's campaign, a fork, a loop, or a level its campaign never reaches. The lobby offers only the selected mode's levels.
 
 ## Map setup
 
@@ -58,7 +60,7 @@ Put objects on any object layer (hidden layers count too). The engine reads each
 | `spawn` | Point (or rect) | `slot` (int 0–3, optional) | Where a player starts. A point marks the player's **feet**, at the bottom-center of the hitbox. Put it on top of the ground, not inside it. Spawns without `slot` fill free slots in authoring order. With fewer than 4 spawns, players share them. The start sign stands at the leftmost spawn, with its checkered line under the player's feet. |
 | `checkpoint` | Rect, or point | – | Touching it moves the respawn point to the zone's bottom-center. A point becomes a 32×64 zone standing on the point. In co-op one touch moves everyone's respawn point; in a race only the toucher's (`checkpointScope`, set by the game mode). Drawn as a pole that raises and waves its flag once activated. |
 | `exit` | Rect, or point | – | Co-op: the level is complete when every present player is alive inside an exit (`exitRule: 'all'`; `'any'` means the first player to arrive wins). Race: each arrival gets a place and leaves play, and the level ends when everyone has finished or 20 s after the first finish. Disconnected players don't block it. Drawn as a trophy that bounces whenever a player arrives. |
-| `collectible` | Point, rect or tile object | `kind` (`coin`, `gem`), `value` (int, optional) | Picked up once per level, by the first player to touch it. Its score is `value` if set, else the kind's value (coin 10, gem 50). It sits at the object's center. |
+| `collectible` | Point, rect or tile object | `kind` (`coin`, `gem`, `apple`, `strawberry`, `pineapple`, `melon`), `value` (int, optional) | Picked up once per level, by the first player to touch it. Its score is `value` if set, else the kind's value (coin 10, gem 50, apple 10, strawberry 10, pineapple 20, melon 50). It sits at the object's center. Each point also recharges the picker's special ability by 1% of its cooldown. |
 | `hazard` | Rect, or point | `style` (`lava`, optional) | Kills on any overlap with the player's hitbox. `style = "lava"` draws animated lava; anything else draws a generic danger pattern. |
 
 Trap classes (`spikes`, `saw`, `trampoline`, …) are listed under [Traps](#traps), and foes (`mushroom`, `chicken`, …) under [Foes](#foes). Objects with any other class are kept in `LevelData.extraObjects`, with position, size and properties. The validator warns that they are ignored. That is the hook for your own entities: signs, NPCs and so on.
@@ -152,7 +154,7 @@ The rhino sleeps until a player comes within 320 px of it in plain sight (or hit
 
 It is armoured: swings, stomps and spat things only hurt it while it is dazed. Otherwise they glance off, though you still bounce off its back. At half health it flies into a rage: it walks and charges faster, drops more rocks, and stays dazed for less time. Tongues and claws can't catch it.
 
-While a boss is alive, **the level's exit stays shut** (players in it don't count). Give it a closed hall: walls either side for it to crash into, a solid ceiling for the rocks, and one-way ledges low enough to jump onto, to dodge its charges. Level 8, *Rhino's Den*, is the example. The level solver (`npm run levels:solve`) leaves the foes out of levels with a boss, so it only checks the layout.
+While a boss is alive, **the level's exit stays shut** (players in it don't count). Give it a closed hall: walls either side for it to crash into, a solid ceiling for the rocks, and one-way ledges low enough to jump onto, to dodge its charges. *Rhino Coliseum* (`coop-4`) is the example: two trampolines, each powered from the ledge across the arena, lift players to refuges out of its reach. The level solver (`npm run levels:solve`) leaves the foes out of levels with a boss, so it only checks the layout.
 
 Sizes, speeds, sight, timings and damage are in `FOE_TUNING` (`packages/shared/src/config/foes.ts`). Foes run on the server only; clients draw them from snapshots, like the other players. The sprites are in `packages/shared/data/sprites/foes/`.
 
@@ -241,7 +243,10 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | Coyote time | 100 ms after walking off a ledge (after that, a press spends the air jump) |
 | Jump buffer | 120 ms before landing, once the air jump is spent |
 | Drop-through | One-way tiles are ignored for 220 ms after Down + Jump |
-| Standing on players | Each player's head is a one-way platform for the others (a rising head pushes them up, but they are never carried sideways or pulled down; Down + Jump drops off), so in multiplayer a jump from a teammate's head reaches 28 px (1.75 tiles) higher. The level solver plays solo, so required routes must not depend on it; it suits optional co-op shortcuts and secrets. |
+| Standing on players | Each player's head is a one-way platform for the others (a rising head pushes them up, but they are never carried sideways or pulled down; Down + Jump drops off), so in multiplayer a jump from a teammate's head reaches 28 px (1.75 tiles) higher: 13.75 tiles. A rider who jumps at the top of the carrier's own jump reaches about 20.5 tiles. The level solver plays solo, so required routes must not depend on it; it suits optional co-op shortcuts and secrets. |
+| Giant Mask Dude's head | A springboard: a jump taken while standing on it leaves at `giant.headLaunch` (1000 px/s) instead of the normal jump, about 30 tiles up with the double jump. Landing on it doesn't bounce. |
+| Trampoline | 14.3 tiles up at the default `launch`; with the double jump about 20 |
+| Frog spit | A spat player flies straight for about 19 tiles (stopped by solid tiles, not by one-way platforms) |
 | Hazard tile hitbox | 4 px in from the sides, from 14 px below the tile top down to its bottom (`hazardTileHitbox`, tuned for 32 px spike tiles; the terrain tileset has no hazard tiles, so the samples use lava zones) |
 | Kill plane | 96 px below the bottom of the map |
 | Fall damage | Drops of more than 256 px = 16 tiles (8) cost a heart, plus one for every further 128 px = 8 tiles (4); 32 tiles (16) or more is fatal. Measured from the top of the airtime, and a double jump, trampoline or stomp on the way down resets it. Keep required drops within 16 tiles, or give players a trampoline or a ledge to break the fall. Foes are hurt past 8 tiles and boxes past 6, a box falling 2 tiles or more onto a player, foe or box hurts it, and so does a foe falling that far onto another foe (`FALL_DAMAGE_TUNING`). |
@@ -249,6 +254,22 @@ These come from `packages/shared/src/config` at the default tuning. Change the c
 | View | 960×540 px = 60×34 tiles (30×17). Maps smaller than the view are centered. |
 
 A spot meant to be reachable only with a trampoline or a fan has to be out of double-jump reach (more than 12 tiles up, or 16 across). Otherwise, set `tuning: { airJumps: 0 }` on the level in the manifest to turn the double jump off there.
+
+## Campaigns and puzzles
+
+The two shipped campaigns show how the modes shape level design.
+
+**Co-op** (2+ players) levels are built around three team puzzles, built by `scripts/levels/puzzles.ts` so every level uses the same proven sizes. Each needs two players because one holds a button while another uses what it switches, and none has a box in reach (a box resting on a button would hold it for a lone player):
+
+| Puzzle | Layout | Why one player can't do it |
+|---|---|---|
+| **Tandem Trampoline** | A pit with a trampoline by a shelf 16 tiles up. Two `on` buttons power it: one on the pit floor 14 tiles from the trampoline, one on the shelf. One player holds the floor button while a teammate bounces up; the teammate holds the shelf button for them. | The shelf is out of jump reach (12) and the presser can't reach the trampoline. 16 tiles is still a safe drop back. |
+| **Spike Gauntlet** | A corridor exactly 2 tiles tall and 48+ long, bored through a wall up to the ceiling, its floor lined with spikes. Two `off` buttons, one before the entrance and one past the exit, switch them off. | Nobody can jump in a 2-tile corridor, walking through takes 3+ hits, and a spat player only flies ~19 tiles. A giant or a drone with its cargo doesn't fit. |
+| **Lift-Off** | A room whose trampoline is powered by a button on a one-way ledge 24 tiles up. Everyone else bounces onto the crest (15 up). The holder leaves last by leaping down to a step (13 up, 14 tiles away) and on to the crest. | 24 tiles is out of reach of jumps, a switched-off trampoline and plain stacking (~20.5). Only an ability gets there: a frog spit, the drone, or a jump off giant Mask Dude's springy head. The step is too far from the ledge to climb back to it, and out of a lone jump's reach from the floor. |
+
+Characters are unique in a room, so any team of two has at least one of the frog, the drone or the giant. Checkpoints are shared in co-op, so put one just before each puzzle and the next a whole section after it, or a player could skip the puzzle by dying once a teammate is through. Co-op needs two players: the lobby won't start it alone, and solo play switches to Race.
+
+**Race** (and solo) levels split into routes that rejoin at checkpoints (a racer's own): a fast, risky one and a slower, safer one. Every obstacle can be passed alone, without abilities. Any button starts held by a box (`shippedLevels.test.ts` checks it), so a racer can smash the box to switch the trap behind them.
 
 ## Prototyping with ASCII
 
@@ -310,7 +331,7 @@ Objects use the same characters as the default legend. Checkpoints and exits are
 
 Other traps can be passed to `asciiToTiledMap` as `objects: [{ name, type: 'saw', x, y, width, height, properties }]` (in pixels).
 
-`npm run samples:generate` rebuilds `level-1.json` … `level-3.json` (and `debug-tiles.png`) from `scripts/generate-samples.ts`. There, layouts are written with a small `Sketch` API (`ground`, `solid`, `block`, `platform`, `text`) that throws on shapes the tileset can't draw. Traps are placed in tile coordinates and checked against the layout (no overlaps, a floor under boxes, trampolines and fans, solid ground behind spikes):
+`npm run samples:generate` rebuilds the campaign maps (and `debug-tiles.png`) from `scripts/levels/`: `coop.ts` and `race.ts` hold one builder per level, `puzzles.ts` the co-op puzzles, `sketch.ts` the drawing API. `-- --only race-2` rebuilds one level, `-- --print` prints each layout as ASCII. Layouts are written with a small `Sketch` API (`ground`, `solid`, `block`, `platform`, `text`, `carve`, `lava`) that throws on shapes the tileset can't draw. Traps are placed in tile coordinates and checked against the layout (no overlaps, a floor under boxes, trampolines and fans, solid ground behind spikes):
 
 ```ts
 s.spikes(30, 23, 3);                      // 3 tiles of spikes on the floor, from column 30
@@ -324,11 +345,11 @@ It **overwrites** those maps, so after editing a sample in Tiled, either stop us
 
 ### Is it finishable?
 
-`npm run levels:solve` checks that one player can reach the exit of every level without losing a heart. It searches over moves (runs, jumps of different heights and steering, double jumps, waits, attacks) in the real simulation, traps and timing included, and prints the route with `--verbose`:
+`npm run levels:solve` checks that one player can reach the exit of every level without losing a heart. A single player can't do a co-op team puzzle, so on co-op levels (or with `-- --assume-buttons`) it plays as if every button were held: traps linked to `on` buttons work, traps linked to `off` buttons are gone. That still proves the layout is passable once the team has done its part. `-- --as-is` turns this off; then every co-op level should fail, a sign that one player alone can't get past its puzzles. It searches over moves (runs, jumps of different heights and steering, double jumps, trampoline bounces, waits, attacks) in the real simulation, traps and timing included, and prints the route with `--verbose`:
 
 ```
-level-3 "Sunset Ruins" (14 traps)
-  ✓ finished in 16 moves, 17.0 s of play, 0 hearts lost (21 nodes, 324 states, 0.3s)
+race-1 "Sunny Sprint" (13 traps)
+  ✓ finished in 23 moves, 28.4 s of play, 0 hearts lost (187 nodes, 1650 states, 9.5s)
 ```
 
 When it fails it reports how close it got and what ended the branches (`trap hit`, `death (hazard)`, `death (crush)`…). Optional areas (bonus coins up a trampoline, a box-blocked nook) are not checked. Use `--level <id>` for one level.

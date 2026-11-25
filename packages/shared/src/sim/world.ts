@@ -23,6 +23,7 @@ import {
   createBody,
   resetBody,
   bodyRect,
+  headCollider,
   hitboxOf,
   playerHead,
   rideAlong,
@@ -345,7 +346,11 @@ export class GameWorld {
     for (const p of this.players.values()) {
       if (p.body === body) continue;
       if (p.ability.deck) out.push({ ...p.ability.deck, id: -1, oneWay: true, bounce: 0 });
-      if (p.head) out.push({ ...p.head, id: -1, oneWay: true, bounce: 0 });
+      if (p.head) {
+        // A giant's head is a springboard: jumping off it launches higher (`giant.headLaunch`).
+        const head = headCollider(p.body, this.ctx);
+        if (head) out.push({ ...head, ...p.head });
+      }
     }
     return out;
   }

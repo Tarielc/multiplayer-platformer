@@ -1,9 +1,11 @@
+import type { GameMode } from '../config/modes';
 import type { MovementTuning } from '../config/movement';
 
 /**
- * The level manifest. To add a level:
+ * The level manifest: one campaign per game mode. To add a level:
  *   1. Save a Tiled JSON map in `packages/shared/data/maps/` (see docs/level-authoring.md).
- *   2. Add an entry below and point the previous level's `next` at it.
+ *   2. Add an entry below with its `mode`, and point the previous level of that campaign's
+ *      `next` at it.
  * Both the server (reads from disk) and the client (fetches /assets/<map>) use this list.
  */
 export interface LevelManifestEntry {
@@ -11,9 +13,11 @@ export interface LevelManifestEntry {
   id: string;
   /** Display name for the lobby and HUD. */
   name: string;
+  /** The campaign it belongs to: only played in this game mode. */
+  mode: GameMode;
   /** Tiled JSON path relative to the shared data directory. */
   map: string;
-  /** Level that follows this one, or `null` to finish the campaign. */
+  /** Level that follows this one in its campaign, or `null` to finish the campaign. */
   next: string | null;
   /** Optional per-level movement overrides (e.g. a low-gravity level). */
   tuning?: Partial<MovementTuning>;
@@ -32,10 +36,17 @@ export type BackgroundTile = (typeof BACKGROUND_TILES)[number];
 
 export interface LevelManifest {
   readonly entries: readonly LevelManifestEntry[];
+  /** The first entry's id (the first campaign's start). */
   readonly firstLevelId: string;
   get(id: string): LevelManifestEntry | undefined;
   require(id: string): LevelManifestEntry;
   has(id: string): boolean;
+  /** The campaign of `mode`, in play order (empty if it has none). */
+  campaign(mode: GameMode): readonly LevelManifestEntry[];
+  /** Where `mode`'s campaign starts, or `null` if it has none. */
+  firstLevelFor(mode: GameMode): string | null;
+  /** 0-based position of a level in its campaign, or -1. */
+  indexInCampaign(id: string): number;
 }
 
 export function defineLevels(entries: readonly LevelManifestEntry[]): LevelManifest {
@@ -47,10 +58,33 @@ export function defineLevels(entries: readonly LevelManifestEntry[]): LevelManif
     if (!entry.map.endsWith('.json')) throw new Error(`Level "${entry.id}": map must be a Tiled .json file`);
     byId.set(entry.id, entry);
   }
+  const pointedAt = new Set<string>();
   for (const entry of entries) {
-    if (entry.next !== null && !byId.has(entry.next)) {
-      throw new Error(`Level "${entry.id}": next level "${entry.next}" is not in the manifest`);
+    if (entry.next === null) continue;
+    const next = byId.get(entry.next);
+    if (!next) throw new Error(`Level "${entry.id}": next level "${entry.next}" is not in the manifest`);
+    if (next.mode !== entry.mode) {
+      throw new Error(`Level "${entry.id}" (${entry.mode}): next level "${entry.next}" belongs to the ${next.mode} campaign`);
     }
+    if (pointedAt.has(entry.next)) throw new Error(`Level "${entry.next}" follows more than one level`);
+    pointedAt.add(entry.next);
+  }
+  // Each mode: exactly one start (a level nothing leads to), and its chain reaches every level.
+  const campaigns = new Map<GameMode, LevelManifestEntry[]>();
+  const modes = [...new Set(entries.map((e) => e.mode))];
+  for (const mode of modes) {
+    const starts = entries.filter((e) => e.mode === mode && !pointedAt.has(e.id));
+    if (starts.length !== 1) {
+      throw new Error(`The ${mode} campaign needs exactly one first level (found ${starts.map((e) => `"${e.id}"`).join(', ') || 'none: it loops'})`);
+    }
+    const chain: LevelManifestEntry[] = [];
+    for (let at: LevelManifestEntry | undefined = starts[0]; at; at = at.next ? byId.get(at.next) : undefined) {
+      if (chain.includes(at)) throw new Error(`The ${mode} campaign loops back to "${at.id}"`);
+      chain.push(at);
+    }
+    const left = entries.filter((e) => e.mode === mode && !chain.includes(e));
+    if (left.length > 0) throw new Error(`The ${mode} campaign never reaches ${left.map((e) => `"${e.id}"`).join(', ')}`);
+    campaigns.set(mode, chain);
   }
   return {
     entries,
@@ -62,68 +96,25 @@ export function defineLevels(entries: readonly LevelManifestEntry[]): LevelManif
       if (!entry) throw new Error(`Unknown level "${id}"`);
       return entry;
     },
+    campaign: (mode) => campaigns.get(mode) ?? [],
+    firstLevelFor: (mode) => campaigns.get(mode)?.[0]?.id ?? null,
+    indexInCampaign(id) {
+      const entry = byId.get(id);
+      return entry ? (campaigns.get(entry.mode) ?? []).indexOf(entry) : -1;
+    },
   };
 }
 
+/**
+ * Co-op: three levels built around 2-player button puzzles, then the rhino. Race (and solo
+ * play): three levels with several routes to the trophy, every one passable alone.
+ */
 export const LEVELS = defineLevels([
-  {
-    id: 'level-1',
-    name: 'Green Hills',
-    map: 'maps/level-1.json',
-    next: 'level-2',
-    background: 'green',
-  },
-  {
-    id: 'level-2',
-    name: 'Sky Steps',
-    map: 'maps/level-2.json',
-    next: 'level-3',
-    // Example of a per-level override: slightly floatier jumps up the tower.
-    tuning: { timeToApex: 0.42 },
-    background: 'lavender',
-  },
-  {
-    id: 'level-3',
-    name: 'Sunset Ruins',
-    map: 'maps/level-3.json',
-    next: 'level-4',
-    background: 'peach',
-  },
-  {
-    id: 'level-4',
-    name: 'Small Test Room',
-    map: 'maps/level-4.json',
-    next: 'level-5',
-    background: 'blue',
-  },
-  {
-    id: 'level-5',
-    name: 'Orchard Hills',
-    map: 'maps/level-5.json',
-    next: 'level-6',
-    background: 'yellow',
-  },
-  {
-    id: 'level-6',
-    name: 'Sawmill Gorge',
-    map: 'maps/level-6.json',
-    next: 'level-7',
-    background: 'gray',
-  },
-  {
-    id: 'level-7',
-    name: 'Candy Keep',
-    map: 'maps/level-7.json',
-    next: 'level-8',
-    background: 'pink',
-  },
-  {
-    id: 'level-8',
-    name: "Rhino's Den",
-    map: 'maps/level-8.json',
-    next: null,
-    background: 'gray',
-  },
+  { id: 'coop-1', name: 'Meadow Gate', mode: 'coop', map: 'maps/coop-1.json', next: 'coop-2', background: 'green' },
+  { id: 'coop-2', name: 'Rust Canyon', mode: 'coop', map: 'maps/coop-2.json', next: 'coop-3', background: 'peach' },
+  { id: 'coop-3', name: 'Jade Citadel', mode: 'coop', map: 'maps/coop-3.json', next: 'coop-4', background: 'lavender' },
+  { id: 'coop-4', name: 'Rhino Coliseum', mode: 'coop', map: 'maps/coop-4.json', next: null, background: 'gray' },
+  { id: 'race-1', name: 'Sunny Sprint', mode: 'race', map: 'maps/race-1.json', next: 'race-2', background: 'yellow' },
+  { id: 'race-2', name: 'Ember Gorge', mode: 'race', map: 'maps/race-2.json', next: 'race-3', background: 'blue' },
+  { id: 'race-3', name: 'Candy Spire', mode: 'race', map: 'maps/race-3.json', next: null, background: 'pink' },
 ]);
-
-export const DEFAULT_LEVEL_ID = LEVELS.firstLevelId;

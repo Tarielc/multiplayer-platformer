@@ -1,7 +1,9 @@
 import {
   CloseCode,
+  MODE_CONFIG,
   NET_CONFIG,
   PROTOCOL_VERSION,
+  SOLO_GAME_MODE,
   TypedEmitter,
   jsonCodec,
   type CharacterId,
@@ -66,7 +68,8 @@ export interface GameClientOptions {
   character?: () => CharacterId | null;
   url: () => string;
   /**
-   * Ready up automatically right after joining a room that is in its lobby (solo play).
+   * Ready up automatically right after joining a room that is in its lobby (solo play). Alone,
+   * the host first switches the room to Race (`SOLO_GAME_MODE`): co-op needs a team.
    * Rejoins and later returns to the lobby (campaign complete) are left to the player.
    */
   autoReady?: boolean;
@@ -348,6 +351,10 @@ export class GameClient {
     this.autoReadyPending = false;
     if (room.phase !== 'lobby') return;
     const me = room.players.find((p) => p.id === this.playerId);
+    // Alone, the room has to run the race campaign: co-op needs a team.
+    if (me?.isHost && room.mode !== SOLO_GAME_MODE && room.players.length < MODE_CONFIG[room.mode].minPlayers) {
+      this.selectMode(SOLO_GAME_MODE);
+    }
     if (me && !me.ready) this.setReady(true);
   }
 

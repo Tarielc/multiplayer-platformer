@@ -8,13 +8,13 @@ import { useCountdown } from './useCountdown';
 export function CountdownOverlay({ room, receivedAt }: { room: RoomInfo; receivedAt: number }) {
   const left = useCountdown(room.countdownMs, receivedAt);
   const seconds = Math.ceil(left / 1000);
-  const levelIndex = room.level ? LEVELS.entries.findIndex((e) => e.id === room.level!.id) : -1;
+  const levelIndex = room.level ? LEVELS.indexInCampaign(room.level.id) : -1;
   return (
     <div className={styles.countdown}>
       <div className={styles.countHead}>
         <span className={`${styles.modeTag} px-notch`} data-mode={room.mode}>
           {MODE_CONFIG[room.mode].name}
-          {levelIndex >= 0 ? ` · ${levelIndex + 1}/${LEVELS.entries.length}` : ''}
+          {levelIndex >= 0 ? ` · ${levelIndex + 1}/${LEVELS.campaign(room.mode).length}` : ''}
         </span>
         <span className={`${styles.levelName} px-outline`}>{room.level?.name}</span>
         {room.scaledFor !== null && room.scaledFor > 1 && (

@@ -143,7 +143,7 @@ export class Room {
     this.log = options.log;
     this.net = options.net ?? NET_CONFIG;
     this.createPlayerId = options.createPlayerId ?? (() => `p${randomBytes(4).toString('hex')}`);
-    this.selectedLevelId = this.manifest.firstLevelId;
+    this.selectedLevelId = this.manifest.firstLevelFor(this.mode) ?? this.manifest.firstLevelId;
   }
 
   // --- queries -------------------------------------------------------------------------------
@@ -372,7 +372,7 @@ export class Room {
   private canStart(): boolean {
     const connected = this.playersBySlot().filter((p) => p.connection);
     return (
-      connected.length >= Math.max(1, this.net.room.minPlayersToStart) &&
+      connected.length >= Math.max(1, this.net.room.minPlayersToStart, MODE_CONFIG[this.mode].minPlayers) &&
       connected.every((p) => p.ready) &&
       this.levels.get(this.selectedLevelId) !== undefined
     );
@@ -546,6 +546,9 @@ export class Room {
     if (!this.manifest.has(levelId) || !this.levels.get(levelId)) {
       return this.reject(player, 'BAD_REQUEST', `Unknown level "${levelId}".`);
     }
+    if (this.manifest.require(levelId).mode !== this.mode) {
+      return this.reject(player, 'BAD_REQUEST', `"${levelId}" is not a ${MODE_CONFIG[this.mode].name} level.`);
+    }
     if (this.selectedLevelId === levelId) return;
     this.selectedLevelId = levelId;
     this.markRoomDirty();
@@ -555,7 +558,11 @@ export class Room {
     if (player.id !== this.hostId) return this.reject(player, 'NOT_ALLOWED', 'Only the host can choose the mode.');
     if (this.phase !== 'lobby') return this.reject(player, 'NOT_ALLOWED', 'The mode can only be changed in the lobby.');
     if (this.mode === mode) return;
+    const first = this.manifest.firstLevelFor(mode);
+    if (!first) return this.reject(player, 'BAD_REQUEST', `There are no ${MODE_CONFIG[mode].name} levels.`);
     this.mode = mode;
+    // Each mode has its own campaign: start it from the beginning.
+    this.selectedLevelId = first;
     this.log.info(`mode set to ${MODE_CONFIG[mode].name} by ${describe(player)}`);
     this.markRoomDirty();
   }

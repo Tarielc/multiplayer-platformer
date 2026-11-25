@@ -147,7 +147,7 @@ describe('parseClientMessage', () => {
     { t: 'join', protocol: 1, roomId: 'ABCDE', name: 'Ann', clientId: '0123456789abcdef', characterId: 'ninja-frog' },
     { t: 'ready', ready: true },
     { t: 'selectCharacter', characterId: 'mask-dude' },
-    { t: 'selectLevel', levelId: 'level-2' },
+    { t: 'selectLevel', levelId: 'coop-2' },
     { t: 'selectMode', mode: 'race' },
     { t: 'selectMode', mode: 'coop' },
     { t: 'input', seq: 42, buttons: Button.LEFT | Button.JUMP },

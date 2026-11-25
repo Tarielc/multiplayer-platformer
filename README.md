@@ -7,7 +7,7 @@ A data-driven starter for online 2D platformers with **1–4 players per room**:
 - **Node.js game server** (`http` + `ws`) that runs every room at a fixed 60 Hz tick and holds the authoritative state. It streams snapshots and deltas over WebSockets.
 - **Shared TypeScript package** used by both client and server: types, wire protocol, tuning configs, level manifest, Tiled JSON parser and a deterministic movement simulation.
 
-Levels are Tiled JSON maps. Adding one takes a map file and one manifest entry. Three sample levels are included, built from a 16 px terrain tileset by an auto-tiling generator, with traps and interactive entities (spikes, saws, trampolines, falling platforms, fans, rock-heads, spike-heads, breakable boxes). Players have 3 hearts. Missing images fall back to generated placeholder textures, so the game still boots without them.
+Levels are Tiled JSON maps. Adding one takes a map file and one manifest entry. Two campaigns are included, one per game mode: four co-op levels (team button puzzles, then a rhino boss) and three race levels (several routes each). They are built from a 16 px terrain tileset by an auto-tiling generator, with traps and interactive entities (spikes, saws, trampolines, falling platforms, fans, rock-heads, spike-heads, breakable boxes). Players have 3 hearts. Missing images fall back to generated placeholder textures, so the game still boots without them.
 
 ## Quick start
 
@@ -55,10 +55,10 @@ Pausing only stops the game when **every** connected player has the menu open. S
 | `npm test` | Vitest: simulation, combat, traps, level pipeline, protocol, rooms, client netcode, state machines, synth (~290 tests, a few seconds) |
 | `npm run typecheck` | `tsc` for every package (including tests and scripts) |
 | `npm run levels:validate` | Parses and validates every level in the manifest |
-| `npm run levels:solve [-- --level level-2] [-- --verbose]` | Proves every level can be finished by one player without losing a heart (search over the real simulation, traps included) |
+| `npm run levels:solve [-- --level race-2] [-- --verbose]` | Proves every level can be finished by one player without losing a heart (search over the real simulation, traps included). On co-op levels every button counts as held, since the team puzzles need a second player |
 | `npm run bots -- --room CODE [--count 3] [--seconds 30] [--attack]` | Headless test clients |
 | `npm run assets:sync` | Copies `packages/shared/data` to `apps/web/public/assets` (runs automatically on `dev`/`build`) |
-| `npm run samples:generate` | Regenerates the sample maps from `scripts/generate-samples.ts` (**overwrites** `level-1`…`level-3`), the debug tileset, and a placeholder fan sheet if `fan.png` is missing |
+| `npm run samples:generate [-- --only coop-2] [-- --print]` | Regenerates the levels from `scripts/levels/` (**overwrites** `coop-1`…`coop-4` and `race-1`…`race-3`), the debug tileset, and placeholder fan and button sheets if missing |
 
 ## How it fits together
 
@@ -130,16 +130,28 @@ Levels can override movement values in the manifest (`tuning: { timeToApex: 0.42
 
 1. Draw a map in [Tiled](https://www.mapeditor.org/), following [docs/level-authoring.md](docs/level-authoring.md).
 2. Save it to `packages/shared/data/maps/`.
-3. Add it to `packages/shared/src/levels/manifest.ts`.
+3. Add it to `packages/shared/src/levels/manifest.ts`, in the campaign of its game mode (`mode: 'coop'` or `'race'`).
+
+Each mode has its own campaign, and the lobby only offers the selected mode's levels:
+
+| Co-op (2+ players) | Race (and solo) |
+|---|---|
+| 1. Meadow Gate | 1. Sunny Sprint |
+| 2. Rust Canyon | 2. Ember Gorge |
+| 3. Jade Citadel | 3. Candy Spire |
+| 4. Rhino Coliseum (boss) | |
+
+The co-op levels are built around three team puzzles (a trampoline powered from two buttons, a long spiked corridor switched off from either end, and a button ledge only an ability reaches). The race levels split into faster, riskier routes and slower, safer ones. See [docs/level-authoring.md](docs/level-authoring.md#campaigns-and-puzzles).
 
 `npm run levels:validate` reports problems with a hint on how to fix each one. In development the server hot-reloads saved maps, and the asset watcher copies them to the client.
 
 ### Game modes
 
-The host picks a mode in the lobby; it applies to the whole campaign. Solo play uses co-op.
+The host picks a mode in the lobby; it applies to the whole campaign, and each mode has its own levels. Co-op needs at least two players, so solo play runs the race campaign.
 
 | | Co-op (default) | Race |
 |---|---|---|
+| Players | 2–4 | 1–4 |
 | Goal | Everyone reaches the trophy | First to the trophy |
 | Checkpoints | Shared: one touch moves everyone's respawn point | Your own |
 | Other players | Swings shove, but nothing costs a teammate hearts | Swings shove; giant swings and spit cost hearts |
@@ -165,7 +177,7 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 
 | Character | Ability | Cooldown | After a miss |
 |---|---|---|---|
-| Mask Dude | Giant Form: 10 s of armour, damaging swings and 2 bonus hearts | 30 s | – |
+| Mask Dude | Giant Form: 10 s of armour, damaging swings, 2 bonus hearts, and a springy head teammates can jump off about 30 tiles high | 30 s | – |
 | Virtual Guy | Claw Drone: 15 s of flight up to 800 px away; the claw carries players, boxes, foes or Virtual Guy himself, and players can ride on top | 22 s | – |
 | Ninja Frog | Tongue Spit: grab, hold and spit a damaging projectile | 15 s | 3 s |
 | Bunny Man | Healing Hug: heals 2 hearts, plus 1 for the healer | 12 s | 3 s |

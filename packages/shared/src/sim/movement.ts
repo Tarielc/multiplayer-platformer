@@ -93,6 +93,11 @@ export interface Collider extends Rect {
   bounce: number;
   /** Low enough to walk up onto (buttons): moving into its side lifts the body on top. */
   step?: boolean;
+  /**
+   * A jump taken while standing on it leaves at this speed (px/s) when that beats the normal
+   * jump: a giant's springy head. Unlike `bounce`, landing on it does nothing.
+   */
+  launch?: number;
 }
 
 /**
@@ -165,6 +170,21 @@ export function playerHead(
 ): Rect | null {
   if (!body.alive || body.held !== Held.NONE || body.flight > 0) return null;
   return { x: body.x, y: body.y, width: hitboxOf(body, ctx).width, height: HEAD_DEPTH };
+}
+
+/**
+ * `playerHead` as the one-way collider others stand on: a giant's head is springy (jumping off it
+ * launches at `giant.headLaunch`). The server and the client's prediction both build it here.
+ */
+export function headCollider(
+  body: Pick<MovementBody, 'x' | 'y' | 'alive' | 'held' | 'flight' | 'giant' | 'phase'>,
+  ctx: HitboxSource,
+): Collider | null {
+  const head = playerHead(body, ctx);
+  if (!head) return null;
+  const collider: Collider = { ...head, id: -1, oneWay: true, bounce: 0 };
+  if (isGiant(body)) collider.launch = (ctx.abilities ?? ABILITIES).giant.headLaunch;
+  return collider;
 }
 
 /**
@@ -342,7 +362,7 @@ export function stepPlayerMovement(
   // Jump: a buffered press + remaining coyote time (covers "pressed just before landing"
   // and "pressed just after walking off a ledge").
   if (body.buffer > 0 && body.coyote > 0) {
-    body.vy = -m.jumpVelocity;
+    body.vy = -Math.max(m.jumpVelocity, body.grounded ? launchUnder(body, ctx, colliders) : 0);
     body.jumping = true;
     body.grounded = false;
     body.buffer = 0;
@@ -568,6 +588,19 @@ function moveY(
   body.vy = 0;
   body.jumping = false;
   return true;
+}
+
+/** The best `launch` of the colliders the body stands on (a giant's head), or 0. */
+function launchUnder(body: MovementBody, ctx: MovementContext, colliders: readonly Collider[]): number {
+  let best = 0;
+  const { width, height } = ctx.hitbox;
+  const feet = body.y + height;
+  for (const c of colliders) {
+    if (!c.launch || c.launch <= best || Math.abs(feet - c.y) > RIDE_EPS) continue;
+    if (body.x >= c.x + c.width - EPS || body.x + width <= c.x + EPS) continue;
+    best = c.launch;
+  }
+  return best;
 }
 
 function standingOnOneWayOnly(body: MovementBody, ctx: MovementContext, colliders: readonly Collider[]): boolean {
