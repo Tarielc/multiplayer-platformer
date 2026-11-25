@@ -16,57 +16,78 @@ import { GAUNTLET_LENGTH, LIFT_CREST, TANDEM_SHELF, liftOff, spikeGauntlet, tand
 import { Sketch, arc, frame } from './sketch';
 
 /**
- * Meadow Gate (gentle): grass, wood platforms and bronze blocks. Boxes to break, a box holding a
- * button that powers a trampoline to a fruit shelf (break it and the trampoline stops), P1 in
- * its plainest form, rolling hills with spikes and mushrooms, P2, and a fruit perch only a
- * stacked teammate reaches.
+ * Meadow Gate (gentle): grass, wood platforms and bronze blocks. From the start hill down into a
+ * meadow under floating islands, where a box holds a button that powers a trampoline up to them
+ * (break it and the trampoline stops). P1 in its plainest form, then the hollow hill: over its
+ * crest or down through the cave inside it. P2 through the mountain, a valley with a fruit perch
+ * only a stacked teammate reaches, and the trophy's hill.
  */
 export function coop1(): Sketch {
-  const s = new Sketch(300, 50);
+  const s = new Sketch(300, 56);
   frame(s);
-  // 1. Start meadow: boxes to break and a chicken.
-  s.ground(2, 79, 40);
-  s.text(5, 39, '1 2 3 4');
-  arc(s, 4, 39, 'a', [3, 4, 4, 3]);
-  s.box(16, 39, 1).box(19, 39, 2).text(19, 35, 's');
-  s.foe('chicken', 26, 39, { range: 3 });
-  s.block('bronzeBlock', 30, 38, 2, 2).text(30, 36, 'a');
-  s.platform('woodPlatform', 34, 34, 6).text(35, 33, 's s s');
-  // 2. The button lesson: a box rests on a button that powers a trampoline up to a fruit shelf.
+  // 1. Start hill, then down into the meadow.
+  s.ground(2, 30, 30);
+  s.text(5, 29, '1 2 3 4');
+  arc(s, 4, 29, 'a', [3, 4, 4, 3]);
+  s.box(18, 29, 1).box(22, 29, 2).text(22, 25, 's');
+  s.ground(31, 40, 36);
+  s.ground(41, 79, 42);
+  s.foe('chicken', 44, 41, { range: 3 });
+  s.block('bronzeBlock', 48, 40, 2, 2).text(48, 38, 'a');
+  // 2. The button lesson: a box rests on a button that powers a trampoline up to the islands.
   //    Break the box and the trampoline stops: a button only works while something holds it.
   const lesson = s.nextName('trampoline');
-  s.trampoline(58, 39);
-  s.box(50, 39, 3);
-  s.button(50, 39, lesson);
-  s.platform('woodPlatform', 56, 24, 8).text(57, 23, 'w  p  w');
-  s.block('bronzeBlock', 66, 38, 2, 2);
-  // 3. Checkpoint, then P1 down in a meadow pit: the shelf is the only way on.
-  s.text(74, 39, 'C');
-  tandemTrampoline(s, 80, 46, { shelfEnd: 297 });
-  s.text(84, 45, 'a a a a');
-  s.foe('mushroom', 96, 45, { range: 3 });
-  // 4. Rolling hills on the shelf (row 30): spikes, mushrooms, fruit on wood platforms.
-  const hill = 46 - TANDEM_SHELF;
-  arc(s, 114, hill - 1, 'a', [2, 3, 3, 2]);
-  s.foe('mushroom', 120, hill - 1, { range: 4 });
-  s.spikes(127, hill - 1, 3);
-  s.ground(133, 146, hill - 4).text(136, hill - 6, 's s s');
-  s.spikes(151, hill - 1, 4);
-  s.platform('woodPlatform', 150, hill - 6, 6).text(151, hill - 7, 'p p');
-  s.foe('mushroom', 160, hill - 1, { range: 3 });
-  s.carve(166, hill, 10, 4).text(168, hill + 3, 'a a a');
-  s.foe('mushroom', 170, hill + 3, { range: 2 });
-  s.block('bronzeBlock', 180, hill - 2, 2, 2).text(180, hill - 4, 's');
-  s.foe('chicken', 187, hill - 1, { range: 3 });
-  // 5. Checkpoint, then P2 through the brick gate.
+  s.box(54, 41, 3);
+  s.button(54, 41, lesson);
+  s.trampoline(60, 41);
+  s.solid('grass', 63, 26, 10, 3).text(65, 25, 'w p w');
+  s.solid('grass', 40, 18, 8, 3).text(42, 17, 's s');
+  s.platform('woodPlatform', 51, 22, 6).text(52, 21, 'a a');
+  s.block('bronzeBlock', 68, 40, 2, 2);
+  s.hint(56.5, 36, { text: 'A box on a button keeps it pressed. Break the box and the trampoline stops.' });
+  s.text(74, 41, 'C');
+  // 3. P1 down in a meadow pit: the shelf is the only way on.
+  tandemTrampoline(s, 80, 48, { shelfEnd: 125 });
+  s.text(84, 47, 'a a a a');
+  s.foe('mushroom', 96, 47, { range: 3 });
+  s.hint(92.5, 42, { text: 'Stand on the button so a teammate can bounce up. Up there, they hold the other button for you.' });
+  // 4. The hollow hill (crest row 32): over the top past spikes and mushrooms, or down the hole
+  //    into the cave and up its far shaft on wood platforms.
+  const hill = 48 - TANDEM_SHELF;
+  s.ground(126, 200, hill);
+  arc(s, 112, hill - 1, 'a', [2, 3, 3, 2]);
+  s.foe('mushroom', 118, hill - 1, { range: 4 });
+  s.carve(138, hill, 4, 4);
+  s.carve(138, hill + 4, 46, 8).text(146, hill + 10, 's a s a s');
+  s.foe('mushroom', 156, hill + 11, { range: 5 });
+  s.block('bronzeBlock', 166, hill + 8, 2, 4).text(166, hill + 6, 'p');
+  s.foe('mushroom', 174, hill + 11, { range: 3 });
+  s.carve(184, hill, 4, 12);
+  s.platform('woodPlatform', 184, hill + 8, 4).platform('woodPlatform', 184, hill + 4, 4).platform('woodPlatform', 184, hill, 4);
+  s.solid('grass', 146, hill - 4, 14, 4).text(149, hill - 5, 'p p');
+  s.spikes(142, hill - 1, 3);
+  s.spikes(162, hill - 1, 4);
+  s.foe('chicken', 172, hill - 1, { range: 3 });
+  s.solid('grass', 158, 14, 10, 3).text(160, 13, 'w g w');
+  s.platform('woodPlatform', 170, 22, 5).text(171, 21, 's');
   s.text(195, hill - 1, 'C');
+  s.hint(194.5, hill - 6, {
+    text: 'Hold a button and the spikes stay down while the others cross. Whoever gets through first holds the far one.',
+  });
+  // 5. P2 through the brick mountain.
+  s.ground(201, 262, hill);
   spikeGauntlet(s, 205, hill, { wall: 'brick' });
-  // 6. The run home, past a fruit perch 13 up: a lone jump falls short, a stacked teammate makes it.
+  // 6. Down into the valley, past a fruit perch 13 up (a lone jump falls short, a stacked
+  //    teammate makes it), and up the bronze steps to the trophy's hill.
   const out = 205 + GAUNTLET_LENGTH;
-  s.text(out + 6, hill - 3, 'a a');
-  s.platform('woodPlatform', out + 14, hill - 13, 4).text(out + 14, hill - 14, 'w g');
-  s.foe('mushroom', out + 24, hill - 1, { range: 3 });
-  s.text(out + 37, hill - 1, 'E');
+  s.text(out + 5, hill - 1, 'a a');
+  s.ground(263, 282, hill + 8);
+  s.platform('woodPlatform', 268, hill - 5, 4).text(268, hill - 6, 'w g');
+  s.hint(272.5, hill + 3, { text: "Too high? Jump off a teammate's head. Giant Mask Dude's head is springy!" });
+  s.foe('mushroom', 272, hill + 7, { range: 3 });
+  s.block('bronzeBlock', 279, hill + 4, 2, 4);
+  s.ground(283, 297, hill - 2);
+  s.text(292, hill - 3, 'E');
   return s;
 }
 
@@ -109,88 +130,113 @@ export function coop2(): Sketch {
   s.ground(124, 129, 52, 'autumn');
   // 5. P3: the button ledge by the left wall, the crest on the right. Fruit in the pit recharges
   //    abilities between tries.
-  liftOff(s, 130, 52, { crestEnd: 214, crest: 'autumn', wall: 'woodWall', ledge: 'metalPlatform' });
+  liftOff(s, 130, 52, { crestEnd: 168, crest: 'autumn', wall: 'woodWall', ledge: 'metalPlatform' });
   s.text(136, 51, 'a s a s a');
   s.text(147, 51, 'p');
-  // 6. The monkey's cliff: a brick tower with a monkey on it, climbed on metal platforms.
+  // 6. The lava chasm: metal platforms, a falling one and steel stepping stones under wood
+  //    pillars hanging from the ceiling, where monkeys climb. Then the brick tower's top.
   const crest = 52 - LIFT_CREST;
-  s.platform('metalPlatform', 170, crest - 6, 5).text(171, crest - 7, 'a a');
-  s.platform('metalPlatform', 177, crest - 11, 5).text(178, crest - 12, 's');
-  s.solid('brick', 185, crest - 15, 6, 15);
-  s.monkey(184, crest - 1, 'right', { range: 3 });
-  s.ground(191, 214, crest - 12, 'autumn');
+  s.text(162, crest - 1, 's s');
+  s.ground(169, 194, 56, 'autumn');
+  s.lava(169, 194, 55);
+  s.platform('metalPlatform', 171, 35, 4).text(172, 34, 'a');
+  s.fallingPlatform(178, 33);
+  s.solid('woodWall', 182, 2, 2, 20);
+  s.monkey(181, 21, 'right', { range: 3 });
+  s.platform('metalPlatform', 184, 31, 4).text(185, 30, 'a');
+  s.block('steelBlock', 190, 28, 2, 2);
+  s.solid('woodWall', 188, 2, 2, 14);
+  s.monkey(190, 15, 'left', { range: 2 });
+  s.ground(195, 214, crest - 12, 'brick');
   s.text(205, crest - 13, 'C');
   // 7. P1 with a saw sweeping the shelf: whoever holds the shelf button has to time it.
   const pit = crest - 6;
-  tandemTrampoline(s, 215, pit, { shelfEnd: 270, shelf: 'brick', floor: 'autumn' });
+  tandemTrampoline(s, 215, pit, { shelfEnd: 256, shelf: 'brick', floor: 'autumn' });
   const shelf = pit - TANDEM_SHELF;
   s.saw(246, shelf - 2, 256, shelf - 2, { speed: 50 });
   s.text(222, pit - 1, 'a a');
   s.foe('mushroom', 230, pit - 1, { range: 3 });
-  // 8. Falling platforms over a lava pit, then a checkpoint and the long P2 at the far end.
+  // 8. A step down, falling platforms stepping down over a lava pit, a checkpoint and the long
+  //    P2 through the wooden mountain.
+  s.ground(257, 270, shelf + 6, 'brick');
+  s.text(262, shelf + 5, 'a');
   s.ground(271, 285, 40, 'autumn');
-  s.text(271, 39, 'L'.repeat(15));
-  s.fallingPlatform(273, shelf).fallingPlatform(277, shelf).fallingPlatform(281, shelf);
-  s.text(277, shelf - 3, 'w');
-  s.ground(286, 357, shelf, 'brick');
-  s.text(288, shelf - 1, 'C');
-  spikeGauntlet(s, 296, shelf, { length: 52, wall: 'woodWall' });
-  s.text(353, shelf - 1, 'E');
+  s.lava(271, 285, 39);
+  s.fallingPlatform(273, shelf + 9).fallingPlatform(277, shelf + 12).fallingPlatform(281, shelf + 15);
+  s.text(277, shelf + 9, 'w');
+  const gate = shelf + 18;
+  s.ground(286, 357, gate, 'brick');
+  s.text(288, gate - 1, 'C');
+  spikeGauntlet(s, 296, gate, { length: 52, wall: 'woodWall' });
+  s.text(353, gate - 1, 'E');
   return s;
 }
 
 /**
  * Jade Citadel: candy ground, jade and stone walls, gold blocks and platforms. New: rock-heads,
- * spike-heads, a bull. A rock-head trench (don't get pinned), spike-head steps, P3 among
- * spike-heads, P2 through the stone gate, a bull's arena on gold platforms, and P1 to the summit
- * with a spike-head by the pit button.
+ * spike-heads, a bull. A climb from the candy gardens into the citadel: a gatehouse tunnel where
+ * a rock-head slams wall to wall (don't get pinned), courtyards stepping up past spike-heads,
+ * P3 among spike-heads, P2 through the stone mountain, down into a bull's arena ringed with gold
+ * ledges, and P1 up to the summit with a spike-head by the pit button.
  */
 export function coop3(): Sketch {
-  const s = new Sketch(330, 72);
+  const s = new Sketch(330, 76);
   frame(s);
-  // 1. Start on candy ground.
-  s.ground(2, 103, 64, 'candy');
-  s.text(5, 63, '1 2 3 4');
-  arc(s, 4, 63, 'a', [3, 4, 4, 3]);
-  // 2. A trench between jade pillars where a rock-head slams from wall to wall: cross while it
-  //    waits, or ride it; don't get caught against a pillar.
-  s.solid('jadeWall', 30, 58, 2, 6).solid('jadeWall', 56, 58, 2, 6);
-  s.rockHead(36, 62, 'x', { waitMs: 1200 });
-  s.text(44, 60, 's s s');
-  // 3. Candy steps with spike-heads to jump.
-  s.ground(64, 103, 58, 'candy');
-  s.spikeHead(72, 55);
-  s.block('goldBlock', 80, 54, 2, 4).text(80, 52, 'a');
-  s.spikeHead(88, 55);
-  s.text(96, 57, 'p');
-  // 4. P3 among spike-heads, with a checkpoint at the tunnel.
-  s.ground(104, 111, 64, 'candy');
-  s.text(105, 63, 'C');
-  liftOff(s, 112, 64, { crestEnd: 327, crest: 'jadeWall', floor: 'candy', wall: 'stoneWall', ledge: 'goldPlatform' });
-  s.spikeHead(119, 61);
-  s.text(126, 63, 'a s a');
-  // 5. Straight on into P2 through the stone gate.
-  const crest = 64 - LIFT_CREST;
+  // 1. The candy gardens.
+  s.ground(2, 44, 68, 'candy');
+  s.text(5, 67, '1 2 3 4');
+  arc(s, 4, 67, 'a', [3, 4, 4, 3]);
+  s.platform('goldPlatform', 20, 62, 5).text(21, 61, 's s');
+  s.platform('goldPlatform', 29, 57, 5).text(30, 56, 'p');
+  // 2. The gatehouse: a jade keep with a tunnel through it; a rock-head slams across the
+  //    tunnel between stone pillars. Cross while it waits, or ride it.
+  s.ground(45, 72, 68, 'candy');
+  s.solid('jadeWall', 45, 36, 28, 26);
+  s.solid('stoneWall', 47, 66, 2, 2).solid('stoneWall', 69, 66, 2, 2);
+  s.rockHead(52, 66, 'x', { waitMs: 1200 });
+  s.text(58, 63, 's s s');
+  s.solid('stoneWall', 45, 30, 4, 6).solid('stoneWall', 57, 30, 4, 6).solid('stoneWall', 69, 30, 4, 6);
+  // 3. Courtyards stepping up past spike-heads and gold blocks.
+  s.ground(73, 84, 64, 'candy');
+  s.spikeHead(77, 61);
+  s.ground(85, 94, 58, 'candy');
+  s.block('goldBlock', 89, 54, 2, 4).text(89, 52, 'a');
+  s.ground(95, 111, 52, 'candy');
+  s.spikeHead(97, 49);
+  s.text(104, 51, 'C');
+  s.solid('stoneWall', 76, 22, 32, 4);
+  // 4. P3 among spike-heads.
+  liftOff(s, 112, 52, { crestEnd: 160, crest: 'jadeWall', floor: 'candy', wall: 'stoneWall', ledge: 'goldPlatform' });
+  s.spikeHead(119, 49);
+  s.text(126, 51, 'a s a');
+  // 5. Straight on into P2 through the stone mountain.
+  const crest = 52 - LIFT_CREST;
   s.text(146, crest - 3, 'a a');
-  spikeGauntlet(s, 152, crest, { wall: 'stoneWall' });
-  // 6. A bull's arena: gold platforms to dodge its charges, gold blocks to hide behind.
-  const arena = 152 + GAUNTLET_LENGTH + 4;
-  s.platform('goldPlatform', arena + 8, crest - 5, 5).text(arena + 9, crest - 6, 's s');
-  s.foe('bull', arena + 22, crest - 1, { range: 8 });
-  s.platform('goldPlatform', arena + 28, crest - 6, 6).text(arena + 29, crest - 7, 'p p');
-  s.block('goldBlock', arena + 38, crest - 2, 2, 2);
-  s.wasp(arena + 30, crest - 14, { range: 4 });
-  s.text(arena + 46, crest - 1, 'C');
+  s.ground(161, 210, crest, 'jadeWall');
+  spikeGauntlet(s, 156, crest, { wall: 'stoneWall' });
+  // 6. The bull's arena, sunk 10 below the citadel floor: gold ledges around it to dodge the
+  //    charges, a wasp over it, gold blocks up the far side.
+  const arena = crest + 10;
+  s.ground(211, 260, arena, 'candy');
+  s.platform('goldPlatform', 214, arena - 5, 6).text(215, arena - 6, 's s');
+  s.platform('goldPlatform', 226, arena - 9, 8).text(228, arena - 10, 'p p');
+  s.platform('goldPlatform', 242, arena - 5, 6).text(243, arena - 6, 's s');
+  s.foe('bull', 235, arena - 1, { range: 10 });
+  s.wasp(234, arena - 16, { range: 4 });
+  s.block('goldBlock', 252, arena - 4, 2, 4);
+  s.block('goldBlock', 256, arena - 8, 2, 4);
+  s.ground(261, 270, crest, 'jadeWall');
+  s.text(264, crest - 1, 'C');
   // 7. P1 to the summit, a spike-head between the pit button and the trampoline.
-  const pitX = arena + 52;
-  s.carve(pitX, crest, 28, 6);
+  const pitX = 271;
   tandemTrampoline(s, pitX, crest + 6, { shelfEnd: 327, shelf: 'jadeWall', floor: 'candy' });
   s.spikeHead(pitX + 15, crest + 3);
   s.text(pitX + 3, crest + 5, 'a a');
   const summit = crest + 6 - TANDEM_SHELF;
   s.foe('chicken', pitX + 40, summit - 1, { range: 4 });
-  s.block('goldBlock', pitX + 50, summit - 4, 2, 4).text(pitX + 50, summit - 6, 'w');
-  s.text(pitX + 62, summit - 1, 'E');
+  s.block('goldBlock', pitX + 46, summit - 4, 2, 4).text(pitX + 46, summit - 6, 'w');
+  s.solid('stoneWall', 300, 2, 28, 8);
+  s.text(pitX + 52, summit - 1, 'E');
   return s;
 }
 
@@ -209,6 +255,9 @@ export function coop4(): Sketch {
   arc(s, 4, 25, 'a', [3, 4, 4, 3]);
   tandemTrampoline(s, 30, 32, { shelfEnd: 69, shelf: 'stoneWall', floor: 'brick' });
   s.text(34, 31, 'a s a');
+  // A vaulted stone ceiling over the antechamber, columns hanging from it (clear of the bounce).
+  s.solid('stoneWall', 2, 2, 84, 8);
+  for (const x of [12, 22, 40]) s.solid('stoneWall', x, 10, 2, 8);
   // 2. Steps down to the arena door; the checkpoint by the door.
   s.ground(70, 75, 28, 'stoneWall');
   s.ground(76, 79, 38, 'stoneWall');

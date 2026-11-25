@@ -4,7 +4,7 @@
  * by `asciiToTiledMap`); traps and foes are Tiled objects placed in tile coordinates, each checked
  * against the layout so a level that can't work fails at generation time.
  */
-import { TRAP_TUNING, type Dir4, type TiledObject, type TiledProperty } from '@platformer/shared';
+import { TRAP_TUNING, type Dir4, type HintImage, type TiledObject, type TiledProperty } from '@platformer/shared';
 import { TERRAIN_CHARS, TERRAIN_SETS, TERRAIN_TILESET, type TerrainSetName } from '@platformer/shared/dev';
 
 export type SetsOfKind<K extends string> = {
@@ -220,6 +220,18 @@ export class Sketch {
     }
     const all = { wall: side, ...props, ...(range === undefined ? {} : { range: range * T }) };
     return this.object('monkey', { x: (x + 0.5) * T, y: (y + 1) * T }, all);
+  }
+
+  /**
+   * A hint sign with its bottom-centre at tile point (x, y): advice `text` (a line break starts a
+   * new line), a picture (`image`), or both. Pure decoration; place a picture on the floor.
+   */
+  hint(x: number, y: number, { text, image }: { text?: string; image?: HintImage }): this {
+    if (!text && !image) throw new Error(`hint at (${x}, ${y}) has neither text nor image`);
+    const props: ObjectProps = {};
+    if (text) props.text = text;
+    if (image) props.image = image;
+    return this.object('hint', { x: x * T, y: y * T }, props);
   }
 
   /** The name the next object of `type` will get ("trampoline 3"): what a button's `target` names. */

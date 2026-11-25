@@ -24,6 +24,28 @@ export interface LevelZone extends Rect {
   properties: Record<string, PropertyValue>;
 }
 
+/** Pictures a hint can show (property `image`); each is drawn by the client. */
+export const HINT_IMAGES = ['giant-boost'] as const;
+export type HintImage = (typeof HINT_IMAGES)[number];
+
+export function isHintImage(value: unknown): value is HintImage {
+  return typeof value === 'string' && (HINT_IMAGES as readonly string[]).includes(value);
+}
+
+/**
+ * Advice shown in the level (class "hint"): a line of text (property `text`), a picture (property
+ * `image`, one of `HINT_IMAGES`), or both. Pure decoration.
+ */
+export interface LevelHint {
+  id: number;
+  /** Bottom-centre of the sign, px. */
+  x: number;
+  y: number;
+  text: string;
+  /** The picture to show, or null for text only; an unknown name is kept so validation can flag it. */
+  image: string | null;
+}
+
 export interface LevelCollectible {
   id: number;
   kind: string;
@@ -66,6 +88,8 @@ export interface LevelData {
   traps: TrapDef[];
   /** Foes, where they start (sorted by id). See `sim/foes`. */
   foes: FoeDef[];
+  /** Advice drawn in the level by clients; the simulation ignores it. */
+  hints: LevelHint[];
   extraObjects: LevelObject[];
   backgroundColor: string | null;
   properties: Record<string, PropertyValue>;

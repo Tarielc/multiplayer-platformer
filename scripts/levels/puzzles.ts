@@ -46,19 +46,29 @@ export function tandemTrampoline(s: Sketch, x: number, f: number, { shelfEnd, sh
 
 export interface GauntletOptions {
   length?: number;
-  /** Material of the wall the corridor is bored through (it reaches the map's ceiling). */
+  /** Material of the mountain the corridor runs under (its summit reaches the map's ceiling). */
   wall?: EdgeMaterial;
 }
 
 /**
  * P2 "Spike Gauntlet": a corridor exactly 2 tiles tall (a player fits; a giant or a drone with
- * its cargo doesn't, and nobody can jump) bored at floor row `f` through a wall from row 2 (under
- * the frame's ceiling) to the corridor, from column `x`. Spikes line its whole floor. Two `off`
+ * its cargo doesn't, and nobody can jump) at floor row `f` from column `x`, under a stepped
+ * mountain whose summit touches the frame's ceiling (row 2), so nobody gets over it. Spikes line
+ * its whole floor. Two `off`
  * buttons switch them off: one 3 tiles before the entrance, one 2 tiles past the exit. The floor
  * (row `f`) must already be solid under the corridor and both buttons.
  */
 export function spikeGauntlet(s: Sketch, x: number, f: number, { length = GAUNTLET_LENGTH, wall = 'brick' }: GauntletOptions = {}): void {
-  s.solid(wall, x, 2, length, f - 4);
+  // The wall is a stepped mountain: 6 tiles over the corridor at its ends, terraces rising every
+  // 4 columns, and an 8-wide summit touching the frame's ceiling, so nobody gets over it.
+  const base = f - 9;
+  const terraces = Math.floor((length / 2 - 4) / 4);
+  const rise = Math.ceil((base - 2) / (terraces + 1));
+  for (let c = x; c < x + length; c++) {
+    const step = Math.floor(Math.min(c - x, x + length - 1 - c) / 4);
+    const top = step >= terraces ? 2 : Math.max(2, base - rise * step);
+    s.solid(wall, c, top, 1, f - 2 - top);
+  }
   const spikes = s.nextName('spikes');
   s.spikes(x, f - 1, length);
   s.button(x - 3, f - 1, spikes, 'off');
@@ -94,4 +104,14 @@ export function liftOff(s: Sketch, x: number, f: number, opts: LiftOptions): voi
   const trampoline = s.nextName('trampoline');
   s.trampoline(x + 28, f - 1);
   s.button(x + 4, f - LIFT_LEDGE - 1, trampoline);
+  // What each ability does here, and a picture of giant Mask Dude launching a teammate.
+  s.hint(x + 8, f, { image: 'giant-boost' });
+  s.hint(x + 19, f - 6, { text: LIFT_HINT });
 }
+
+const LIFT_HINT = [
+  'The button up on the ledge powers the trampoline. Get a teammate up there:',
+  'Ninja Frog: swallow them, then spit them up',
+  'Virtual Guy: grab them with the Claw Drone',
+  'Mask Dude: go Giant, they jump extra high off your head',
+].join('\n');

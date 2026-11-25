@@ -2,7 +2,7 @@ import { MAX_PLAYERS } from '../config/players';
 import { cellAt } from '../sim/collision';
 import type { LevelManifestEntry } from '../levels/manifest';
 import { LevelFormatError, parseTiledLevel, type ParseLevelOptions } from './parse';
-import { CellFlag, type LevelData, type LevelIssue } from './types';
+import { CellFlag, HINT_IMAGES, isHintImage, type LevelData, type LevelIssue } from './types';
 
 /** Semantic checks on a parsed level. Errors make the level unplayable; warnings are advisory. */
 export function validateLevel(level: LevelData): LevelIssue[] {
@@ -38,6 +38,13 @@ export function validateLevel(level: LevelData): LevelIssue[] {
   }
   for (const foe of level.foes) {
     if (outside(foe.x, foe.y)) warn(`Foe #${foe.id} (${foe.kind}) is outside the map.`);
+  }
+  for (const hint of level.hints) {
+    if (!hint.text && !hint.image) warn(`Hint #${hint.id} has neither "text" nor "image", so it shows nothing.`);
+    if (hint.image !== null && !isHintImage(hint.image)) {
+      warn(`Hint #${hint.id} has unknown image "${hint.image}" (known: ${HINT_IMAGES.join(', ')}).`);
+    }
+    if (outside(hint.x, hint.y)) warn(`Hint #${hint.id} is outside the map.`);
   }
   for (const obj of level.extraObjects) {
     warn(`Object #${obj.id} has unknown class "${obj.kind || '(none)'}" and is ignored by the engine.`);

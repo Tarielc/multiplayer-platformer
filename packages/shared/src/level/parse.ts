@@ -18,6 +18,7 @@ import {
   CellFlag,
   type LevelCollectible,
   type LevelData,
+  type LevelHint,
   type LevelObject,
   type LevelSpawn,
   type LevelZone,
@@ -127,6 +128,7 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
   const exits: LevelZone[] = [];
   const hazards: LevelZone[] = [];
   const collectibles: LevelCollectible[] = [];
+  const hints: LevelHint[] = [];
   const extraObjects: LevelObject[] = [];
   const trapObjects: TrapObject[] = [];
   const foeObjects: FoeObject[] = [];
@@ -169,6 +171,17 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
           case 'hazard':
             hazards.push(toZone(obj, entities.zoneDefaults));
             break;
+          case 'hint': {
+            const { x, y } = objectTopLeft(obj);
+            hints.push({
+              id: obj.id,
+              x: x + obj.width / 2,
+              y: y + obj.height,
+              text: typeof props.text === 'string' ? props.text.trim() : '',
+              image: typeof props.image === 'string' && props.image ? props.image : null,
+            });
+            break;
+          }
           case 'collectible': {
             const { x, y } = objectTopLeft(obj);
             const itemKind = typeof props.kind === 'string' && props.kind ? props.kind : entities.defaultCollectibleKind;
@@ -241,6 +254,7 @@ export function parseTiledLevel(json: unknown, options: ParseLevelOptions): Leve
     collectibles,
     traps: [],
     foes: [],
+    hints,
     extraObjects,
     backgroundColor: map.backgroundcolor ?? (typeof mapProps.backgroundColor === 'string' ? mapProps.backgroundColor : null) ?? options.backgroundColor ?? null,
     properties: mapProps,

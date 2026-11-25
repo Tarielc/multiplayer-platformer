@@ -72,6 +72,7 @@ import type { GameServices } from '../services';
 import { listen, onSceneEnd } from '../util/listen';
 import { Backdrop } from '../views/Backdrop';
 import { EntityViews } from '../views/EntityViews';
+import { HintViews } from '../views/HintViews';
 import { airPuff, floatText, puff } from '../views/effects';
 import { PlayerView } from '../views/PlayerView';
 import { TrapViews } from '../traps/TrapViews';
@@ -125,6 +126,7 @@ export class LevelScene extends Phaser.Scene {
   private interpolator = new Interpolator();
   private views = new Map<string, PlayerView>();
   private entityViews: EntityViews | null = null;
+  private hintViews: HintViews | null = null;
   private traps: TrapField | null = null;
   /** Other players' drone decks and heads in the latest server state: what the prediction can stand on. */
   private readonly decks = new Map<string, Rect>();
@@ -162,6 +164,7 @@ export class LevelScene extends Phaser.Scene {
     this.interpolator = new Interpolator();
     this.views = new Map();
     this.entityViews = null;
+    this.hintViews = null;
     this.traps = null;
     this.trapViews = null;
     this.propViews = null;
@@ -249,6 +252,7 @@ export class LevelScene extends Phaser.Scene {
     this.backdrop = new Backdrop(this, this.entry.background);
     this.buildTilemap(json as TiledMap);
     this.entityViews = new EntityViews(this, level);
+    this.hintViews = new HintViews(this, level.hints);
     this.trapViews = new TrapViews(this, traps, (event) => this.presentation.emit('world', event));
     this.propViews = new PropViews(this, traps.config.box);
     this.foeViews = new FoeViews(this, (event) => this.presentation.emit('world', event));
@@ -279,6 +283,8 @@ export class LevelScene extends Phaser.Scene {
       this.propViews = null;
       this.foeViews?.destroy();
       this.foeViews = null;
+      this.hintViews?.destroy();
+      this.hintViews = null;
       this.presentation.removeAllListeners();
       sound.destroy();
       this.sfx = null;

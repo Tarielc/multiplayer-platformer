@@ -760,13 +760,51 @@
         {
           "rotation": 0,
           "visible": true,
+          "name": "hint 1",
+          "type": "hint",
+          "x": 1920,
+          "y": 832,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "image",
+              "type": "string",
+              "value": "giant-boost"
+            }
+          ],
+          "id": 38
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "hint 2",
+          "type": "hint",
+          "x": 2096,
+          "y": 736,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "The button up on the ledge powers the trampoline. Get a teammate up there:\nNinja Frog: swallow them, then spit them up\nVirtual Guy: grab them with the Claw Drone\nMask Dude: go Giant, they jump extra high off your head"
+            }
+          ],
+          "id": 39
+        },
+        {
+          "rotation": 0,
+          "visible": true,
           "name": "spikeHead 3",
           "type": "spikeHead",
           "x": 1907,
           "y": 787,
           "width": 42,
           "height": 42,
-          "id": 38
+          "id": 40
         },
         {
           "rotation": 0,
@@ -777,7 +815,7 @@
           "y": 576,
           "width": 768,
           "height": 16,
-          "id": 39
+          "id": 41
         },
         {
           "rotation": 0,
@@ -801,7 +839,7 @@
               "value": "off"
             }
           ],
-          "id": 40
+          "id": 42
         },
         {
           "rotation": 0,
@@ -825,7 +863,7 @@
               "value": "off"
             }
           ],
-          "id": 41
+          "id": 43
         },
         {
           "rotation": 0,
@@ -844,7 +882,7 @@
               "value": 160
             }
           ],
-          "id": 42
+          "id": 44
         },
         {
           "rotation": 0,
@@ -863,7 +901,7 @@
               "value": 64
             }
           ],
-          "id": 43
+          "id": 45
         },
         {
           "rotation": 0,
@@ -875,7 +913,7 @@
           "width": 0,
           "height": 0,
           "point": true,
-          "id": 44
+          "id": 46
         },
         {
           "rotation": 0,
@@ -894,7 +932,7 @@
               "value": "trampoline 2"
             }
           ],
-          "id": 45
+          "id": 47
         },
         {
           "rotation": 0,
@@ -913,7 +951,7 @@
               "value": "trampoline 2"
             }
           ],
-          "id": 46
+          "id": 48
         },
         {
           "rotation": 0,
@@ -924,7 +962,7 @@
           "y": 643,
           "width": 42,
           "height": 42,
-          "id": 47
+          "id": 49
         },
         {
           "rotation": 0,
@@ -943,7 +981,7 @@
               "value": 64
             }
           ],
-          "id": 48
+          "id": 50
         }
       ],
       "opacity": 1,
@@ -954,7 +992,7 @@
     }
   ],
   "nextlayerid": 5,
-  "nextobjectid": 49,
+  "nextobjectid": 51,
   "orientation": "orthogonal",
   "renderorder": "right-down",
   "tiledversion": "1.11.2",

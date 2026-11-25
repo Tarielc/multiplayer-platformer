@@ -137,6 +137,30 @@ describe('parseTiledLevel', () => {
     ]);
   });
 
+  it('reads hints (text, a picture, or both) at their bottom-centre, and flags empty or unknown ones', () => {
+    const map = fixture();
+    const text = (value: string) => ({ name: 'text', type: 'string' as const, value });
+    const image = (value: string) => ({ name: 'image', type: 'string' as const, value });
+    entitiesLayer(map).objects.push(
+      object({ id: 60, type: 'hint', x: 40, y: 48, point: true, properties: [text('  Jump!  ')] }),
+      object({ id: 61, type: 'hint', x: 80, y: 32, width: 32, height: 16, properties: [image('giant-boost'), text('Go big')] }),
+      object({ id: 62, type: 'hint', x: 10, y: 10, point: true, properties: [image('rocket')] }),
+      object({ id: 63, type: 'hint', x: 10, y: 10, point: true }),
+    );
+    const level = parse(map);
+    expect(level.hints).toEqual([
+      { id: 60, x: 40, y: 48, text: 'Jump!', image: null },
+      { id: 61, x: 96, y: 48, text: 'Go big', image: 'giant-boost' },
+      { id: 62, x: 10, y: 10, text: '', image: 'rocket' },
+      { id: 63, x: 10, y: 10, text: '', image: null },
+    ]);
+    expect(level.extraObjects).toEqual([]);
+    const messages = validateLevel(level).map((i) => i.message);
+    expect(messages).toContainEqual(expect.stringMatching(/Hint #62 has unknown image "rocket"/));
+    expect(messages).toContainEqual(expect.stringMatching(/Hint #63 has neither/));
+    expect(messages.join('\n')).not.toMatch(/Hint #6[01]/);
+  });
+
   describe('rejects unsupported maps with actionable errors', () => {
     const cases: Array<[string, (map: TiledMap) => unknown, RegExp]> = [
       ['infinite maps', (m) => ({ ...m, infinite: true }), /Infinite/],
