@@ -56,6 +56,7 @@ Pausing only stops the game when **every** connected player has the menu open. S
 | `npm run typecheck` | `tsc` for every package (including tests and scripts) |
 | `npm run levels:validate` | Parses and validates every level in the manifest |
 | `npm run levels:solve [-- --level race-2] [-- --verbose]` | Proves every level can be finished by one player without losing a heart (search over the real simulation, traps included). On co-op levels every button counts as held, since the team puzzles need a second player |
+| `npm run levels:preview [-- race-1 …]` | Draws each generated level as a small overview PNG in `.level-previews/` (terrain by material, traps, foes, fruit, checkpoints), to judge a whole layout at a glance |
 | `npm run bots -- --room CODE [--count 3] [--seconds 30] [--attack]` | Headless test clients |
 | `npm run assets:sync` | Copies `packages/shared/data` to `apps/web/public/assets` (runs automatically on `dev`/`build`) |
 | `npm run samples:generate [-- --only coop-2] [-- --print]` | Regenerates the levels from `scripts/levels/` (**overwrites** `coop-1`…`coop-4` and `race-1`…`race-3`), the debug tileset, and placeholder fan and button sheets if missing |

@@ -45,7 +45,7 @@ const asIs = args.includes('--as-is');
 
 /** Search budget per level. */
 const MAX_EXPANSIONS = 60_000;
-const MAX_SECONDS = 240;
+const MAX_SECONDS = Number(process.env.SOLVE_SECONDS ?? 240);
 /** Neutral ticks a macro may wait to land before the branch is dropped (hovering in wind…). */
 const MAX_SETTLE_TICKS = 300;
 
@@ -215,6 +215,8 @@ function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): 
   if (boss) console.log('  (boss level: foes left out, checking the layout only)');
   const start = new GameWorld({ level, movement, ...(boss ? { foes: null } : {}) });
   bounceSpeed = movement.jumpVelocity * 1.15;
+  // Trampoline moves only where there is a trampoline: fewer branches everywhere else.
+  const macros = level.traps.some((t) => t.kind === 'trampoline') ? MACROS : MACROS.filter((m) => !m.onBounce);
   start.addPlayer('solo', 0);
   // Moving traps make the same spot safe or deadly depending on when you get there.
   const timed = level.traps.some((t) => t.kind !== 'spikes' && t.kind !== 'box' && t.kind !== 'trampoline');
@@ -229,13 +231,14 @@ function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): 
   queue.push({ world: start, path: [], ticks: 0, priority: exitDistance(level, start) });
   let expanded = 0;
   let closest = Infinity;
+  let closestPath: string[] = [];
   const losses = new Map<string, number>();
 
   while (queue.size > 0) {
     if (expanded >= MAX_EXPANSIONS || (Date.now() - started) / 1000 > MAX_SECONDS) break;
     const node = queue.pop()!;
     expanded++;
-    for (const macro of MACROS) {
+    for (const macro of macros) {
       const world = node.world.clone();
       const before = world.tick;
       const outcome = play(world, macro);
@@ -260,7 +263,10 @@ function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): 
       if (seen.has(key)) continue;
       seen.add(key);
       const distance = exitDistance(level, world);
-      closest = Math.min(closest, distance);
+      if (distance < closest) {
+        closest = distance;
+        closestPath = path;
+      }
       queue.push({ world, path, ticks, priority: distance + path.length * 6 });
     }
   }
@@ -268,6 +274,7 @@ function solve(level: LevelData, movement: ReturnType<typeof resolveMovement>): 
   const why = [...losses].sort((a, b) => b[1] - a[1]).map(([reason, n]) => `${reason} ×${n}`).join(', ');
   console.log(`  ✗ no way to the exit found: closest ${Math.round(closest)} px away (${expanded} nodes, ${seen.size} states, ${secs}s)`);
   console.log(`    branches lost to: ${why || 'nothing'}`);
+  if (verbose) for (const [i, move] of closestPath.entries()) console.log(`    ${String(i + 1).padStart(2)}. ${move}`);
   return false;
 }
 

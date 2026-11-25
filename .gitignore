@@ -16,6 +16,9 @@ apps/web/public/assets/
 .env.local
 .env.*.local
 
+# overview images from scripts/preview-levels.ts
+.level-previews/
+
 # misc
 coverage/
 .DS_Store

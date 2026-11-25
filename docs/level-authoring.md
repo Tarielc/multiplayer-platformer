@@ -264,12 +264,14 @@ The two shipped campaigns show how the modes shape level design.
 | Puzzle | Layout | Why one player can't do it |
 |---|---|---|
 | **Tandem Trampoline** | A pit with a trampoline by a shelf 16 tiles up. Two `on` buttons power it: one on the pit floor 14 tiles from the trampoline, one on the shelf. One player holds the floor button while a teammate bounces up; the teammate holds the shelf button for them. | The shelf is out of jump reach (12) and the presser can't reach the trampoline. 16 tiles is still a safe drop back. |
-| **Spike Gauntlet** | A corridor exactly 2 tiles tall and 48+ long, bored through a wall up to the ceiling, its floor lined with spikes. Two `off` buttons, one before the entrance and one past the exit, switch them off. | Nobody can jump in a 2-tile corridor, walking through takes 3+ hits, and a spat player only flies ~19 tiles. A giant or a drone with its cargo doesn't fit. |
+| **Spike Gauntlet** | A corridor exactly 2 tiles tall and 48+ long, under a stepped mountain whose summit touches the ceiling (so nobody goes over it), its floor lined with spikes. Two `off` buttons, one before the entrance and one past the exit, switch them off. | Nobody can jump in a 2-tile corridor, walking through takes 3+ hits, and a spat player only flies ~19 tiles. A giant or a drone with its cargo doesn't fit. |
 | **Lift-Off** | A room whose trampoline is powered by a button on a one-way ledge 24 tiles up. Everyone else bounces onto the crest (15 up). The holder leaves last by leaping down to a step (13 up, 14 tiles away) and on to the crest. | 24 tiles is out of reach of jumps, a switched-off trampoline and plain stacking (~20.5). Only an ability gets there: a frog spit, the drone, or a jump off giant Mask Dude's springy head. The step is too far from the ledge to climb back to it, and out of a lone jump's reach from the floor. |
 
 Characters are unique in a room, so any team of two has at least one of the frog, the drone or the giant. Checkpoints are shared in co-op, so put one just before each puzzle and the next a whole section after it, or a player could skip the puzzle by dying once a teammate is through. Co-op needs two players: the lobby won't start it alone, and solo play switches to Race.
 
 **Race** (and solo) levels split into routes that rejoin at checkpoints (a racer's own): a fast, risky one and a slower, safer one. Every obstacle can be passed alone, without abilities. Any button starts held by a box (`shippedLevels.test.ts` checks it), so a racer can smash the box to switch the trap behind them.
+
+Whatever the mode, give a level a shape, not one long floor: stack routes over each other (treetops over a dell, a tower over gardens, a mine under a canyon), cut caves and tunnels into hills, and keep climbing and dropping. A run of flat ground with obstacles dotted along it reads as repetitive however many traps it has. `npm run levels:preview` shows each level's silhouette at a glance.
 
 ## Prototyping with ASCII
 
@@ -331,7 +333,7 @@ Objects use the same characters as the default legend. Checkpoints and exits are
 
 Other traps can be passed to `asciiToTiledMap` as `objects: [{ name, type: 'saw', x, y, width, height, properties }]` (in pixels).
 
-`npm run samples:generate` rebuilds the campaign maps (and `debug-tiles.png`) from `scripts/levels/`: `coop.ts` and `race.ts` hold one builder per level, `puzzles.ts` the co-op puzzles, `sketch.ts` the drawing API. `-- --only race-2` rebuilds one level, `-- --print` prints each layout as ASCII. Layouts are written with a small `Sketch` API (`ground`, `solid`, `block`, `platform`, `text`, `carve`, `lava`) that throws on shapes the tileset can't draw. Traps are placed in tile coordinates and checked against the layout (no overlaps, a floor under boxes, trampolines and fans, solid ground behind spikes):
+`npm run samples:generate` rebuilds the campaign maps (and `debug-tiles.png`) from `scripts/levels/`: `coop.ts` and `race.ts` hold one builder per level, `puzzles.ts` the co-op puzzles, `sketch.ts` the drawing API. `-- --only race-2` rebuilds one level, `-- --print` prints each layout as ASCII, and `npm run levels:preview` draws each one as a small overview PNG in `.level-previews/`, the quickest way to judge a whole layout's shape. Layouts are written with a small `Sketch` API (`ground`, `solid`, `block`, `platform`, `text`, `carve`, `lava`) that throws on shapes the tileset can't draw. Traps are placed in tile coordinates and checked against the layout (no overlaps, a floor under boxes, trampolines and fans, solid ground behind spikes):
 
 ```ts
 s.spikes(30, 23, 3);                      // 3 tiles of spikes on the floor, from column 30
