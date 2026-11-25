@@ -1,6 +1,12 @@
 import { CHARACTERS, type CharacterId } from '@platformer/shared';
 import type { CSSProperties } from 'react';
-import { CHARACTER_ART, CHARACTER_SHEET, CLIPS, clipDurationMs } from '@/game/characters/characterArt';
+import {
+  CHARACTER_ART,
+  CHARACTER_SHEET,
+  CLIPS,
+  clipDurationMs,
+  type ClipName,
+} from '@/game/characters/characterArt';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import styles from './CharacterPortrait.module.css';
 
@@ -9,22 +15,26 @@ const SHEET_URL = `${DEFAULT_ASSET_BASE}/${CHARACTER_SHEET.path}`;
 const CROP = 32;
 
 /**
- * A character's idle frame(s) as a CSS sprite: the same sheet Phaser uses, cropped to the
- * body and scaled with crisp pixels. `animated` loops the Idle clip (off under reduced motion).
+ * A character's frame(s) for one clip as a CSS sprite: the same sheet Phaser uses, cropped to
+ * the body and scaled with crisp pixels. `animated` loops `clip` (default Idle; off under
+ * reduced motion).
  */
 export function CharacterPortrait({
   characterId,
   scale = 2,
   animated = false,
+  clip = 'idle',
   className,
 }: {
   characterId: CharacterId;
   scale?: number;
   animated?: boolean;
+  clip?: ClipName;
   className?: string;
 }) {
   const { frameWidth, frameHeight, width, height, rowsPerCharacter } = CHARACTER_SHEET;
-  const row = CHARACTER_ART[characterId].block * rowsPerCharacter + CLIPS.idle.row;
+  const def = CLIPS[clip];
+  const row = CHARACTER_ART[characterId].block * rowsPerCharacter + def.row;
   const x0 = -((frameWidth - CROP) / 2) * scale;
   const style = {
     width: CROP * scale,
@@ -33,9 +43,9 @@ export function CharacterPortrait({
     backgroundSize: `${width * scale}px ${height * scale}px`,
     backgroundPosition: `${x0}px ${-row * frameHeight * scale}px`,
     '--x0': `${x0}px`,
-    '--strip': `${CLIPS.idle.frames * frameWidth * scale}px`,
-    '--frames': CLIPS.idle.frames,
-    '--duration': `${clipDurationMs('idle')}ms`,
+    '--strip': `${def.frames * frameWidth * scale}px`,
+    '--frames': def.frames,
+    '--duration': `${clipDurationMs(clip)}ms`,
   } as CSSProperties;
   const name = CHARACTERS[characterId].name;
   return (
