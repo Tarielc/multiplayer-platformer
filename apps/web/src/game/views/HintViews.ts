@@ -45,7 +45,7 @@ const KEY_SIGN = { width: 80, height: 64, ground: -14, keyHeight: 16 } as const;
 const KEYS_X = -16;
 const DEMO_X = 18;
 
-/** A keycap on a key sign: an arrow or a key name, lit while `pressed(ms)`. */
+/** A keycap on a key sign (an arrow, a key name, or a mouse button: `mouse-left` / `mouse-right`), lit while `pressed(ms)`. */
 interface KeyCap {
   x: number;
   y: number;
@@ -425,7 +425,7 @@ export class HintViews {
     const caps = scene.add.graphics();
     sign.add(caps);
     const names = lesson.keys.map((key) => {
-      if (key.label === 'left' || key.label === 'right') return null;
+      if (key.label === 'left' || key.label === 'right' || key.label.startsWith('mouse-')) return null;
       const text = scene.add
         .text(key.x, key.y, key.label, { fontFamily: VIEW_CONFIG.label.fontFamily, fontSize: '9px', fontStyle: 'bold', color: SIGN.ink })
         .setOrigin(0.5, 0.5)
@@ -539,7 +539,7 @@ export class HintViews {
         const length = clipDurationMs('attack');
         const frames = CLIPS.attack.frames;
         return {
-          keys: [{ x: KEYS_X, y: row, label: 'X', pressed: held(swing - 40, swing + 160) }],
+          keys: [{ x: KEYS_X, y: row, label: 'mouse-left', pressed: held(swing - 40, swing + 160) }],
           total: 1800,
           at: swing,
           act: (player, _fx, ms) => {
@@ -551,7 +551,7 @@ export class HintViews {
       }
       case 'key-ability': {
         const use = 600;
-        return { keys: [{ x: KEYS_X, y: row, label: 'C', pressed: held(use - 40, use + 220) }], total: 1800, at: use, act: () => {} };
+        return { keys: [{ x: KEYS_X, y: row, label: 'mouse-right', pressed: held(use - 40, use + 220) }], total: 1800, at: use, act: () => {} };
       }
     }
   }
@@ -561,6 +561,10 @@ export class HintViews {
     caps.clear();
     keys.forEach((key, i) => {
       const down = key.pressed(ms);
+      if (key.label === 'mouse-left' || key.label === 'mouse-right') {
+        this.drawMouse(caps, key.x, key.y, key.label === 'mouse-left' ? -1 : 1, down);
+        return;
+      }
       const arrow = key.label === 'left' || key.label === 'right';
       const w = arrow ? h : Math.max(h, key.label.length * 6 + 8);
       const top = key.y - h / 2 + (down ? 1 : 0);
@@ -573,6 +577,20 @@ export class HintViews {
       else if (key.label === 'right') caps.fillTriangle(key.x + 4, cy, key.x - 3, cy - 5, key.x - 3, cy + 5);
       names[i]?.setY(cy);
     });
+  }
+
+  /** A mouse centred on (x, y): its left (`side` -1) or right (1) button lit and sunk while `down`. */
+  private drawMouse(g: Phaser.GameObjects.Graphics, x: number, y: number, side: -1 | 1, down: boolean): void {
+    const [w, h, buttons] = [16, 22, 9];
+    const [left, top] = [x - w / 2, y - h / 2];
+    g.fillStyle(SIGN.keyOutline).fillRoundedRect(left - 1, top - 1, w + 2, h + 2, 7);
+    g.fillStyle(SIGN.key).fillRoundedRect(left, top, w, h, 6);
+    // The button: its half of the top, sunk a pixel and lit.
+    const bx = side < 0 ? left : x;
+    g.fillStyle(down ? SIGN.keyPressed : SIGN.key).fillRoundedRect(bx, top + (down ? 1 : 0), w / 2, buttons, side < 0 ? { tl: 6, tr: 0, bl: 0, br: 0 } : { tl: 0, tr: 6, bl: 0, br: 0 });
+    // Seams: between the buttons, and under them.
+    g.fillStyle(SIGN.keyOutline).fillRect(x - 0.5, top, 1, buttons).fillRect(left, top + buttons, w, 1);
+    g.fillStyle(SIGN.keySide).fillRect(left + 2, top + h - 3, w - 4, 1);
   }
 
   /** Frame of a looping clip of the demo character. */
