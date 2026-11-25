@@ -44,13 +44,11 @@ export function coop1(): Sketch {
   s.solid('grass', 40, 18, 8, 3).text(42, 17, 's s');
   s.platform('woodPlatform', 51, 22, 6).text(52, 21, 'a a');
   s.block('bronzeBlock', 68, 40, 2, 2);
-  s.hint(56.5, 36, { text: 'A box on a button keeps it pressed. Break the box and the trampoline stops.' });
   s.text(74, 41, 'C');
   // 3. P1 down in a meadow pit: the shelf is the only way on.
   tandemTrampoline(s, 80, 48, { shelfEnd: 125 });
   s.text(84, 47, 'a a a a');
   s.foe('mushroom', 96, 47, { range: 3 });
-  s.hint(92.5, 42, { text: 'Stand on the button so a teammate can bounce up. Up there, they hold the other button for you.' });
   // 4. The hollow hill (crest row 32): over the top past spikes and mushrooms, or down the hole
   //    into the cave and up its far shaft on wood platforms.
   const hill = 48 - TANDEM_SHELF;
@@ -71,9 +69,6 @@ export function coop1(): Sketch {
   s.solid('grass', 158, 14, 10, 3).text(160, 13, 'w g w');
   s.platform('woodPlatform', 170, 22, 5).text(171, 21, 's');
   s.text(195, hill - 1, 'C');
-  s.hint(194.5, hill - 6, {
-    text: 'Hold a button and the spikes stay down while the others cross. Whoever gets through first holds the far one.',
-  });
   // 5. P2 through the brick mountain.
   s.ground(201, 262, hill);
   spikeGauntlet(s, 205, hill, { wall: 'brick' });
@@ -83,7 +78,6 @@ export function coop1(): Sketch {
   s.text(out + 5, hill - 1, 'a a');
   s.ground(263, 282, hill + 8);
   s.platform('woodPlatform', 268, hill - 5, 4).text(268, hill - 6, 'w g');
-  s.hint(272.5, hill + 3, { text: "Too high? Jump off a teammate's head. Giant Mask Dude's head is springy!" });
   s.foe('mushroom', 272, hill + 7, { range: 3 });
   s.block('bronzeBlock', 279, hill + 4, 2, 4);
   s.ground(283, 297, hill - 2);

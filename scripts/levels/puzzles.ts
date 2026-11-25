@@ -104,14 +104,8 @@ export function liftOff(s: Sketch, x: number, f: number, opts: LiftOptions): voi
   const trampoline = s.nextName('trampoline');
   s.trampoline(x + 28, f - 1);
   s.button(x + 4, f - LIFT_LEDGE - 1, trampoline);
-  // What each ability does here, and a picture of giant Mask Dude launching a teammate.
-  s.hint(x + 8, f, { image: 'giant-boost' });
-  s.hint(x + 19, f - 6, { text: LIFT_HINT });
+  // A picture sign for each ability that gets a teammate up to the button.
+  s.hint(x + 4, f, { image: 'giant-boost' });
+  s.hint(x + 12, f, { image: 'frog-spit' });
+  s.hint(x + 20, f, { image: 'drone-lift' });
 }
-
-const LIFT_HINT = [
-  'The button up on the ledge powers the trampoline. Get a teammate up there:',
-  'Ninja Frog: swallow them, then spit them up',
-  'Virtual Guy: grab them with the Claw Drone',
-  'Mask Dude: go Giant, they jump extra high off your head',
-].join('\n');

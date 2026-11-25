@@ -25,7 +25,7 @@ export interface LevelZone extends Rect {
 }
 
 /** Pictures a hint can show (property `image`); each is drawn by the client. */
-export const HINT_IMAGES = ['giant-boost'] as const;
+export const HINT_IMAGES = ['giant-boost', 'frog-spit', 'drone-lift'] as const;
 export type HintImage = (typeof HINT_IMAGES)[number];
 
 export function isHintImage(value: unknown): value is HintImage {

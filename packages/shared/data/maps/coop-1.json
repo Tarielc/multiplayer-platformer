@@ -992,25 +992,6 @@
         {
           "rotation": 0,
           "visible": true,
-          "name": "hint 1",
-          "type": "hint",
-          "x": 904,
-          "y": 576,
-          "width": 0,
-          "height": 0,
-          "point": true,
-          "properties": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "A box on a button keeps it pressed. Break the box and the trampoline stops."
-            }
-          ],
-          "id": 51
-        },
-        {
-          "rotation": 0,
-          "visible": true,
           "name": "trampoline 2",
           "type": "trampoline",
           "x": 1680,
@@ -1018,7 +999,7 @@
           "width": 0,
           "height": 0,
           "point": true,
-          "id": 52
+          "id": 51
         },
         {
           "rotation": 0,
@@ -1037,7 +1018,7 @@
               "value": "trampoline 2"
             }
           ],
-          "id": 53
+          "id": 52
         },
         {
           "rotation": 0,
@@ -1056,7 +1037,7 @@
               "value": "trampoline 2"
             }
           ],
-          "id": 54
+          "id": 53
         },
         {
           "rotation": 0,
@@ -1075,26 +1056,7 @@
               "value": 48
             }
           ],
-          "id": 55
-        },
-        {
-          "rotation": 0,
-          "visible": true,
-          "name": "hint 2",
-          "type": "hint",
-          "x": 1480,
-          "y": 672,
-          "width": 0,
-          "height": 0,
-          "point": true,
-          "properties": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Stand on the button so a teammate can bounce up. Up there, they hold the other button for you."
-            }
-          ],
-          "id": 56
+          "id": 54
         },
         {
           "rotation": 0,
@@ -1113,7 +1075,7 @@
               "value": 64
             }
           ],
-          "id": 57
+          "id": 55
         },
         {
           "rotation": 0,
@@ -1132,7 +1094,7 @@
               "value": 80
             }
           ],
-          "id": 58
+          "id": 56
         },
         {
           "rotation": 0,
@@ -1151,7 +1113,7 @@
               "value": 48
             }
           ],
-          "id": 59
+          "id": 57
         },
         {
           "rotation": 0,
@@ -1162,7 +1124,7 @@
           "y": 496,
           "width": 48,
           "height": 16,
-          "id": 60
+          "id": 58
         },
         {
           "rotation": 0,
@@ -1173,7 +1135,7 @@
           "y": 496,
           "width": 64,
           "height": 16,
-          "id": 61
+          "id": 59
         },
         {
           "rotation": 0,
@@ -1192,26 +1154,7 @@
               "value": 48
             }
           ],
-          "id": 62
-        },
-        {
-          "rotation": 0,
-          "visible": true,
-          "name": "hint 3",
-          "type": "hint",
-          "x": 3112,
-          "y": 416,
-          "width": 0,
-          "height": 0,
-          "point": true,
-          "properties": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Hold a button and the spikes stay down while the others cross. Whoever gets through first holds the far one."
-            }
-          ],
-          "id": 63
+          "id": 60
         },
         {
           "rotation": 0,
@@ -1222,7 +1165,7 @@
           "y": 496,
           "width": 768,
           "height": 16,
-          "id": 64
+          "id": 61
         },
         {
           "rotation": 0,
@@ -1246,7 +1189,7 @@
               "value": "off"
             }
           ],
-          "id": 65
+          "id": 62
         },
         {
           "rotation": 0,
@@ -1270,26 +1213,7 @@
               "value": "off"
             }
           ],
-          "id": 66
-        },
-        {
-          "rotation": 0,
-          "visible": true,
-          "name": "hint 4",
-          "type": "hint",
-          "x": 4360,
-          "y": 560,
-          "width": 0,
-          "height": 0,
-          "point": true,
-          "properties": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Too high? Jump off a teammate's head. Giant Mask Dude's head is springy!"
-            }
-          ],
-          "id": 67
+          "id": 63
         },
         {
           "rotation": 0,
@@ -1308,7 +1232,7 @@
               "value": 48
             }
           ],
-          "id": 68
+          "id": 64
         }
       ],
       "opacity": 1,
@@ -1319,7 +1243,7 @@
     }
   ],
   "nextlayerid": 5,
-  "nextobjectid": 69,
+  "nextobjectid": 65,
   "orientation": "orthogonal",
   "renderorder": "right-down",
   "tiledversion": "1.11.2",
