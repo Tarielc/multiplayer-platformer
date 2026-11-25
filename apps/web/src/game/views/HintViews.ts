@@ -1,8 +1,8 @@
 import { type CharacterId, type HintImage, type LevelHint, isHintImage } from '@platformer/shared';
 import * as Phaser from 'phaser';
 import { abilityAnim } from '../abilities/abilityAnimations';
-import { ABILITY_SHEETS, type AbilityAnimDef, TONGUE_COLORS, animLengthMs, frameAt, frameName } from '../abilities/abilityArt';
-import { CHARACTER_SHEET, type ClipName, sheetFrame } from '../characters/characterArt';
+import { ABILITY_SHEETS, type AbilityAnimDef, TONGUE_COLORS, abilityIconKey, animLengthMs, frameAt, frameName } from '../abilities/abilityArt';
+import { CHARACTER_SHEET, CLIPS, type ClipName, clipDurationMs, sheetFrame } from '../characters/characterArt';
 import { VIEW_CONFIG } from '../config';
 
 /** Colours of the hint signs (wood board, parchment, ink). */
@@ -19,6 +19,11 @@ const SIGN = {
   button: 0xd94c3a,
   path: 0x8a6a45,
   cable: 0x8b93af,
+  key: 0xf7f1e3,
+  keyPressed: 0xffd35a,
+  keySide: 0x9c8f7a,
+  keyOutline: 0x3b2a1a,
+  puff: 0xffffff,
 } as const;
 
 /** Width a text hint wraps at, px. */
@@ -34,6 +39,22 @@ const LEDGE = { x0: 16, x1: 48, y: -100, button: 34 } as const;
 /** Where the teammate ends up: on the ledge, left of the button. */
 const ON_LEDGE = { x: 26, y: LEDGE.y } as const;
 
+/** Key signs: board size (posts below it), the picture's ground line, keycap height. */
+const KEY_SIGN = { width: 80, height: 64, ground: -14, keyHeight: 16 } as const;
+/** Centres of a key sign's two halves: keycaps on the left, the small player on the right. */
+const KEYS_X = -16;
+const DEMO_X = 18;
+
+/** A keycap on a key sign: an arrow or a key name, lit while `pressed(ms)`. */
+interface KeyCap {
+  x: number;
+  y: number;
+  label: string;
+  pressed: (ms: number) => boolean;
+}
+
+type KeyImage = Extract<HintImage, `key-${string}`>;
+
 /** A teammate's flight onto the ledge, as a quadratic curve (sprite feet positions). */
 interface Arc {
   from: { x: number; y: number };
@@ -48,6 +69,10 @@ interface Arc {
  */
 export class HintViews {
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
+  /** Who the control signs show: the local player's character once it is known. */
+  private demo: CharacterId = 'virtual-guy';
+  /** Keycaps mean nothing on a touch-first device (it has on-screen sticks instead). */
+  private readonly touchFirst = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -62,6 +87,11 @@ export class HintViews {
         this.note(hint.text, hint.x, hint.y);
       }
     }
+  }
+
+  /** The control signs act with this character (the local player's). */
+  setDemoCharacter(id: CharacterId): void {
+    this.demo = id;
   }
 
   destroy(): void {
@@ -102,6 +132,13 @@ export class HintViews {
         break;
       case 'drone-lift':
         this.droneLift(x, y);
+        break;
+      case 'key-move':
+      case 'key-jump':
+      case 'key-double-jump':
+      case 'key-attack':
+      case 'key-ability':
+        if (!this.touchFirst) this.keySign(image, x, y);
         break;
     }
   }
@@ -364,6 +401,189 @@ export class HintViews {
         buddy.setAlpha(Math.max(0, 1 - into / fade));
       }
     });
+  }
+
+  /**
+   * A small sign teaching one control: its keycap(s) on the left light up while a small player
+   * (the local player's character) on the right does what the key does. No words but key names.
+   */
+  private keySign(image: KeyImage, x: number, y: number): void {
+    const { scene } = this;
+    const { width, height, ground } = KEY_SIGN;
+    const sign = scene.add.container(x, y).setDepth(VIEW_CONFIG.depth.entities - 2);
+    this.objects.push(sign);
+    const g = scene.add.graphics();
+    g.fillStyle(SIGN.post).fillRect(-20, -10, 4, 10).fillRect(16, -10, 4, 10);
+    g.fillStyle(SIGN.woodDark).fillRoundedRect(-width / 2, -height, width, height - 8, 4);
+    g.fillStyle(SIGN.wood).fillRoundedRect(-width / 2 + 2, -height + 2, width - 4, height - 12, 3);
+    g.fillStyle(SIGN.parchment).fillRect(-width / 2 + 5, -height + 6, width - 10, height - 20);
+    g.fillStyle(SIGN.grass).fillRect(DEMO_X - 15, ground, 30, 2);
+    sign.add(g);
+
+    const lesson = this.lesson(image);
+    // The keycaps: redrawn each frame (a pressed one sinks a pixel and lights up), names on top.
+    const caps = scene.add.graphics();
+    sign.add(caps);
+    const names = lesson.keys.map((key) => {
+      if (key.label === 'left' || key.label === 'right') return null;
+      const text = scene.add
+        .text(key.x, key.y, key.label, { fontFamily: VIEW_CONFIG.label.fontFamily, fontSize: '9px', fontStyle: 'bold', color: SIGN.ink })
+        .setOrigin(0.5, 0.5)
+        .setResolution(3);
+      sign.add(text);
+      return text;
+    });
+    const icon = image === 'key-ability' && scene.textures.exists(abilityIconKey(this.demo)) ? scene.add.image(DEMO_X, ground - 18, abilityIconKey(this.demo)) : null;
+    if (icon) sign.add(icon);
+    const fx = scene.add.graphics();
+    sign.add(fx);
+    const player = this.character(sign, this.demo, DEMO_X, ground);
+    if (!player) return;
+    player.setVisible(image !== 'key-ability');
+
+    this.loop(lesson.total, (ms) => {
+      this.drawKeys(caps, names, lesson.keys, ms);
+      fx.clear();
+      if (icon) {
+        // The player's own ability icon, popping when the key goes down.
+        const key = abilityIconKey(this.demo);
+        if (icon.texture.key !== key && scene.textures.exists(key)) icon.setTexture(key);
+        const t = (ms - lesson.at) / 400;
+        const pop = t >= 0 && t < 1 ? Math.sin(t * Math.PI) : 0;
+        icon.setScale(1 + 0.3 * pop);
+        if (pop > 0) fx.lineStyle(1, SIGN.keyPressed, pop).strokeCircle(DEMO_X, ground - 18, 18 + 8 * t);
+        return;
+      }
+      lesson.act(player, fx, ms);
+    });
+  }
+
+  /** What a key sign shows: its keycaps, and how the small player moves over one loop. */
+  private lesson(image: KeyImage): {
+    keys: KeyCap[];
+    total: number;
+    /** When the main key goes down. */
+    at: number;
+    act: (player: Phaser.GameObjects.Sprite, fx: Phaser.GameObjects.Graphics, ms: number) => void;
+  } {
+    const ground = KEY_SIGN.ground;
+    const row = -KEY_SIGN.height / 2 - 8;
+    const held = (from: number, to: number) => (ms: number) => ms >= from && ms < to;
+    switch (image) {
+      case 'key-move': {
+        // Runs right, stops, runs back left, stops.
+        const [x0, x1] = [DEMO_X - 6, DEMO_X + 6];
+        return {
+          keys: [
+            { x: KEYS_X - 10, y: row, label: 'left', pressed: held(1300, 2300) },
+            { x: KEYS_X + 10, y: row, label: 'right', pressed: held(0, 1000) },
+          ],
+          total: 2600,
+          at: 0,
+          act: (player, _fx, ms) => {
+            if (ms < 1000) player.setPosition(x0 + (x1 - x0) * (ms / 1000), ground).setFlipX(false).setFrame(this.frame('run', ms));
+            else if (ms < 1300) player.setPosition(x1, ground).setFrame(this.frame('idle', ms));
+            else if (ms < 2300) player.setPosition(x1 - (x1 - x0) * ((ms - 1300) / 1000), ground).setFlipX(true).setFrame(this.frame('run', ms));
+            else player.setPosition(x0, ground).setFrame(this.frame('idle', ms));
+          },
+        };
+      }
+      case 'key-jump': {
+        const [up, air] = [600, 640];
+        return {
+          keys: [{ x: KEYS_X, y: row, label: 'SPACE', pressed: held(up - 40, up + 220) }],
+          total: 1800,
+          at: up,
+          act: (player, _fx, ms) => {
+            const t = (ms - up) / air;
+            player.setFlipX(false);
+            if (t < 0 || t >= 1) player.setPosition(DEMO_X, ground).setFrame(this.frame('idle', ms));
+            else player.setPosition(DEMO_X, ground - 14 * 4 * t * (1 - t)).setFrame(this.airFrame(t < 0.5, ms - up));
+          },
+        };
+      }
+      case 'key-double-jump': {
+        // A jump, and near its top a second one from the air (a puff where it pushes off).
+        // Second part: height 9 + a·t − b·t², topping out at 18 and landing at t = 1.
+        const [up, first, second, peak] = [500, 240, 620, 9];
+        const again = up + first;
+        const a = 43.46;
+        const b = a + peak;
+        return {
+          keys: [
+            { x: KEYS_X, y: row - 10, label: 'SPACE', pressed: held(up - 40, up + 160) },
+            { x: KEYS_X, y: row + 10, label: 'SPACE', pressed: held(again - 20, again + 160) },
+          ],
+          total: 2200,
+          at: up,
+          act: (player, fx, ms) => {
+            player.setFlipX(false);
+            if (ms < up || ms >= again + second) {
+              player.setPosition(DEMO_X, ground).setFrame(this.frame('idle', ms));
+            } else if (ms < again) {
+              const t = (ms - up) / first;
+              player.setPosition(DEMO_X, ground - peak * (1 - (1 - t) ** 2)).setFrame(this.airFrame(true, ms - up));
+            } else {
+              const t = (ms - again) / second;
+              player.setPosition(DEMO_X, ground - Math.max(0, peak + a * t - b * t * t)).setFrame(this.airFrame(t < 0.414, ms - again));
+              if (ms - again < 240) {
+                const k = (ms - again) / 240;
+                fx.lineStyle(1, SIGN.puff, 1 - k).strokeEllipse(DEMO_X, ground - peak, 10 + 12 * k, 3 + 3 * k);
+              }
+            }
+          },
+        };
+      }
+      case 'key-attack': {
+        const swing = 600;
+        const length = clipDurationMs('attack');
+        const frames = CLIPS.attack.frames;
+        return {
+          keys: [{ x: KEYS_X, y: row, label: 'X', pressed: held(swing - 40, swing + 160) }],
+          total: 1800,
+          at: swing,
+          act: (player, _fx, ms) => {
+            player.setPosition(DEMO_X - 6, ground).setFlipX(false);
+            if (ms >= swing && ms < swing + length) player.setFrame(sheetFrame(this.demo, 'attack', Math.min(frames - 1, Math.floor(((ms - swing) / length) * frames))));
+            else player.setFrame(this.frame('idle', ms));
+          },
+        };
+      }
+      case 'key-ability': {
+        const use = 600;
+        return { keys: [{ x: KEYS_X, y: row, label: 'C', pressed: held(use - 40, use + 220) }], total: 1800, at: use, act: () => {} };
+      }
+    }
+  }
+
+  private drawKeys(caps: Phaser.GameObjects.Graphics, names: readonly (Phaser.GameObjects.Text | null)[], keys: readonly KeyCap[], ms: number): void {
+    const h = KEY_SIGN.keyHeight;
+    caps.clear();
+    keys.forEach((key, i) => {
+      const down = key.pressed(ms);
+      const arrow = key.label === 'left' || key.label === 'right';
+      const w = arrow ? h : Math.max(h, key.label.length * 6 + 8);
+      const top = key.y - h / 2 + (down ? 1 : 0);
+      caps.fillStyle(SIGN.keyOutline).fillRoundedRect(key.x - w / 2 - 1, key.y - h / 2 - 1, w + 2, h + 3, 3);
+      caps.fillStyle(SIGN.keySide).fillRoundedRect(key.x - w / 2, top, w, h + (down ? 0 : 1), 2);
+      caps.fillStyle(down ? SIGN.keyPressed : SIGN.key).fillRoundedRect(key.x - w / 2, top, w, h - 2, 2);
+      const cy = top + (h - 2) / 2;
+      caps.fillStyle(SIGN.keyOutline);
+      if (key.label === 'left') caps.fillTriangle(key.x - 4, cy, key.x + 3, cy - 5, key.x + 3, cy + 5);
+      else if (key.label === 'right') caps.fillTriangle(key.x + 4, cy, key.x - 3, cy - 5, key.x - 3, cy + 5);
+      names[i]?.setY(cy);
+    });
+  }
+
+  /** Frame of a looping clip of the demo character. */
+  private frame(clip: ClipName, ms: number): number {
+    const def = CLIPS[clip];
+    return sheetFrame(this.demo, clip, Math.floor((ms / 1000) * (def.frameRate ?? 10)) % def.frames);
+  }
+
+  /** Rising (jump) or falling frame of the demo character, `ms` into the air. */
+  private airFrame(rising: boolean, ms: number): number {
+    return rising ? sheetFrame(this.demo, 'jump', Math.min(CLIPS.jump.frames - 1, Math.floor(ms / 70))) : sheetFrame(this.demo, 'fall', 1);
   }
 }
 

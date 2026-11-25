@@ -308,3 +308,18 @@ export function arc(s: Sketch, x: number, y: number, ch: string, heights: readon
 export function frame(s: Sketch): void {
   s.solid('stoneWall', 0, 0, 2, s.height).solid('stoneWall', s.width - 2, 0, 2, s.height).solid('stoneWall', 2, 0, s.width - 4, 2);
 }
+
+/**
+ * The control signs of a campaign's first level, in a row on the start hill (floor top at row
+ * `f`): move (behind the spawns), jump, double jump, attack, then a box to try the attack on,
+ * then the ability sign (`ability: false` leaves it for the caller to place). Each sign is 5
+ * tiles wide; the row runs from column 5 to 35.
+ */
+export function controlSigns(s: Sketch, f: number, { box, ability = true }: { box: number; ability?: boolean }): void {
+  s.hint(7.5, f, { image: 'key-move' });
+  s.hint(13.5, f, { image: 'key-jump' });
+  s.hint(19.5, f, { image: 'key-double-jump' });
+  s.hint(25.5, f, { image: 'key-attack' });
+  s.box(box, f - 1);
+  if (ability) s.hint(32.5, f, { image: 'key-ability' });
+}

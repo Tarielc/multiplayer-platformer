@@ -5,7 +5,7 @@
  * box at the start: smash the box and the trap switches, which is a way to cut off the racers
  * behind you.
  */
-import { Sketch, arc, frame } from './sketch';
+import { Sketch, arc, controlSigns, frame } from './sketch';
 
 /**
  * Sunny Sprint: grass, wood platforms, bronze blocks. Spikes, a trampoline, boxes, a box on a
@@ -23,8 +23,8 @@ export function race1(): Sketch {
   // Start hill.
   s.ground(2, 34, 26);
   s.text(5, 25, '1 2 3 4');
-  arc(s, 4, 25, 'a', [3, 4, 4, 3]);
-  s.box(28, 25, 1);
+  arc(s, 4, 24, 'a', [3, 4, 4, 3]);
+  controlSigns(s, 26, { box: 29 });
   // 1a. The treetops: floating islands and a wood platform up to the hill's crest.
   for (const [x, y, w, fruit] of [
     [40, 21, 8, 's s'],

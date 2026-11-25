@@ -25,7 +25,18 @@ export interface LevelZone extends Rect {
 }
 
 /** Pictures a hint can show (property `image`); each is drawn by the client. */
-export const HINT_IMAGES = ['giant-boost', 'frog-spit', 'drone-lift'] as const;
+export const HINT_IMAGES = [
+  // Abilities getting a teammate up to a ledge.
+  'giant-boost',
+  'frog-spit',
+  'drone-lift',
+  // Controls: a keycap that lights up as a small player does what it does.
+  'key-move',
+  'key-jump',
+  'key-double-jump',
+  'key-attack',
+  'key-ability',
+] as const;
 export type HintImage = (typeof HINT_IMAGES)[number];
 
 export function isHintImage(value: unknown): value is HintImage {

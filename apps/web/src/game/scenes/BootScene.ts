@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
-import { BACKGROUND_TILES } from '@platformer/shared';
+import { BACKGROUND_TILES, CHARACTER_IDS } from '@platformer/shared';
 import { queueAbilitySheets, registerAbilitySheets } from '../abilities/abilityAnimations';
+import { abilityIconKey, abilityIconPath } from '../abilities/abilityArt';
 import { backgroundKey, backgroundPath } from '../art/backgroundArt';
 import { createProceduralTextures } from '../art/textures';
 import { prepareSoundCues, queueSoundOverrides } from '../audio/SoundController';
@@ -41,6 +42,9 @@ export class BootScene extends Phaser.Scene {
     queueTrapSheets(this, this.services.assetBase);
     queueAbilitySheets(this, this.services.assetBase);
     queueAbilitySheets(this, this.services.assetBase, allFoeSheets());
+    for (const id of CHARACTER_IDS) {
+      if (!this.textures.exists(abilityIconKey(id))) this.load.image(abilityIconKey(id), `${this.services.assetBase}/${abilityIconPath(id)}`);
+    }
     for (const name of BACKGROUND_TILES) {
       if (!this.textures.exists(backgroundKey(name))) this.load.image(backgroundKey(name), `${this.services.assetBase}/${backgroundPath(name)}`);
     }

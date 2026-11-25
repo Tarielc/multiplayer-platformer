@@ -374,6 +374,7 @@ export class LevelScene extends Phaser.Scene {
       const preview =
         ability === Ability.TONGUE ? (aim ?? (body.phase === Phase.TONGUE_HOLD ? ahead : null)) : ability === Ability.HEAL ? aim : null;
       local.render(feetX, feetY, body.facing, signals, frameMs, preview);
+      this.hintViews?.setDemoCharacter(local.characterId);
       // Race: once you finished, watch someone still racing; dead, watch a teammate until you respawn.
       const spectating = local.isFinished || !body.alive;
       this.follow((spectating ? this.spectateTarget(samples) : null) ?? local.droneTarget ?? local.container);

@@ -64,6 +64,11 @@ export function abilityIconPath(id: CharacterId): string {
   return `${dir}/${id}/icon.png`;
 }
 
+/** Phaser texture key of a character's ability icon (loaded by the boot scene). */
+export function abilityIconKey(id: CharacterId): string {
+  return `ab:icon:${id}`;
+}
+
 /** Phaser texture frame name of frame `i` of `anim`. */
 export const frameName = (anim: string, i: number) => `${anim}:${i}`;
 

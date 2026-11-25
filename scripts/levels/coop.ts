@@ -13,7 +13,7 @@
  * whole section after it: dying on purpose after a teammate crossed doesn't skip it for free.
  */
 import { GAUNTLET_LENGTH, LIFT_CREST, TANDEM_SHELF, liftOff, spikeGauntlet, tandemTrampoline } from './puzzles';
-import { Sketch, arc, frame } from './sketch';
+import { Sketch, arc, controlSigns, frame } from './sketch';
 
 /**
  * Meadow Gate (gentle): grass, wood platforms and bronze blocks. From the start hill down into a
@@ -28,9 +28,11 @@ export function coop1(): Sketch {
   // 1. Start hill, then down into the meadow.
   s.ground(2, 30, 30);
   s.text(5, 29, '1 2 3 4');
-  arc(s, 4, 29, 'a', [3, 4, 4, 3]);
-  s.box(18, 29, 1).box(22, 29, 2).text(22, 25, 's');
+  arc(s, 4, 28, 'a', [3, 4, 4, 3]);
+  controlSigns(s, 30, { box: 29, ability: false });
+  s.box(30, 29, 2).text(30, 26, 's');
   s.ground(31, 40, 36);
+  s.hint(36, 36, { image: 'key-ability' });
   s.ground(41, 79, 42);
   s.foe('chicken', 44, 41, { range: 3 });
   s.block('bronzeBlock', 48, 40, 2, 2).text(48, 38, 'a');

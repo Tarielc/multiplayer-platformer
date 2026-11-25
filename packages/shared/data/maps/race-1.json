@@ -286,6 +286,44 @@
         },
         {
           "id": 12,
+          "name": "apple",
+          "type": "collectible",
+          "rotation": 0,
+          "visible": true,
+          "x": 104,
+          "y": 328,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "apple"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "name": "apple",
+          "type": "collectible",
+          "rotation": 0,
+          "visible": true,
+          "x": 136,
+          "y": 328,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "apple"
+            }
+          ]
+        },
+        {
+          "id": 14,
           "name": "strawberry",
           "type": "collectible",
           "rotation": 0,
@@ -304,7 +342,7 @@
           ]
         },
         {
-          "id": 13,
+          "id": 15,
           "name": "strawberry",
           "type": "collectible",
           "rotation": 0,
@@ -323,7 +361,7 @@
           ]
         },
         {
-          "id": 14,
+          "id": 16,
           "name": "strawberry",
           "type": "collectible",
           "rotation": 0,
@@ -342,51 +380,13 @@
           ]
         },
         {
-          "id": 15,
-          "name": "apple",
-          "type": "collectible",
-          "rotation": 0,
-          "visible": true,
-          "x": 104,
-          "y": 344,
-          "width": 0,
-          "height": 0,
-          "point": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "apple"
-            }
-          ]
-        },
-        {
-          "id": 16,
-          "name": "apple",
-          "type": "collectible",
-          "rotation": 0,
-          "visible": true,
-          "x": 136,
-          "y": 344,
-          "width": 0,
-          "height": 0,
-          "point": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "apple"
-            }
-          ]
-        },
-        {
           "id": 17,
           "name": "apple",
           "type": "collectible",
           "rotation": 0,
           "visible": true,
           "x": 72,
-          "y": 360,
+          "y": 344,
           "width": 0,
           "height": 0,
           "point": true,
@@ -405,7 +405,7 @@
           "rotation": 0,
           "visible": true,
           "x": 168,
-          "y": 360,
+          "y": 344,
           "width": 0,
           "height": 0,
           "point": true,
@@ -936,14 +936,109 @@
         {
           "rotation": 0,
           "visible": true,
-          "name": "box 1",
-          "type": "box",
-          "x": 456,
+          "name": "hint 1",
+          "type": "hint",
+          "x": 120,
           "y": 416,
           "width": 0,
           "height": 0,
           "point": true,
+          "properties": [
+            {
+              "name": "image",
+              "type": "string",
+              "value": "key-move"
+            }
+          ],
           "id": 47
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "hint 2",
+          "type": "hint",
+          "x": 216,
+          "y": 416,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "image",
+              "type": "string",
+              "value": "key-jump"
+            }
+          ],
+          "id": 48
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "hint 3",
+          "type": "hint",
+          "x": 312,
+          "y": 416,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "image",
+              "type": "string",
+              "value": "key-double-jump"
+            }
+          ],
+          "id": 49
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "hint 4",
+          "type": "hint",
+          "x": 408,
+          "y": 416,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "image",
+              "type": "string",
+              "value": "key-attack"
+            }
+          ],
+          "id": 50
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "box 1",
+          "type": "box",
+          "x": 472,
+          "y": 416,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "id": 51
+        },
+        {
+          "rotation": 0,
+          "visible": true,
+          "name": "hint 5",
+          "type": "hint",
+          "x": 520,
+          "y": 416,
+          "width": 0,
+          "height": 0,
+          "point": true,
+          "properties": [
+            {
+              "name": "image",
+              "type": "string",
+              "value": "key-ability"
+            }
+          ],
+          "id": 52
         },
         {
           "rotation": 0,
@@ -962,7 +1057,7 @@
               "value": 32
             }
           ],
-          "id": 48
+          "id": 53
         },
         {
           "rotation": 0,
@@ -973,7 +1068,7 @@
           "y": 688,
           "width": 48,
           "height": 16,
-          "id": 49
+          "id": 54
         },
         {
           "rotation": 0,
@@ -992,7 +1087,7 @@
               "value": 48
             }
           ],
-          "id": 50
+          "id": 55
         },
         {
           "rotation": 0,
@@ -1011,7 +1106,7 @@
               "value": 2
             }
           ],
-          "id": 51
+          "id": 56
         },
         {
           "rotation": 0,
@@ -1022,7 +1117,7 @@
           "y": 688,
           "width": 64,
           "height": 16,
-          "id": 52
+          "id": 57
         },
         {
           "rotation": 0,
@@ -1041,7 +1136,7 @@
               "value": 48
             }
           ],
-          "id": 53
+          "id": 58
         },
         {
           "rotation": 0,
@@ -1053,7 +1148,7 @@
           "width": 0,
           "height": 0,
           "point": true,
-          "id": 54
+          "id": 59
         },
         {
           "rotation": 0,
@@ -1072,7 +1167,7 @@
               "value": 48
             }
           ],
-          "id": 55
+          "id": 60
         },
         {
           "rotation": 0,
@@ -1083,7 +1178,7 @@
           "y": 432,
           "width": 48,
           "height": 16,
-          "id": 56
+          "id": 61
         },
         {
           "rotation": 0,
@@ -1102,7 +1197,7 @@
               "value": 64
             }
           ],
-          "id": 57
+          "id": 62
         },
         {
           "rotation": 0,
@@ -1121,7 +1216,7 @@
               "value": 3
             }
           ],
-          "id": 58
+          "id": 63
         },
         {
           "rotation": 0,
@@ -1140,7 +1235,7 @@
               "value": 64
             }
           ],
-          "id": 59
+          "id": 64
         },
         {
           "rotation": 0,
@@ -1159,7 +1254,7 @@
               "value": 304
             }
           ],
-          "id": 60
+          "id": 65
         },
         {
           "rotation": 0,
@@ -1178,7 +1273,7 @@
               "value": 48
             }
           ],
-          "id": 61
+          "id": 66
         },
         {
           "rotation": 0,
@@ -1189,7 +1284,7 @@
           "y": 768,
           "width": 48,
           "height": 16,
-          "id": 62
+          "id": 67
         },
         {
           "rotation": 0,
@@ -1201,7 +1296,7 @@
           "width": 0,
           "height": 0,
           "point": true,
-          "id": 63
+          "id": 68
         },
         {
           "rotation": 0,
@@ -1220,7 +1315,7 @@
               "value": 3
             }
           ],
-          "id": 64
+          "id": 69
         },
         {
           "rotation": 0,
@@ -1239,7 +1334,7 @@
               "value": "trampoline 2"
             }
           ],
-          "id": 65
+          "id": 70
         },
         {
           "rotation": 0,
@@ -1250,7 +1345,7 @@
           "y": 768,
           "width": 64,
           "height": 16,
-          "id": 66
+          "id": 71
         },
         {
           "rotation": 0,
@@ -1269,7 +1364,7 @@
               "value": 64
             }
           ],
-          "id": 67
+          "id": 72
         },
         {
           "rotation": 0,
@@ -1288,7 +1383,7 @@
               "value": 64
             }
           ],
-          "id": 68
+          "id": 73
         }
       ],
       "opacity": 1,
@@ -1299,7 +1394,7 @@
     }
   ],
   "nextlayerid": 5,
-  "nextobjectid": 69,
+  "nextobjectid": 74,
   "orientation": "orthogonal",
   "renderorder": "right-down",
   "tiledversion": "1.11.2",
