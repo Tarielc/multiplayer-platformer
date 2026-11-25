@@ -32,7 +32,7 @@ export class BossBar {
   private shown = 0;
   private trailFrac = 1;
 
-  constructor(private readonly scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene) {
     const x = VIEW_CONFIG.width / 2;
     const y = VIEW_CONFIG.height - BOTTOM - HEIGHT / 2;
     const left = -WIDTH / 2 + PORTRAIT / 2;

@@ -49,8 +49,6 @@ export const ABILITY_SHEETS = {
   spitFx: { key: 'ab:spitFx', path: `${dir}/ninja-frog/spit_fx` },
 } as const satisfies Record<string, AbilitySheetFile>;
 
-export type AbilitySheetName = keyof typeof ABILITY_SHEETS;
-
 export function reactionSheet(id: CharacterId): AbilitySheetFile {
   return { key: `ab:react:${id}`, path: `${dir}/reactions/${id}` };
 }

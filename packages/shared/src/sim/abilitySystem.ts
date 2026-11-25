@@ -12,7 +12,6 @@ import {
   feetOf,
   foeCargo,
   interruptAbility,
-  isTonguePhase,
   giantActive,
   healHands,
   healHugFeet,
@@ -1003,9 +1002,4 @@ export class AbilitySystem {
     body.x = x;
     body.y = y;
   }
-}
-
-/** Whether a phase can hold something with a tongue (for the renderer). */
-export function tongueHolds(phase: number): boolean {
-  return isTonguePhase(phase) && phase >= Phase.TONGUE_PULL && phase !== Phase.TONGUE_RETRACT && phase !== Phase.TONGUE_SPIT_RECOVER;
 }

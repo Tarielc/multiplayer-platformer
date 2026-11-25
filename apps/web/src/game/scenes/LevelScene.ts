@@ -121,7 +121,6 @@ export class LevelScene extends Phaser.Scene {
   private mapUrl = '';
   private mapKey = '';
   private failedFiles = new Set<string>();
-  private levelData: LevelData | null = null;
   private predictor: LocalPredictor | null = null;
   private interpolator = new Interpolator();
   private views = new Map<string, PlayerView>();
@@ -159,7 +158,6 @@ export class LevelScene extends Phaser.Scene {
     this.info = null;
     this.entry = null;
     this.failedFiles = new Set();
-    this.levelData = null;
     this.predictor = null;
     this.interpolator = new Interpolator();
     this.views = new Map();
@@ -228,7 +226,6 @@ export class LevelScene extends Phaser.Scene {
         message: `Your copy of "${this.entry.name}" differs from the server's (${checksum} vs ${this.info.checksum}). Reload the page.`,
       });
     }
-    this.levelData = level;
 
     // Same trap runtime as the server's world; the predictor keeps it in sync with snapshots.
     const traps = TrapField.forLevel(level);
