@@ -1,13 +1,13 @@
 # 2D Platformer Template
 
-A data-driven starter for online 2D platformers with **1–4 players per room**:
+A data-driven starter (working title **Overgrown**, set in `apps/web/src/components/brand.ts`) for online 2D platformers with **1–4 players per room**:
 
-- **Next.js 16 (App Router) + React 19** for the web shell: home screen, lobby, HUD, pause menu and overlays.
+- **Next.js 16 (App Router) + React 19** for the web shell: home screen, lobby, HUD, pause menu and overlays. On desktop the site runs on a CRT in a 3D desk scene (Three.js), and on phones inside a pocket handheld.
 - **Phaser 4** for the game itself. It runs only in the browser and is created and destroyed safely under React Strict Mode.
 - **Node.js game server** (`http` + `ws`) that runs every room at a fixed 60 Hz tick and holds the authoritative state. It streams snapshots and deltas over WebSockets.
 - **Shared TypeScript package** used by both client and server: types, wire protocol, tuning configs, level manifest, Tiled JSON parser and a deterministic movement simulation.
 
-Levels are Tiled JSON maps. Adding one takes a map file and one manifest entry. Two campaigns are included, one per game mode: four co-op levels (team button puzzles, then a rhino boss) and three race levels (several routes each). They are built from a 16 px terrain tileset by an auto-tiling generator, with traps and interactive entities (spikes, saws, trampolines, falling platforms, fans, rock-heads, spike-heads, breakable boxes). Players have 3 hearts. Missing images fall back to generated placeholder textures, so the game still boots without them.
+Levels are Tiled JSON maps. Adding one takes a map file and one manifest entry. Two campaigns are included, one per game mode: four co-op levels (team button puzzles, then a rhino boss) and three race levels (several routes each). They are built from a 16 px terrain tileset by an auto-tiling generator, with traps and interactive entities (spikes, saws, trampolines, falling platforms, fans, rock-heads, spike-heads, breakable boxes) and foes (mushrooms, chickens, wasps, monkeys, bulls and a rhino boss). Players have 3 hearts. Missing images fall back to generated placeholder textures, so the game still boots without them.
 
 ## Quick start
 
@@ -30,18 +30,19 @@ npm run bots -- --room ABCDE --attack      # …and swing at each other now and 
 
 ### Controls
 
-| Action | Keyboard | Gamepad | Touch |
-|---|---|---|---|
-| Move | ← → / A D | Left stick, D-pad | Walk stick (left) |
-| Jump (hold for higher) | Space, ↑, W, Z, K | A / B | Jump button |
-| Double jump | Jump again in mid-air | A / B again | Jump again |
-| Drop through planks | ↓ + Jump | Down + A | Walk stick down + Jump |
-| Attack (shoves other players, breaks boxes) | J, X | X / □ | Attack stick (bottom right): lift to swing, drag left/right first to swing that way |
-| Special ability | L, C, right-click (aim: arrow keys / mouse) | Y / RB (aim: right stick) | Special stick (above attack): drag to aim, lift to fire |
-| Pause menu | Esc | Start | Menu button (top right) |
-| Debug overlay | F3 | – | – |
+| Action | Keyboard | Gamepad | Touch (tablet) | Handheld (phone) |
+|---|---|---|---|---|
+| Move | ← → / A D | Left stick, D-pad | Walk stick (left) | D-pad |
+| Jump (hold for higher) | Space, ↑, W, Z, K | A / B | Jump button | A |
+| Double jump | Jump again in mid-air | A / B again | Jump again | A again |
+| Drop through planks | ↓ + Jump | Down + A | Walk stick down + Jump | Down + A |
+| Attack (shoves other players, breaks boxes) | J, X | X / □ | Attack stick (bottom right): lift to swing, drag left/right first to swing that way | B |
+| Special ability | L, C, right-click (aim: arrow keys / mouse) | Y / RB (aim: right stick) | Special stick (above attack): drag to aim, lift to fire | S thumbstick: drag to aim, let go to fire |
+| Pause menu | Esc | Start | Menu button (top right) | Start |
+| Full screen | – | – | – | Select |
+| Debug overlay | F3 | – | – | – |
 
-Touch controls appear on touch-first devices (phones, tablets) and on any device once its screen is touched.
+Touch controls appear on touch-first devices and on any device once its screen is touched; on phones the handheld's own buttons replace them (see [The desk scene and the handheld](#the-desk-scene-and-the-handheld)). The pause menu has a **Controls** page that shows the controls for the device in hand. The rows live in `apps/web/src/components/controls.tsx`, which the home page, the How to play screen and the pause menu all read.
 
 Pausing only stops the game when **every** connected player has the menu open. Solo, Esc really pauses.
 
@@ -52,7 +53,7 @@ Pausing only stops the game when **every** connected player has the menu open. S
 | `npm run dev` | Game server (auto-restart) + Next.js dev server + asset sync watcher |
 | `npm run build` | Bundles the server (`apps/server/dist`) and runs `next build` |
 | `npm start` | Runs the production builds |
-| `npm test` | Vitest: simulation, combat, traps, level pipeline, protocol, rooms, client netcode, state machines, synth (~290 tests, a few seconds) |
+| `npm test` | Vitest: simulation, combat, traps, level pipeline, protocol, rooms, client netcode, state machines, synth (~540 tests, a few seconds) |
 | `npm run typecheck` | `tsc` for every package (including tests and scripts) |
 | `npm run levels:validate` | Parses and validates every level in the manifest |
 | `npm run levels:solve [-- --level race-2] [-- --verbose]` | Proves every level can be finished by one player without losing a heart (search over the real simulation, traps included). On co-op levels every button counts as held, since the team puzzles need a second player |
@@ -90,7 +91,9 @@ apps/
     scripts/         bots.ts, validate-levels.ts
   web/               Next.js App Router + Phaser 4
     src/app/         routes: / and /room/[roomId]
-    src/components/  lobby, HUD, overlays, GameCanvas
+    src/components/  lobby, HUD, overlays, GameCanvas, controls list
+    src/desk/        SiteShell, 3D desk scene and weather, phone handheld
+    src/screen/      retro home and lobby screens for the CRT and the handheld
     src/net/         GameClient, prediction, interpolation (no React or Phaser imports)
     src/game/        Phaser: createGame, scenes, views, input, React bridge
 packages/
@@ -118,6 +121,7 @@ Gameplay values live in typed configs in `packages/shared/src/config/`. Client a
 | `players.ts` | max players, slot labels and colors, hitbox, hearts (`maxHp`), respawn delays (`respawnDelaysMs`, `soloMaxRespawnDelayMs`), name rules |
 | `characters.ts` | the playable roster (`CHARACTER_IDS`, display names), slot defaults, how a taken pick falls back |
 | `combat.ts` | `playerHits` (`false` makes swings cosmetic), swing duration, cooldown, active window, reach box, facing lock, stun, post-stun immunity, knockback |
+| `foes.ts` | the five foes and the rhino boss: hitbox, hit points, contact damage, stompability, sight, attacks and projectiles (see [Foes](#foes)) |
 | `fall.ts` | fall damage for players (`safeDropPx`, `pxPerHeart`, landing stun and invulnerability), foes and boxes (`safeDropPx`, `pxPerHit`), and boxes landing on things (`crush`) |
 | `entities.ts` | collectible values, hazard tile hitbox, kill plane, `checkpointScope` (`team`/`player`), `exitRule` (`all`/`any`) |
 | `abilities.ts` | special abilities: timings, reach, damage, cooldowns, `fruitRecharge` and `foeRecharge` (see [Special abilities](#special-abilities)) |
@@ -193,6 +197,12 @@ Each character has one special ability. Its cooldown is ranked by how strong the
 
 **Fruit recharges abilities.** Each point of a pickup takes 1% of the ability's full cooldown off: an apple, strawberry or coin (10 pts) 10%, a pineapple 20%, a melon or gem (50 pts) half. **Beating a foe recharges them too**, by twice its score: a mushroom (10 pts) 20%, a chicken or wasp 30%, a monkey 40%, a bull 60%, and the rhino boss refills it. Only the player who lands the final hit gets it (a frog's spit counts for the frog). Both work in both modes, so fruit and foes still matter in a race. The HUD shows your ability as a large badge in the bottom-left corner, and each player's chip shows a smaller one. The ring around the icon fills as it recharges, glows when it is ready, and flashes when fruit or a kill tops it up.
 
+### Foes
+
+Foes are Tiled objects too (class `mushroom`, `chicken`, `wasp`, `monkey`, `bull` or `rhino`); [docs/level-authoring.md](docs/level-authoring.md#foes) covers placing them. Players beat them with attacks, abilities (a frog's spit, a drop from the drone's claw) or falls, and mushrooms, chickens, wasps, bulls and the rhino can also be **stomped**: landing on one costs it a hit point and bounces the player up without costing a heart (touching one from the side still hurts). Monkeys can't be stomped. While a boss is alive the level's exit stays shut.
+
+Foes run on the server only and sleep until a player is within 600×400 px of them. A flying drone counts as a lookout too, so foes near a drone flown far from its pilot wake up. Tune them in `FOE_TUNING` (`packages/shared/src/config/foes.ts`).
+
 ### Traps and health
 
 Players have **3 hearts** (`PLAYER_CONFIG.maxHp`), shown in the HUD. Spikes, saws and spike-heads cost one heart, with a stun, a knockback away from the trap and about a second of invulnerability (the player blinks). At 0 hearts the player dies and respawns with full hearts. Lava, pits and being crushed by a rock-head kill outright.
@@ -250,13 +260,22 @@ The levels use `packages/shared/data/tilesets/terrain-tileset.png` (16×16 tiles
 
 The start sign, checkpoint flags and finish trophies are sprite sheets in `packages/shared/data/sprites/markers/` (64×64 frames, one row per animation; layout in `traps/trapArt.ts`). Collectibles are drawn procedurally in `apps/web/src/game/art/textures.ts`. Swap in real images by loading them in `BootScene` and pointing `EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
 
-### The desk scene
+### The desk scene and the handheld
 
-On desktop the site sits inside a 3D room: a night-time desk with an old CRT, built in Blender and drawn with Three.js. The whole site, game included, runs on the CRT. The page opens on a wide shot of the desk, then the camera moves in until the screen fills the window. **Lean back** (bottom left) returns to the wide shot, and clicking the screen or the room goes back in.
+The site is drawn in one of three frames, chosen once per page load by `apps/web/src/desk/SiteShell.tsx`:
 
-- `apps/web/src/desk/SiteShell.tsx` decides between the desk and the plain site. Phones and tablets, windows under 900×560, browsers without WebGL 2 and `?flat` in the address all get the plain site.
-- The site on the screen is an iframe of the same app, laid out at the screen's size in the close-up and mapped onto the glass every frame (`desk/homography.ts`). The browser address and tab title follow the iframe, so invite links still work.
-- `apps/web/src/desk/deskScene.ts` loads `public/scene/desk.glb` and `scene.json`, rebuilds Blender's lights and moves the camera.
+| Device | Frame |
+|---|---|
+| Desktop (window at least 900×560, WebGL 2) | **Desk:** the site runs on an old CRT in a 3D room |
+| Phone (coarse pointer, short side ≤ 600 px) | **Handheld:** the site runs on the screen of a pocket console |
+| Tablets, small windows, no WebGL 2, or `?flat` in the address | **Flat:** the plain site |
+
+In the desk and the handheld, the site is an iframe of the same app. The browser address and tab title follow the iframe, so invite links still work. Inside either frame the home page and lobby become retro **screens** (`apps/web/src/screen/`): a title screen with a menu, drawn on a fixed stage (960×720 design pixels on the CRT, 300×404 on the handheld) that is scaled to fit and never scrolls. A status line sits on top, and a hint bar at the bottom names the controls at hand. Arrows / WASD move the focus, Enter / Space pick and Esc / Backspace go back. The plain site keeps the long home page (`components/HomeScreen.tsx`).
+
+**The desk.** A night-time desk with a CRT, built in Blender and drawn with Three.js. The page opens on a wide shot, then the camera moves in until the screen fills the window. **Lean back** (bottom left) returns to the wide shot, and clicking the screen or the room goes back in. A storm plays outside the window (`desk/weather.ts`): the sky follows the visitor's local time (night, dawn, a grey day, dusk), with rain and lightning that flashes into the room. With reduced motion it is a still, rainy sky.
+
+- The iframe is laid out at the screen's size in the close-up and mapped onto the glass every frame (`desk/homography.ts`).
+- `desk/deskScene.ts` loads `public/scene/desk.glb` and `scene.json`, rebuilds Blender's lights and moves the camera.
 
 To change the room, edit `E:/BLENDER/Overgrown.blend` (or your copy) and export it again. The export needs the baked textures in `showcase/textures/web/`; `showcase/blender/make_web_textures.py` makes them.
 
@@ -265,6 +284,8 @@ To change the room, edit `E:/BLENDER/Overgrown.blend` (or your copy) and export 
 ```
 
 The export leaves the .blend unchanged. It replaces the CRT's picture with dark glass, records the glass's exact bounds in `scene.json`, and moves the sticky note off the glass.
+
+**The handheld.** Phones get a pocket console (`desk/HandheldShell.tsx`). Held upright, its controls sit under the screen; turned sideways, they split left and right. Its buttons are the touch controls (see [Controls](#controls)), and the on-screen sticks, rotate nudge and full-screen prompt stay hidden. The S thumbstick's cap shows your ability and its recharge ring. In menus the pad moves the focus and nudges sliders, A picks and B backs out. While a game runs, the screen turns 16:9 and the HUD may scale smaller. The two sides talk through `postMessage` (`desk/handheldPad.ts`): the shell sends button presses in, and the game sends back whether it is running and whose ability to show.
 
 ## React ↔ Phaser integration
 
