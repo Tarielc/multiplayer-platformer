@@ -257,12 +257,17 @@ data = {
     "screenMaterial": "OG_Screen_Race",
     "neonMaterial": "OG_Neon",
     # Three.js has no shadowed area lights: the moon (outside, through the blinds) becomes a
-    # shadow-casting spot so the slats still stripe the room.
+    # shadow-casting spot so the slats still stripe the room. `gain` dims a light in the browser
+    # only (the room read too bright there with the EEVEE values).
     "lightHints": {"Moon_Key": {"as": "spot", "angleDeg": 24, "penumbra": 0.5, "shadow": True, "mapSize": 2048},
-                   "Lamp_Spot": {"shadow": True, "mapSize": 1024}},
+                   "Lamp_Spot": {"shadow": True, "mapSize": 1024, "gain": 0.55},
+                   "Lava_Light": {"gain": 0.25},
+                   "Neon_Spill": {"gain": 0.7},
+                   "Rim_Magenta": {"gain": 0.6},
+                   "Rim_Blue": {"gain": 0.75}},
     # multipliers on top of the physical conversion, tuned against the EEVEE render
-    "tuning": {"exposure": 1.0, "area": 1.0, "point": 1.0, "spot": 1.0, "ambient": 0.0,
-               "bloom": {"strength": 0.22, "radius": 0.5, "threshold": 1.2}},
+    "tuning": {"exposure": 0.9, "area": 1.0, "point": 1.0, "spot": 1.0, "ambient": 0.0,
+               "bloom": {"strength": 0.16, "radius": 0.5, "threshold": 1.35}},
 }
 scr_obj = bpy.data.objects["SRC__CRT_Screen"]
 data["camera"]["orbitTarget"] = t_vec(scr_obj.matrix_world.translation)

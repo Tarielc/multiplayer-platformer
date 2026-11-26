@@ -336,10 +336,10 @@ export function createWeather(scene: THREE.Scene, options: { reducedMotion: bool
       boltMaterial.opacity = bolt.visible ? Math.min(1, flash * 1.4) : 0;
 
       if (windowLight) {
-        windowLight.intensity = baseIntensity * (palette.light + flash * 5);
+        windowLight.intensity = baseIntensity * (palette.light + flash * 3.2);
         windowLight.color.copy(baseColor).multiply(palette.lightTint).lerp(flashTint, Math.min(1, flash));
       }
-      ambient.intensity = palette.ambient + flash * 0.22;
+      ambient.intensity = palette.ambient + flash * 0.14;
     },
     dispose() {
       group.traverse((o) => {

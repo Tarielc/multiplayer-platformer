@@ -65,7 +65,8 @@ interface SceneConfig {
   loopSeconds: number;
   bobMetres: number;
   neonMaterial: string;
-  lightHints: Record<string, { as?: string; angleDeg?: number; penumbra?: number; shadow?: boolean; mapSize?: number }>;
+  /** Per light: how to rebuild it, and `gain`, a multiplier on its brightness. */
+  lightHints: Record<string, { as?: string; angleDeg?: number; penumbra?: number; shadow?: boolean; mapSize?: number; gain?: number }>;
   tuning: {
     exposure?: number;
     area?: number;
@@ -162,6 +163,7 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
       cam.near = 0.1;
       cam.far = 6;
     }
+    light.intensity *= hint.gain ?? 1;
     light.name = L.name;
     scene.add(light);
   }

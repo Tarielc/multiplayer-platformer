@@ -280,19 +280,32 @@
   },
   "Lamp_Spot": {
    "shadow": true,
-   "mapSize": 1024
+   "mapSize": 1024,
+   "gain": 0.55
+  },
+  "Lava_Light": {
+   "gain": 0.25
+  },
+  "Neon_Spill": {
+   "gain": 0.7
+  },
+  "Rim_Magenta": {
+   "gain": 0.6
+  },
+  "Rim_Blue": {
+   "gain": 0.75
   }
  },
  "tuning": {
-  "exposure": 1.0,
+  "exposure": 0.9,
   "area": 1.0,
   "point": 1.0,
   "spot": 1.0,
   "ambient": 0.0,
   "bloom": {
-   "strength": 0.22,
+   "strength": 0.16,
    "radius": 0.5,
-   "threshold": 1.2
+   "threshold": 1.35
   }
  },
  "screen": {
