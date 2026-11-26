@@ -19,6 +19,15 @@ apps/web/public/assets/
 # overview images from scripts/preview-levels.ts
 .level-previews/
 
+# local art working files: the desk scene's source textures and fonts (read by
+# scripts/blender/export_desk_scene.py), Blender files and their backups
+showcase/
+*.blend
+*.blend[0-9]*
+
+# local Claude Code settings
+.claude/settings.local.json
+
 # misc
 coverage/
 .DS_Store
