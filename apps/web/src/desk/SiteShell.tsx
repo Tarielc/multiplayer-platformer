@@ -1,9 +1,17 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { GAME_TITLE } from '@/components/brand';
-import type { DeskScene, DeskView } from './deskScene';
+import type { DeskHit, DeskScene, DeskView } from './deskScene';
 import { HandheldShell } from './HandheldShell';
 import { quadTransform } from './homography';
 import styles from './SiteShell.module.css';
@@ -96,6 +104,15 @@ function DeskShell() {
   // The computer waits switched off in the room; a click (or a key) turns it on and sits down.
   const [on, setOn] = useState(false);
   const onRef = useRef(false);
+  // An item picked up off the desk (its name), and whether it is still off the desk: the site on
+  // the screen steps aside until it is back down.
+  const [held, setHeld] = useState<string | null>(null);
+  const heldRef = useRef<string | null>(null);
+  const [lifted, setLifted] = useState(false);
+  // What the pointer is on, and the little label that follows it.
+  const [hover, setHover] = useState<DeskHit | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -121,7 +138,12 @@ function DeskShell() {
           onSettled: (settled) => {
             setMoving(false);
             setView(settled);
-            if (settled === 'screen') frameRef.current?.contentWindow?.focus();
+            if (settled === 'screen' && !heldRef.current) frameRef.current?.contentWindow?.focus();
+          },
+          onHoverChange: setHover,
+          onPutBack: () => {
+            setLifted(false);
+            if (sceneRef.current?.view === 'screen' && !heldRef.current) frameRef.current?.contentWindow?.focus();
           },
         }),
       )
@@ -143,7 +165,7 @@ function DeskShell() {
 
   const goTo = (next: DeskView) => {
     const scene = sceneRef.current;
-    if (!scene) return;
+    if (!scene || scene.view === next) return;
     setMoving(true);
     setView(next);
     scene.setView(next);
@@ -155,13 +177,110 @@ function DeskShell() {
     onRef.current = true;
     setOn(true);
     scene.setPower(true);
-    goTo('screen');
+    if (!heldRef.current) goTo('screen');
+  };
+
+  const powerOff = () => {
+    const scene = sceneRef.current;
+    if (!scene || !onRef.current) return;
+    onRef.current = false;
+    setOn(false);
+    scene.setPower(false);
+    goTo('room');
+  };
+
+  const pickUp = (hit: DeskHit & { kind: 'item' }) => {
+    const scene = sceneRef.current;
+    if (!scene || heldRef.current) return;
+    heldRef.current = hit.label;
+    setHeld(hit.label);
+    setLifted(true);
+    setHover(null);
+    scene.inspect(hit.id);
+  };
+
+  const putBack = () => {
+    if (!heldRef.current) return;
+    heldRef.current = null;
+    setHeld(null);
+    sceneRef.current?.inspect(null);
+  };
+
+  const tipAt = useRef('translate(0px, 0px)');
+  const moveTip = (x: number, y: number) => {
+    tipAt.current = `translate(${Math.round(x + 16)}px, ${Math.round(y + 18)}px)`;
+    if (tipRef.current) tipRef.current.style.transform = tipAt.current;
+  };
+
+  // The room under the pointer: pick things up, flip the power switch, sit down at the screen.
+  const onStagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    drag.current = { x: event.clientX, y: event.clientY, moved: false };
+    if (heldRef.current) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onStagePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const d = drag.current;
+    if (d && heldRef.current && event.buttons) {
+      const dx = event.clientX - d.x;
+      const dy = event.clientY - d.y;
+      if (!d.moved && Math.hypot(dx, dy) < 4) return;
+      d.moved = true;
+      d.x = event.clientX;
+      d.y = event.clientY;
+      scene.turnItem(dx * 0.01, dy * 0.01);
+      return;
+    }
+    const hit = event.pointerType === 'touch' ? null : scene.hover(event.clientX, event.clientY);
+    moveTip(event.clientX, event.clientY);
+    setHover((prev) => (prev?.kind === hit?.kind && prev?.label === hit?.label ? prev : hit));
+  };
+
+  const onStageClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const scene = sceneRef.current;
+    const d = drag.current;
+    drag.current = null;
+    if (!scene || d?.moved) return;
+    const hit = scene.hitTest(event.clientX, event.clientY);
+    // whatever happens next moves things under the pointer: the label waits for the next move
+    scene.hover(null);
+    setHover(null);
+    if (heldRef.current) {
+      if (!hit) putBack();
+      return;
+    }
+    if (hit?.kind === 'item') pickUp(hit);
+    else if (hit?.kind === 'power') (onRef.current ? powerOff : powerOn)();
+    else if (!onRef.current) powerOn();
+    else if (scene.view === 'room') goTo('screen');
+  };
+
+  const onStageLeave = () => {
+    sceneRef.current?.hover(null);
+    setHover(null);
   };
 
   // Keys pressed while the outer page has focus belong to the game on the screen; with the
-  // computer still off, any key switches it on.
+  // computer still off, any key switches it on. Holding an item, the keys turn it instead.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (heldRef.current) {
+        const scene = sceneRef.current;
+        const turns: Record<string, [number, number]> = {
+          ArrowLeft: [-0.3, 0],
+          ArrowRight: [0.3, 0],
+          ArrowUp: [0, -0.3],
+          ArrowDown: [0, 0.3],
+        };
+        if (event.key === 'Escape') putBack();
+        else if (turns[event.key]) scene?.turnItem(...turns[event.key]!);
+        else if (event.key === '+' || event.key === '=') scene?.zoomItem(1.2);
+        else if (event.key === '-' || event.key === '_') scene?.zoomItem(1 / 1.2);
+        else return;
+        event.preventDefault();
+        return;
+      }
       if (!onRef.current) {
         if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.key === 'Tab') return;
         if (!sceneRef.current) return;
@@ -182,8 +301,25 @@ function DeskShell() {
 
   const atScreen = view === 'screen' && !moving;
   return (
-    <div className={styles.desk} data-view={view} data-ready={ready} data-power={on ? 'on' : 'off'}>
-      <div ref={stageRef} className={styles.stage} aria-hidden onClick={() => view === 'room' && goTo('screen')} />
+    <div
+      className={styles.desk}
+      data-view={view}
+      data-ready={ready}
+      data-power={on ? 'on' : 'off'}
+      data-held={held !== null}
+      data-lifted={lifted}
+      data-hover={hover?.kind ?? 'none'}
+    >
+      <div
+        ref={stageRef}
+        className={styles.stage}
+        aria-hidden
+        onPointerDown={onStagePointerDown}
+        onPointerMove={onStagePointerMove}
+        onPointerLeave={onStageLeave}
+        onClick={onStageClick}
+        onWheel={(event) => heldRef.current && sceneRef.current?.zoomItem(Math.exp(-event.deltaY * 0.0015))}
+      />
 
       <div ref={screenRef} className={styles.screen}>
         <iframe
@@ -202,10 +338,30 @@ function DeskShell() {
         )}
       </div>
 
-      {ready && !on && (
-        <button type="button" className={styles.powerCatcher} onClick={powerOn} autoFocus>
-          <span className={`${styles.powerHint} px-notch`}>Click anywhere to turn on the computer</span>
-        </button>
+      {hover && !held && (
+        <div ref={tipRef} className={`${styles.tip} px-notch`} style={{ transform: tipAt.current }} aria-hidden>
+          <span className={styles.tipTitle}>{hover.kind === 'item' ? hover.label : 'Power'}</span>
+          <span className={styles.tipAction}>{hover.kind === 'item' ? 'Click to pick up' : hover.label}</span>
+        </div>
+      )}
+
+      {ready && !on && !held && (
+        <div className={styles.powerBar}>
+          <button type="button" className={`${styles.powerHint} px-notch`} onClick={powerOn} autoFocus>
+            Click anywhere to turn on the computer
+          </button>
+          <span className={styles.powerTip}>Things on the desk can be picked up</span>
+        </div>
+      )}
+
+      {held && (
+        <div className={`${styles.inspectBar} px-notch`} role="dialog" aria-label={held}>
+          <span className={styles.inspectName}>{held}</span>
+          <span className={styles.inspectHelp}>Drag or arrow keys to turn · Scroll to zoom</span>
+          <button type="button" className={`${styles.putBack} px-notch`} onClick={putBack} autoFocus>
+            Put back
+          </button>
+        </div>
       )}
 
       <div className={styles.controls}>

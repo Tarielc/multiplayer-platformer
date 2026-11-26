@@ -270,6 +270,83 @@
  ],
  "screenMaterial": "OG_Screen_Race",
  "neonMaterial": "OG_Neon",
+ "pickables": [
+  {
+   "node": "Pick_ArcadeStick",
+   "label": "Arcade stick"
+  },
+  {
+   "node": "Pick_Cartridge",
+   "label": "Game cartridge"
+  },
+  {
+   "node": "Pick_Cassettes",
+   "label": "Cassette tapes"
+  },
+  {
+   "node": "Pick_Clock",
+   "label": "Alarm clock"
+  },
+  {
+   "node": "Pick_Floppy0",
+   "label": "Floppy disk"
+  },
+  {
+   "node": "Pick_Floppy1",
+   "label": "Floppy disk"
+  },
+  {
+   "node": "Pick_Gamepad",
+   "label": "Gamepad",
+   "hide": [
+    "Gamepad_Cable"
+   ]
+  },
+  {
+   "node": "Pick_Handheld",
+   "label": "Handheld console"
+  },
+  {
+   "node": "Pick_Headphones",
+   "label": "Headphones"
+  },
+  {
+   "node": "Pick_MaskDude",
+   "label": "Mask Dude figure"
+  },
+  {
+   "node": "Pick_Mug",
+   "label": "Coffee mug"
+  },
+  {
+   "node": "Pick_NinjaFrog",
+   "label": "Ninja Frog figure"
+  },
+  {
+   "node": "Pick_PuzzleCube",
+   "label": "Puzzle cube"
+  },
+  {
+   "node": "Pick_SodaCan",
+   "label": "Soda can"
+  },
+  {
+   "node": "Pick_VirtualGuy",
+   "label": "Virtual Guy figure"
+  }
+ ],
+ "power": {
+  "buttons": [
+   "CRT_PowerSwitch",
+   "PC_PowerButton"
+  ],
+  "leds": [
+   "CRT_PowerLED",
+   "PC_LED_0",
+   "PC_LED_1",
+   "PC_Floppy_LED"
+  ]
+ },
  "lightHints": {
   "Moon_Key": {
    "as": "spot",

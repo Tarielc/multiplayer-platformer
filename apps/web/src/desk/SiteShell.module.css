@@ -107,36 +107,155 @@
   display: none;
 }
 
-/* Off: the whole page is the power switch. */
-.powerCatcher {
+/* Off: a click anywhere on the room (or any key) is the power switch; the hint sits at the bottom. */
+.powerBar {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: 28px;
   display: grid;
-  align-items: end;
   justify-items: center;
-  padding: 0 16px 28px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.powerCatcher:focus-visible {
-  outline: none;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .powerHint {
   padding: 10px 16px;
+  border: 0;
   background: rgb(7 17 13 / 82%);
   color: var(--bone);
   font-family: var(--ui);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
   animation: hintPulse 2.4s steps(4) infinite;
 }
 
-.powerCatcher:focus-visible .powerHint {
+.powerHint:focus-visible {
   outline: 3px solid var(--firefly);
+  outline-offset: 3px;
+}
+
+.powerTip {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lichen);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 80%);
+}
+
+/* What the pointer is on: a small label that follows it. */
+.tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: grid;
+  gap: 3px;
+  padding: 7px 10px;
+  background: rgb(7 17 13 / 88%);
+  color: var(--bone);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.tipTitle {
+  font-family: var(--ui);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.tipAction {
+  font-family: var(--ui);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.desk[data-hover='item'] .stage {
+  cursor: grab;
+}
+
+.desk[data-hover='power'] .stage,
+.desk[data-power='off'][data-hover='none'] .stage {
+  cursor: pointer;
+}
+
+.desk[data-held='true'] .stage {
+  cursor: default;
+}
+
+.desk[data-held='true'] .stage:active {
+  cursor: grabbing;
+}
+
+/* Off, the dark glass is part of the room (a click on it switches the computer on). */
+.desk[data-power='off'] .screen {
+  pointer-events: none;
+}
+
+/* An item is up in front of the camera: the site on the screen steps out of its way. */
+.screen {
+  transition: opacity 0.25s;
+}
+
+.desk[data-lifted='true'] .screen {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.desk[data-held='true'] .controls {
+  display: none;
+}
+
+.inspectBar {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 10px 10px 18px;
+  transform: translateX(-50%);
+  background: rgb(7 17 13 / 86%);
+  color: var(--bone);
+  white-space: nowrap;
+}
+
+.inspectName {
+  font-family: var(--display);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--moss-lit);
+}
+
+.inspectHelp {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.putBack {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--firefly);
+  color: var(--night);
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.putBack:focus-visible {
+  outline: 3px solid var(--bone);
   outline-offset: 3px;
 }
 
@@ -246,5 +365,9 @@
   .desk[data-power='on'] .frame,
   .powerHint {
     animation: none;
+  }
+
+  .screen {
+    transition: none;
   }
 }

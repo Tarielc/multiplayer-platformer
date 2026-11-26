@@ -143,7 +143,11 @@ for n in ("CRT_StickyNote", "CRT_StickyText"):   # clear of the glass, still on 
 dg.update()
 sources = [o for o in sc.objects if o.type in GEOM and not o.hide_render]
 names = {o: o.name for o in sources}
-for o in sources:
+# Things a visitor can pick up: an object tagged ["pickable"] = label (usually an empty) and
+# everything under it. They keep their own node in the glTF so the site can lift them.
+pick_roots = [o for o in sc.objects if o.get("pickable") and not o.hide_render]
+names.update({o: o.name for o in pick_roots})
+for o in sources + pick_roots:
     o.name = "SRC__" + o.name
 for m in list(bpy.data.materials):
     if not m.name.startswith("SRC__"):
@@ -168,6 +172,23 @@ def box_uv(me, mw):
             uv.data[li].uv = {2: (co.x, co.y), 1: (co.x, co.z), 0: (co.y, co.z)}[ax]
 
 
+pick_nodes = {}
+for r in pick_roots:
+    e = bpy.data.objects.new(names[r], None)
+    coll.objects.link(e)
+    e.matrix_world = r.matrix_world.copy()
+    pick_nodes[r] = e
+
+
+def pick_root_of(o):
+    p = o
+    while p is not None:
+        if p in pick_nodes:
+            return p
+        p = p.parent
+    return None
+
+
 tris = 0
 for o in sources:
     name = names[o]
@@ -179,6 +200,10 @@ for o in sources:
     me.name = name
     new = bpy.data.objects.new(name, me)
     coll.objects.link(new)
+    root = pick_root_of(o)
+    if root is not None:
+        new.parent = pick_nodes[root]
+        new.matrix_parent_inverse = Matrix.Identity(4)
     new.matrix_world = o.matrix_world.copy()
     variant = None
     if "Leaf" in name or "Crown" in name:             # leaves get one of 3 green shades
@@ -256,6 +281,12 @@ data = {
     "lavaBlobs": [n for n in (names[o] for o in sources) if n.startswith("Lava_Blob")],
     "screenMaterial": "OG_Screen_Race",
     "neonMaterial": "OG_Neon",
+    "pickables": [{"node": names[r], "label": r["pickable"],
+                   **({"hide": ["Gamepad_Cable"]} if names[r] == "Pick_Gamepad" else {})}
+                  for r in sorted(pick_roots, key=lambda r: names[r])],
+    # the computer's power: either switch toggles it; the LEDs go dark while it is off
+    "power": {"buttons": ["CRT_PowerSwitch", "PC_PowerButton"],
+              "leds": ["CRT_PowerLED", "PC_LED_0", "PC_LED_1", "PC_Floppy_LED"]},
     # Three.js has no shadowed area lights: the moon (outside, through the blinds) becomes a
     # shadow-casting spot so the slats still stripe the room. `gain` dims a light in the browser
     # only (the room read too bright there with the EEVEE values).

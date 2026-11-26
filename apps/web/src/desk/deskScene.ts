@@ -35,13 +35,30 @@ export interface DeskSceneOptions {
   onSettled?: (view: DeskView) => void;
   /** Start with the computer switched off (its glow on the room dark) until `setPower(true)`. */
   startOff?: boolean;
+  /** A held item has been put back down (see `DeskScene.inspect`). */
+  onPutBack?: () => void;
+  /** The camera moved and something else is under the (still) pointer now (see `DeskScene.hover`). */
+  onHoverChange?: (hit: DeskHit | null) => void;
 }
+
+/** What is under the pointer: something on the desk to pick up, or one of the computer's power switches. */
+export type DeskHit = { kind: 'item'; id: string; label: string } | { kind: 'power'; label: string };
 
 export interface DeskScene {
   setView(view: DeskView, instant?: boolean): void;
   readonly view: DeskView;
-  /** Switch the computer on or off: its screen's glow on the room fades in or out. */
+  /** Switch the computer on or off: its screen's glow on the room and its LEDs fade in or out. */
   setPower(on: boolean): void;
+  /** What is at this point of the window (client px); with an item held, only that item counts. */
+  hitTest(clientX: number, clientY: number): DeskHit | null;
+  /** Like `hitTest`, and lights up what is under the pointer. `null` clears it. */
+  hover(clientX: number | null, clientY?: number): DeskHit | null;
+  /** Lift an item up in front of the camera (the room darkens behind it), or put it back (`null`). */
+  inspect(id: string | null): void;
+  /** Turn the held item (radians, around the view's vertical and horizontal axes). */
+  turnItem(yaw: number, pitch: number): void;
+  /** Bring the held item closer (> 1) or further (< 1). */
+  zoomItem(factor: number): void;
   dispose(): void;
 }
 
@@ -69,6 +86,10 @@ interface SceneConfig {
   loopSeconds: number;
   bobMetres: number;
   neonMaterial: string;
+  /** Things on the desk a visitor can pick up: a node each, and what to hide while it is held. */
+  pickables?: { node: string; label: string; hide?: string[] }[];
+  /** The computer's power switches, and the LEDs that go dark while it is off. */
+  power?: { buttons: string[]; leds: string[] };
   /** Per light: how to rebuild it, and `gain`, a multiplier on its brightness. */
   lightHints: Record<string, { as?: string; angleDeg?: number; penumbra?: number; shadow?: boolean; mapSize?: number; gain?: number }>;
   tuning: {
@@ -101,6 +122,32 @@ const LOOK_EDGE_X = 0.045;
 const LOOK_EDGE_Y = 0.06;
 /** How quickly the camera turns toward where it should look (per second). */
 const LOOK_RATE = 1.6;
+/** In the close-up the room around the screen dims by this share, so the game stands out. */
+const FOCUS_DIM = 0.42;
+/** Picking an item up (or putting it back) takes this long. */
+const LIFT_SECONDS = 0.55;
+/** A held item's bounding sphere fills this share of the window's half-height (before zooming). */
+const HOLD_FILL = 0.42;
+/** The room behind a held item darkens to this opacity (tone mapping lifts it back a fair way). */
+const BACKDROP_OPACITY = 0.965;
+/** How a held item first turns to the viewer: its top tipped forward, a quarter-turn sideways. */
+const HOLD_TILT = new THREE.Euler(0.38, -0.32, 0, 'YXZ');
+/** Added to an item's glow while the pointer is on it. */
+const HOVER_GLOW = new THREE.Color().setRGB(0.05, 0.075, 0.035, THREE.LinearSRGBColorSpace);
+
+interface Pickable {
+  id: string;
+  label: string;
+  /** Parent of the item's own node, at its centre: it moves and turns around its middle. */
+  pivot: THREE.Group;
+  rest: THREE.Vector3;
+  radius: number;
+  meshes: THREE.Mesh[];
+  /** The item's own (cloned) materials and their glow at rest. */
+  glow: { material: THREE.MeshStandardMaterial; emissive: THREE.Color }[];
+  /** Hidden while the item is held (the gamepad's cable). */
+  hide: THREE.Object3D[];
+}
 
 const linear = (rgb: readonly number[]) => new THREE.Color().setRGB(rgb[0]!, rgb[1]!, rgb[2]!, THREE.LinearSRGBColorSpace);
 /**
@@ -228,7 +275,63 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     material.emissiveIntensity *= 0.45;
   }
   const weather = createWeather(scene, { reducedMotion: reduced, windowLight: scene.getObjectByName('Moon_Key') as THREE.Light | undefined });
-  mergeStaticMeshes(root, new Set([...cfg.floaters, ...cfg.lavaBlobs]));
+
+  // Things to pick up: each moves to a pivot at its centre (outside `root`, so the merge below
+  // leaves it alone), with materials of its own to light up under the pointer.
+  const keep = new Set([...cfg.floaters, ...cfg.lavaBlobs]);
+  const pickables: Pickable[] = [];
+  const box = new THREE.Box3();
+  const sphere = new THREE.Sphere();
+  for (const entry of cfg.pickables ?? []) {
+    const node = find(entry.node);
+    if (!node) continue;
+    for (const name of entry.hide ?? []) keep.add(name);
+    box.setFromObject(node);
+    const pivot = new THREE.Group();
+    box.getCenter(pivot.position);
+    scene.add(pivot);
+    pivot.updateMatrixWorld();
+    pivot.attach(node);
+    const item: Pickable = {
+      id: entry.node,
+      label: entry.label,
+      pivot,
+      rest: pivot.position.clone(),
+      radius: Math.max(0.02, box.getBoundingSphere(sphere).radius),
+      meshes: [],
+      glow: [],
+      hide: (entry.hide ?? []).map(find).filter((o): o is THREE.Object3D => Boolean(o)),
+    };
+    node.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const own = (Array.isArray(o.material) ? o.material : [o.material]).map((m: THREE.Material) => m.clone());
+      o.material = Array.isArray(o.material) ? own : own[0]!;
+      for (const m of own) {
+        if (m instanceof THREE.MeshStandardMaterial && !m.emissiveMap) item.glow.push({ material: m, emissive: m.emissive.clone() });
+      }
+      o.userData.pick = pickables.length;
+      item.meshes.push(o);
+    });
+    pickables.push(item);
+  }
+  // The power switches, and the LEDs that follow the power (each with its own material).
+  const powerButtons = (cfg.power?.buttons ?? [])
+    .map(find)
+    .filter((o): o is THREE.Mesh => o instanceof THREE.Mesh)
+    .map((o) => {
+      keep.add(o.name);
+      return { o, rest: o.position.clone() };
+    });
+  const leds = (cfg.power?.leds ?? [])
+    .map(find)
+    .filter((o): o is THREE.Mesh => o instanceof THREE.Mesh)
+    .map((o) => {
+      keep.add(o.name);
+      const material = (o.material as THREE.MeshStandardMaterial).clone();
+      o.material = material;
+      return { name: o.name, material, color: material.color.clone(), emissive: material.emissiveIntensity };
+    });
+  mergeStaticMeshes(root, keep);
   // Nothing else moves: draw the shadow maps once.
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
@@ -321,7 +424,109 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
   const crtGlowFull = crtGlow?.intensity ?? 0;
   let power = options.startOff ? 0 : 1;
   let powerGoal = power;
-  if (crtGlow) crtGlow.intensity = crtGlowFull * power;
+  // Seconds since the computer was switched on (the drive light chatters while it boots).
+  let boot = Infinity;
+  let press = 0; // a power switch pushed in: 1 … 0
+  const applyPower = () => {
+    // A tube warming up: a quick flash, then settling to its glow.
+    const flash = powerGoal > 0 && !reduced ? Math.sin(power * Math.PI) * 0.8 : 0;
+    if (crtGlow) crtGlow.intensity = crtGlowFull * (power + flash);
+    const chatter = boot < 1.8 ? (Math.sin(boot * 53) * Math.sin(boot * 31) > 0.1 ? 1 : 0.15) : 1;
+    for (const led of leds) {
+      const level = power * (led.name === 'PC_LED_1' ? chatter : 1);
+      led.material.emissiveIntensity = led.emissive * level;
+      led.material.color.copy(led.color).multiplyScalar(0.22 + 0.78 * level);
+    }
+    for (const b of powerButtons) b.o.position.z = b.rest.z - 0.0025 * press;
+  };
+  applyPower();
+
+  // Holding an item: it rides up to the camera while a dark backdrop fades in behind it, lit by
+  // a light of its own.
+  let held: Pickable | null = null;
+  let hovered: Pickable | null = null;
+  let hoverAt: { x: number; y: number; key: string } | null = null;
+  let lift = 0;
+  let liftGoal = 0;
+  const turnGoal = new THREE.Quaternion();
+  const turn = new THREE.Quaternion();
+  let zoomGoal = 1;
+  let zoom = 1;
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: 0x010204, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }),
+  );
+  backdrop.visible = false;
+  backdrop.renderOrder = 10;
+  scene.add(backdrop);  const holdLight = new THREE.DirectionalLight(0xfff0dc, 0);
+  scene.add(holdLight, holdLight.target);
+  const holdPos = new THREE.Vector3();
+  const holdQuat = new THREE.Quaternion();
+  const identity = new THREE.Quaternion();
+  const axis = new THREE.Vector3();
+  const nudge = new THREE.Quaternion();
+  const setGlow = (item: Pickable | null, on: boolean) => {
+    if (!item) return;
+    for (const g of item.glow) {
+      g.material.emissive.copy(g.emissive);
+      if (on) g.material.emissive.add(HOVER_GLOW);
+    }
+  };
+  const setShadows = (item: Pickable, cast: boolean) => {
+    for (const m of item.meshes) m.castShadow = cast;
+    for (const o of item.hide) o.visible = cast;
+    renderer.shadowMap.needsUpdate = true;
+  };
+  const placeHeld = () => {
+    if (!held) return;
+    const e = ease(lift);
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const d = Math.max(held.radius / (tanHalf * HOLD_FILL) / zoom, held.radius * 1.7 + 0.05);
+    holdPos.set(0, 0, -d).applyQuaternion(camera.quaternion).add(camera.position);
+    holdQuat.copy(camera.quaternion).multiply(turn);
+    held.pivot.position.lerpVectors(held.rest, holdPos, e);
+    held.pivot.position.y += Math.sin(e * Math.PI) * 0.05;
+    held.pivot.quaternion.slerpQuaternions(identity, holdQuat, e);
+    // the backdrop: just behind the item, filling the view
+    const back = d + held.radius * 1.2 + 0.05;
+    const h = 2 * tanHalf * back * 1.25;
+    backdrop.position.set(0, 0, -back).applyQuaternion(camera.quaternion).add(camera.position);
+    backdrop.quaternion.copy(camera.quaternion);
+    backdrop.scale.set(h * camera.aspect, h, 1);
+    (backdrop.material as THREE.MeshBasicMaterial).opacity = BACKDROP_OPACITY * e;
+    backdrop.visible = e > 0.001;
+    holdLight.intensity = 2.4 * e;
+    holdLight.position.set(-0.5, 0.7, 0.6).applyQuaternion(camera.quaternion).add(held.pivot.position);
+    holdLight.target.position.copy(held.pivot.position);
+    holdLight.target.updateMatrixWorld();
+  };
+
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const targets: THREE.Object3D[] = [...pickables.flatMap((p) => p.meshes), ...powerButtons.map((b) => b.o)];
+  const hitAt = (clientX: number, clientY: number): DeskHit | null => {
+    const rect = container.getBoundingClientRect();
+    ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    const list = held ? held.meshes : targets;
+    const hit = raycaster.intersectObjects(list, false)[0];
+    if (!hit) return null;
+    const index = hit.object.userData.pick as number | undefined;
+    if (index !== undefined) {
+      const item = pickables[index]!;
+      return { kind: 'item', id: item.id, label: item.label };
+    }
+    return { kind: 'power', label: powerGoal > 0.5 ? 'Switch off' : 'Switch on' };
+  };
+  const hitKey = (hit: DeskHit | null) => (hit ? `${hit.kind}:${hit.kind === 'item' ? hit.id : hit.label}` : '');
+  const setHovered = (hit: DeskHit | null) => {
+    const item = !held && hit?.kind === 'item' ? (pickables.find((p) => p.id === hit.id) ?? null) : null;
+    if (item === hovered) return;
+    setGlow(hovered, false);
+    setGlow(item, true);
+    hovered = item;
+    dirty = true;
+  };
   let raf = 0;
   let last = 0;
   let lastDraw = 0;
@@ -348,17 +553,35 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
         options.onSettled?.(view);
       }
     }
-    if (power !== powerGoal) {
+    if (power !== powerGoal || boot < 1.8 || press > 0) {
       const step = reduced ? 1 : dt / POWER_SECONDS;
       power = powerGoal > power ? Math.min(powerGoal, power + step) : Math.max(powerGoal, power - step);
-      // A tube warming up: a quick flash, then settling to its glow.
-      const flash = powerGoal > 0 && !reduced ? Math.sin(power * Math.PI) * 0.8 : 0;
-      if (crtGlow) crtGlow.intensity = crtGlowFull * (power + flash);
+      boot += dt;
+      press = Math.max(0, press - dt / 0.18);
+      applyPower();
       moving = true;
     }
 
+    // an item on its way up or down, or being turned
+    if (held) {
+      if (lift !== liftGoal) {
+        const step = reduced ? 1 : dt / LIFT_SECONDS;
+        lift = liftGoal > lift ? Math.min(liftGoal, lift + step) : Math.max(liftGoal, lift - step);
+        moving = true;
+      }
+      const k = reduced ? 1 : Math.min(1, dt * 12);
+      if (turn.angleTo(turnGoal) > 1e-4) {
+        turn.slerp(turnGoal, k);
+        moving = true;
+      }
+      if (Math.abs(zoom - zoomGoal) > 1e-4) {
+        zoom += (zoomGoal - zoom) * k;
+        moving = true;
+      }
+    }
+
     // in the wide shot the camera drifts a little after the pointer
-    const goal = view === 'room' && !reduced ? pointer : null;
+    const goal = view === 'room' && !reduced && !held ? pointer : null;
     const gx = goal ? goal.x * 0.09 : 0;
     const gy = goal ? -goal.y * 0.04 : 0;
     if (Math.abs(gx - drift.x) > 1e-5 || Math.abs(gy - drift.y) > 1e-5) {
@@ -368,7 +591,7 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     }
 
     // at the edge of the window the camera looks around
-    if (reduced || !pointerIn) lookGoal.set(0, 0);
+    if (reduced || !pointerIn || held) lookGoal.set(0, 0);
     else lookGoal.set(edgePull(pointer.x, LOOK_EDGE_X * 2), edgePull(pointer.y, LOOK_EDGE_Y * 2));
     if (Math.abs(lookGoal.x - look.x) > 1e-4 || Math.abs(lookGoal.y - look.y) > 1e-4) {
       const k = Math.min(1, dt * LOOK_RATE);
@@ -400,6 +623,35 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
 
     weather.update(t);
     placeCamera();
+    // Closer to the screen, the room around it dims (and blooms less) so the game stands out.
+    const span = roomDistance - screenDistance;
+    const focus = span > 0 ? THREE.MathUtils.clamp((roomDistance - distance) / span, 0, 1) : 0;
+    renderer.toneMappingExposure = (tune.exposure ?? 1) * (1 - FOCUS_DIM * focus);
+    bloom.strength = (bloomCfg.strength ?? 0.3) * (1 - 0.5 * focus);
+    // the camera turned under a still pointer: what is under it now?
+    if (moving && hoverAt && !held) {
+      const hit = hitAt(hoverAt.x, hoverAt.y);
+      const key = hitKey(hit);
+      if (key !== hoverAt.key) {
+        hoverAt.key = key;
+        setHovered(hit);
+        options.onHoverChange?.(hit);
+      }
+    }
+    if (held) {
+      placeHeld();
+      if (lift === 0 && liftGoal === 0) {
+        // back on the desk
+        const item = held;
+        held = null;
+        item.pivot.position.copy(item.rest);
+        item.pivot.quaternion.identity();
+        backdrop.visible = false;
+        holdLight.intensity = 0;
+        setShadows(item, true);
+        options.onPutBack?.();
+      }
+    }
     composer.render();
     reportScreen();
   };
@@ -450,7 +702,51 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
       }
     },
     setPower(on) {
-      powerGoal = on ? 1 : 0;
+      const goal = on ? 1 : 0;
+      if (goal === powerGoal) return;
+      powerGoal = goal;
+      boot = on && !reduced ? 0 : Infinity;
+      press = 1;
+      dirty = true;
+    },
+    hitTest: hitAt,
+    hover(clientX, clientY = 0) {
+      const hit = clientX === null ? null : hitAt(clientX, clientY);
+      hoverAt = clientX === null ? null : { x: clientX, y: clientY, key: hitKey(hit) };
+      setHovered(hit);
+      return hit;
+    },
+    inspect(id) {
+      if (id === null) {
+        if (held) liftGoal = 0;
+        dirty = true;
+        return;
+      }
+      if (held) return;
+      const item = pickables.find((p) => p.id === id);
+      if (!item) return;
+      setGlow(hovered, false);
+      hovered = null;
+      held = item;
+      lift = 0;
+      liftGoal = 1;
+      turnGoal.setFromEuler(HOLD_TILT);
+      turn.copy(turnGoal);
+      zoom = zoomGoal = 1;
+      setShadows(item, false);
+      dirty = true;
+    },
+    turnItem(yaw, pitch) {
+      if (!held) return;
+      // around the view's own axes, whichever way the item already faces
+      turnGoal.premultiply(nudge.setFromAxisAngle(axis.set(0, 1, 0), yaw));
+      turnGoal.premultiply(nudge.setFromAxisAngle(axis.set(1, 0, 0), pitch));
+      turnGoal.normalize();
+      dirty = true;
+    },
+    zoomItem(factor) {
+      if (!held) return;
+      zoomGoal = THREE.MathUtils.clamp(zoomGoal * factor, 0.6, 2.6);
       dirty = true;
     },
     dispose() {
