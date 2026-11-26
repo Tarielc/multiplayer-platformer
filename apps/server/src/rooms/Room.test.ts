@@ -148,7 +148,7 @@ describe('Room: characters', () => {
   it('gives each slot its default character', () => {
     const room = createRoom();
     const clients = ['A', 'B', 'C', 'D'].map((name) => join(room, name));
-    expect(clients.map((c) => characterOf(room, c.id))).toEqual(['bunny-man', 'virtual-guy', 'mask-dude', 'ninja-frog']);
+    expect(clients.map((c) => characterOf(room, c.id))).toEqual(['ninja-frog', 'bunny-man', 'virtual-guy', 'mask-dude']);
   });
 
   it('honours a preferred character on join, or gives the next free one', () => {
@@ -157,8 +157,8 @@ describe('Room: characters', () => {
     const b = join(room, 'B', undefined, 'ninja-frog');
     const c = join(room, 'C');
     expect(characterOf(room, a.id)).toBe('ninja-frog');
-    expect(characterOf(room, b.id)).toBe('bunny-man'); // wraps past the end of the roster
-    expect(characterOf(room, c.id)).toBe('mask-dude'); // slot default
+    expect(characterOf(room, b.id)).toBe('bunny-man'); // the next one in the roster
+    expect(characterOf(room, c.id)).toBe('virtual-guy'); // slot default
   });
 
   it('lets players switch to a free character in the lobby', () => {
@@ -171,16 +171,16 @@ describe('Room: characters', () => {
 
     room.handle(b.id, { t: 'selectCharacter', characterId: 'mask-dude' });
     expect(b.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED', message: 'Mask Dude is taken by P1.' });
-    expect(characterOf(room, b.id)).toBe('virtual-guy');
+    expect(characterOf(room, b.id)).toBe('bunny-man');
   });
 
   it('refuses character changes outside the lobby', () => {
     const room = createRoom();
     const a = join(room, 'A');
     startSolo(room, a);
-    room.handle(a.id, { t: 'selectCharacter', characterId: 'ninja-frog' });
+    room.handle(a.id, { t: 'selectCharacter', characterId: 'mask-dude' });
     expect(a.conn.last('error')).toMatchObject({ code: 'NOT_ALLOWED' });
-    expect(characterOf(room, a.id)).toBe('bunny-man');
+    expect(characterOf(room, a.id)).toBe('ninja-frog');
   });
 
   it('keeps the character across a reconnect, ignoring a new preference', () => {
@@ -194,10 +194,10 @@ describe('Room: characters', () => {
 
   it('gives a drop-in player a free character', () => {
     const room = createRoom();
-    const a = join(room, 'A', undefined, 'virtual-guy');
+    const a = join(room, 'A', undefined, 'bunny-man');
     startSolo(room, a);
     const late = join(room, 'Late'); // slot 1 default is taken by A
-    expect(characterOf(room, late.id)).toBe('mask-dude');
+    expect(characterOf(room, late.id)).toBe('virtual-guy');
   });
 });
 

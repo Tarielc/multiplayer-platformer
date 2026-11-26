@@ -243,9 +243,9 @@ Traps are Tiled objects; [docs/level-authoring.md](docs/level-authoring.md#traps
 
 ### Characters and animation
 
-Each player picks a character: on the home screen (saved in the browser, used for solo play and as the default when joining) or in the lobby. Picks are unique per room. A taken pick falls back to the next free character, and a player keeps their character across reconnects.
+Each player picks a character (a new player starts as Ninja Frog, the first in `CHARACTER_IDS`): on the home screen (saved in the browser, used for solo play and as the default when joining) or in the lobby. Picks are unique per room. A taken pick falls back to the next free character, and a player keeps their character across reconnects.
 
-The sprites come from one sheet, `packages/shared/data/sprites/all-characters.png`: 64×32 frames, 11 columns, and 7 rows per character in this order: Idle, Run, Attack, Jump, Fall, Hurt, Death. Characters are stacked in roster order. The body is centred in the frame with its feet on the bottom row, facing right.
+The sprites come from one sheet, `packages/shared/data/sprites/all-characters.png`: 64×32 frames, 11 columns, and 7 rows per character in this order: Idle, Run, Attack, Jump, Fall, Hurt, Death. Each character's block of rows is its `block` in `CHARACTER_ART`, not its place in the roster. The body is centred in the frame with its feet on the bottom row, facing right.
 
 The player presentation is split into small parts, under `apps/web/src/game/`:
 

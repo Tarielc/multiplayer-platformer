@@ -34,7 +34,7 @@ const MODE_ART: Record<GameMode, { image: string; alt: string }> = {
 
 export function HomeScreen() {
   const [name, setName] = useState('');
-  // null until picked: the server then uses the slot default (P1 Bunny Man, P2 Virtual Guy, …).
+  // null until picked: the server then uses the slot default (P1 Ninja Frog, P2 Bunny Man, …).
   const [character, setCharacter] = useState<CharacterId | null>(null);
   const [code, setCode] = useState('');
   const server = useServerHealth();

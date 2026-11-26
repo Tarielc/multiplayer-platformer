@@ -3,9 +3,10 @@
  * stable; display art lives on the client (`apps/web/src/game/characters/characterArt.ts`).
  *
  * To add a character: append an id here, add its art entry on the client and a block of rows
- * to the sprite sheet. Order matters only for defaults (`defaultCharacterForSlot`).
+ * to the sprite sheet. Order is the pickers' order and sets the defaults (`defaultCharacterForSlot`):
+ * the first is a new player's character. Sprite rows don't depend on it (`CHARACTER_ART[id].block`).
  */
-export const CHARACTER_IDS = ['bunny-man', 'virtual-guy', 'mask-dude', 'ninja-frog'] as const;
+export const CHARACTER_IDS = ['ninja-frog', 'bunny-man', 'virtual-guy', 'mask-dude'] as const;
 
 export type CharacterId = (typeof CHARACTER_IDS)[number];
 
@@ -29,7 +30,7 @@ export function characterInfo(id: CharacterId): CharacterInfo {
   return CHARACTERS[id];
 }
 
-/** P1 → Bunny Man, P2 → Virtual Guy, … (wraps if there are more slots than characters). */
+/** P1 → Ninja Frog, P2 → Bunny Man, … (wraps if there are more slots than characters). */
 export function defaultCharacterForSlot(slot: number): CharacterId {
   const n = CHARACTER_IDS.length;
   return CHARACTER_IDS[((slot % n) + n) % n]!;
