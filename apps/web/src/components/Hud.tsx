@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import type { NetStats } from '@/game/bridge';
 import type { HudPlayer, RoomView } from '@/net/RoomStore';
 import { useTouchDevice } from '@/hooks/useTouchDevice';
+import { useInHandheld } from '@/desk/handheldPad';
 import { AbilityBadge } from './AbilityBadge';
 import { CharacterPortrait } from './CharacterPortrait';
 import { FullscreenButton } from './FullscreenButton';
@@ -16,11 +17,13 @@ import { useCountdown } from './useCountdown';
  * The in-game HUD, drawn in 1280×720 reference pixels and scaled with the stage (`--k`, set by
  * GameView). Top-left: your plate (portrait, hearts) and a chip per teammate. Top-right: the
  * team score (co-op) or the race clock, and which level this is. Bottom-right: the menu key.
- * Touch devices get a menu button instead (a phone has no Esc key), with a full-screen toggle beside it.
+ * Touch devices get a menu button instead (a phone has no Esc key), with a full-screen toggle beside it
+ * (except on the handheld, whose Select key does that).
  */
 export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats | null; onMenu: () => void }) {
   const room = view.room!;
   const touch = useTouchDevice();
+  const handheld = useInHandheld();
   const levelIndex = room.level ? LEVELS.indexInCampaign(room.level.id) : -1;
   const mode = MODE_CONFIG[room.mode];
   const coop = room.mode === 'coop';
@@ -63,7 +66,7 @@ export function Hud({ view, stats, onMenu }: { view: RoomView; stats: NetStats |
             </span>
           )}
         </div>
-        {touch && <FullscreenButton className={`${styles.menu} px-notch`} />}
+        {touch && !handheld && <FullscreenButton className={`${styles.menu} px-notch`} />}
         {touch && (
           <button type="button" className={`${styles.menu} px-notch`} aria-label="Menu" onClick={onMenu}>
             <svg viewBox="0 0 6 6" width="18" height="18" shapeRendering="crispEdges" aria-hidden>
