@@ -47,7 +47,7 @@
 }
 
 .badge[data-active='true'] .ring {
-  background: var(--moss-lit);
+  background: conic-gradient(var(--moss-lit) var(--charge), var(--stone-lo) 0);
 }
 
 .face {
@@ -88,9 +88,15 @@
   color: var(--night);
 }
 
-.badge[data-ready='false'][data-active='false'] .face img {
+.badge[data-counting='true'] .face img {
   opacity: 0.35;
   filter: grayscale(1);
+}
+
+/* In use, counting down: dimmed behind the seconds but still in colour. */
+.badge[data-counting='true'][data-active='true'] .face img {
+  opacity: 0.5;
+  filter: none;
 }
 
 .seconds {

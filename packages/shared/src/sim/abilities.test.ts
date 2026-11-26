@@ -9,7 +9,7 @@ import { asciiToLevel } from '../dev/asciiMap';
 import type { TiledObject } from '../level/tiled';
 import { bodyFromNetState } from '../protocol/state';
 import { diffWorld } from '../protocol/delta';
-import { droneDeck, droneGrip, tongueTip } from './abilities';
+import { abilityTimer, droneDeck, droneGrip, tongueTip } from './abilities';
 import { stepPlayerBody } from './actions';
 import type { GameEvent } from './events';
 import type { Foe } from './foes/FoeField';
@@ -1213,5 +1213,18 @@ describe('co-op: no friendly damage (playerDamage off)', () => {
     expect(stunned).toBe(true);
     expect(c.hp).toBe(PLAYER_CONFIG.maxHp);
     expect(b.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+});
+
+describe('abilityTimer', () => {
+  it('counts down the drone battery, giant form and the frog hold, and nothing else', () => {
+    const at = (phase: number, phaseTime: number, giant = 0) => abilityTimer({ phase, phaseTime, giant });
+    expect(at(Phase.DRONE_PILOT, 4)).toEqual({ left: ABILITIES.drone.battery - 4, total: ABILITIES.drone.battery });
+    expect(at(Phase.NONE, 0, 3.5)).toEqual({ left: 3.5, total: ABILITIES.giant.duration });
+    expect(at(Phase.TONGUE_HOLD, 1)).toEqual({ left: ABILITIES.tongue.holdMax - 1, total: ABILITIES.tongue.holdMax });
+    expect(at(Phase.DRONE_PILOT, ABILITIES.drone.battery + 1)!.left).toBe(0);
+    expect(at(Phase.HEAL_HUG, 0.3)).toBeNull();
+    expect(at(Phase.DRONE_DEPLOY, 0.1)).toBeNull();
+    expect(at(Phase.NONE, 0)).toBeNull();
   });
 });

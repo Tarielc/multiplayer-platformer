@@ -57,6 +57,21 @@ export function isDroneOut(body: Pick<MovementBody, 'phase' | 'phaseTime'>, c: R
   return body.phase >= Phase.DRONE_SIT && body.phase <= Phase.DRONE_RECALL;
 }
 
+/**
+ * How long a timed ability has left, seconds, and its full length: the drone's battery while it
+ * is flown, giant form, or the frog holding someone before it spits them out. Null while the
+ * ability is doing something without a time limit (or nothing).
+ */
+export function abilityTimer(
+  body: Pick<MovementBody, 'phase' | 'phaseTime' | 'giant'>,
+  c: Readonly<CompiledAbilities> = ABILITIES,
+): { left: number; total: number } | null {
+  if (body.giant > 0) return { left: body.giant, total: c.giant.duration };
+  if (body.phase === Phase.DRONE_PILOT) return { left: Math.max(0, c.drone.battery - body.phaseTime), total: c.drone.battery };
+  if (body.phase === Phase.TONGUE_HOLD) return { left: Math.max(0, c.tongue.holdMax - body.phaseTime), total: c.tongue.holdMax };
+  return null;
+}
+
 export function feetOf(body: Pick<MovementBody, 'x' | 'y'>, hitbox: HitboxSize): Vec2 {
   return { x: body.x + hitbox.width / 2, y: body.y + hitbox.height };
 }

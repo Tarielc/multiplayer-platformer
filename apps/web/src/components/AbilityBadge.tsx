@@ -11,10 +11,11 @@ import styles from './AbilityBadge.module.css';
 /**
  * A special ability's icon in a notched stone frame whose gold ring fills as it recharges: the
  * seconds left on top while it cools down, solid gold (and a slow glow) once it is ready, moss
- * while in use, and a flash each time fruit tops it up. `size`: `chip` (teammate chips),
+ * while in use (draining, with the seconds left, when the use is timed: the drone's battery,
+ * giant form), and a flash each time fruit tops it up. `size`: `chip` (teammate chips),
  * `button` (your own, large), `fill` (fills its parent, e.g. the touch special button).
  * `symbol` stands in for the ability's sprite (the phone controls show the button's own mark),
- * hidden while the seconds count down.
+ * hidden while seconds count down.
  */
 export function AbilityBadge({
   characterId,
@@ -27,9 +28,16 @@ export function AbilityBadge({
   size: 'chip' | 'button' | 'fill';
   symbol?: ReactNode;
 }) {
-  const { name, cooldown, charge, active, refills } = ability;
+  const { name, cooldown, charge, active, left, refills } = ability;
   const ready = cooldown <= 0;
-  const label = active ? `${name} (active)` : ready ? `${name} (ready)` : `${name} (${cooldown.toFixed(1)} s)`;
+  // The seconds on the face: time left in use, or until it is ready again.
+  const timed = active && left > 0;
+  const seconds = timed ? Math.ceil(left) : !ready && !active ? Math.ceil(cooldown) : 0;
+  const label = active
+    ? `${name} (active${timed ? `, ${left.toFixed(1)} s left` : ''})`
+    : ready
+      ? `${name} (ready)`
+      : `${name} (${cooldown.toFixed(1)} s)`;
   const style = { '--charge': `${Math.round(charge * 360)}deg` } as CSSProperties;
   return (
     <span
@@ -37,6 +45,7 @@ export function AbilityBadge({
       data-size={size}
       data-ready={ready}
       data-active={active}
+      data-counting={seconds > 0}
       style={style}
       title={label}
       aria-label={label}
@@ -48,9 +57,9 @@ export function AbilityBadge({
             {symbol === undefined ? (
               <img src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(characterId)}`} alt="" draggable={false} />
             ) : (
-              (ready || active) && <span className={styles.symbol}>{symbol}</span>
+              seconds === 0 && <span className={styles.symbol}>{symbol}</span>
             )}
-            {!ready && !active && <span className={`${styles.seconds} px-outline`}>{Math.ceil(cooldown)}</span>}
+            {seconds > 0 && <span className={`${styles.seconds} px-outline`}>{seconds}</span>}
           </span>
         </span>
       </span>

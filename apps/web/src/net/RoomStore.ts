@@ -4,6 +4,7 @@ import {
   PLAYER_CONFIG,
   TICK_DT,
   abilityForCharacter,
+  abilityTimer,
   fullCooldown,
   ordinal,
   slotStyle,
@@ -51,6 +52,8 @@ export interface HudAbility {
   charge: number;
   /** In use now (giant form, drone flying, a hug or tongue under way). */
   active: boolean;
+  /** Seconds left of a timed use (drone battery, giant form, a frog's hold); 0 = untimed or idle. */
+  left: number;
   /** Fruit pickups and foe kills that recharged it so far this level (a change replays the HUD flash). */
   refills: number;
 }
@@ -222,6 +225,7 @@ export class RoomStore {
           abilityForCharacter(p.characterId),
           s?.specialCooldown ?? 0,
           (s?.phase ?? 0) !== 0 || (s?.giant ?? 0) > 0,
+          s ? abilityTimer(s) : null,
           this.refills.get(p.id) ?? 0,
         ),
       };
@@ -238,10 +242,21 @@ export class RoomStore {
   }
 }
 
-function hudAbility(ability: AbilityId, specialCooldown: number, active: boolean, refills: number): HudAbility {
-  // Tenths of a second keep HUD updates rare while a cooldown runs.
+function hudAbility(
+  ability: AbilityId,
+  specialCooldown: number,
+  active: boolean,
+  timer: { left: number; total: number } | null,
+  refills: number,
+): HudAbility {
+  // Tenths of a second keep HUD updates rare while a cooldown (or a timed use) runs.
   const cooldown = Math.ceil(specialCooldown * 10) / 10;
   const full = fullCooldown(ability);
-  const charge = full > 0 ? Math.max(0, Math.min(1, 1 - cooldown / full)) : 1;
-  return { name: ABILITY_NAMES[ability], cooldown, full, charge, active, refills };
+  const left = active && timer ? Math.ceil(timer.left * 10) / 10 : 0;
+  // While a timed use runs the ring drains with it; otherwise it fills as the cooldown runs out.
+  const charge =
+    left > 0 && timer ? clamp01(left / timer.total) : full > 0 ? clamp01(1 - cooldown / full) : 1;
+  return { name: ABILITY_NAMES[ability], cooldown, full, charge, active, left, refills };
 }
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
