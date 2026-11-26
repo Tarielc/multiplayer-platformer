@@ -11,7 +11,7 @@ import {
   type CharacterId,
   type GameMode,
 } from '@platformer/shared';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { abilityIconPath } from '@/game/abilities/abilityArt';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { loadPlayerName, loadPreferredCharacter, savePlayerName, savePreferredCharacter } from '@/net/identity';
@@ -20,6 +20,7 @@ import { gameServerHttpUrl } from '@/net/serverUrl';
 import { ABILITY_BLURBS, BACKDROP_URL, GAME_TITLE, abilityName } from './brand';
 import { CharacterPicker } from './CharacterPicker';
 import { CharacterPortrait } from './CharacterPortrait';
+import { CONTROL_ROWS, ControlKeys } from './controls';
 import { Fireflies } from './Fireflies';
 import { MossCap } from './PixelIcons';
 import styles from './HomeScreen.module.css';
@@ -275,13 +276,15 @@ export function HomeScreen() {
                 </tr>
               </thead>
               <tbody>
-                {CONTROLS.map((row) => (
+                {CONTROL_ROWS.map((row) => (
                   <tr key={row.action}>
                     <td>
                       {row.action}
                       {row.detail && ` · ${row.detail}`}
                     </td>
-                    <td>{row.keys}</td>
+                    <td>
+                      <ControlKeys row={row} />
+                    </td>
                     <td>{row.pad}</td>
                     <td>{row.touch}</td>
                   </tr>
@@ -292,13 +295,13 @@ export function HomeScreen() {
         </div>
         {/* Phones: one card per action, the touch control first. */}
         <ul className={styles.controlCards}>
-          {CONTROLS.map((row) => (
+          {CONTROL_ROWS.map((row) => (
             <li key={row.action} className="px-panel">
               <h3>{row.action}</h3>
               <p className={styles.touchLine}>{row.touch}</p>
               {row.detail && <p className={styles.detail}>{row.detail}</p>}
               <p className={styles.otherInputs}>
-                {row.keys} <span aria-hidden>·</span> {row.pad}
+                <ControlKeys row={row} /> <span aria-hidden>·</span> {row.pad}
               </p>
             </li>
           ))}
@@ -324,81 +327,6 @@ const SECTIONS = [
   ['levels', 'Levels'],
   ['controls', 'Controls'],
 ] as const;
-
-interface ControlRow {
-  action: string;
-  /** Extra how-to, after the action in the table and under it on a card. */
-  detail?: string;
-  keys: ReactNode;
-  pad: string;
-  touch: string;
-}
-
-const CONTROLS: ControlRow[] = [
-  {
-    action: 'Move',
-    keys: (
-      <>
-        <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd>
-      </>
-    ),
-    pad: 'Left stick, D-pad',
-    touch: 'Walk stick (left)',
-  },
-  {
-    action: 'Jump',
-    detail: 'hold for higher, again in mid-air to double jump',
-    keys: (
-      <>
-        <kbd>Space</kbd> <kbd>↑</kbd> <kbd>W</kbd> <kbd>Z</kbd> <kbd>K</kbd>
-      </>
-    ),
-    pad: 'A / B',
-    touch: 'Jump button',
-  },
-  {
-    action: 'Drop through planks',
-    keys: (
-      <>
-        <kbd>↓</kbd> + jump
-      </>
-    ),
-    pad: 'Down + A',
-    touch: 'Walk stick down + Jump',
-  },
-  {
-    action: 'Attack',
-    detail: 'shoves players, breaks boxes',
-    keys: (
-      <>
-        <kbd>J</kbd> <kbd>X</kbd>
-      </>
-    ),
-    pad: 'X / □',
-    touch: 'Attack stick: lift to swing, drag first to aim',
-  },
-  {
-    action: 'Special ability',
-    keys: (
-      <>
-        <kbd>L</kbd> <kbd>C</kbd> right-click · aim with arrows or mouse
-      </>
-    ),
-    pad: 'Y / RB · aim with the right stick',
-    touch: 'Special stick: drag to aim, lift to fire',
-  },
-  {
-    action: 'Menu',
-    detail: 'F3 toggles the debug overlay',
-    keys: (
-      <>
-        <kbd>Esc</kbd> · <kbd>F3</kbd>
-      </>
-    ),
-    pad: 'Start',
-    touch: 'Menu button (top right)',
-  },
-];
 
 function MenuGlyph({ open }: { open: boolean }) {
   return (

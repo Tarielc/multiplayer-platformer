@@ -16,6 +16,7 @@ import {
 import { useRef, useState, type ReactNode } from 'react';
 import { ABILITY_BLURBS, BACKDROP_URL, abilityName } from '@/components/brand';
 import { CharacterPortrait } from '@/components/CharacterPortrait';
+import { CONTROL_ROWS } from '@/components/controls';
 import { loadAudioSettings, saveAudioSettings } from '@/game/audio/audioSettings';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { useRoomActions, useServerHealth, type ServerState } from '@/hooks/useHomeActions';
@@ -526,29 +527,13 @@ function LevelsTab({ pocket, index, setIndex }: { pocket: boolean; index: number
   );
 }
 
-interface ControlRow {
-  action: string;
-  keys: string[];
-  pad: string;
-  pocket: string;
-}
-
-const CONTROL_ROWS: ControlRow[] = [
-  { action: 'Move', keys: ['←', '→', 'A', 'D'], pad: 'Left stick, D-pad', pocket: 'D-pad' },
-  { action: 'Jump · hold for higher, again to double', keys: ['Space', '↑', 'W'], pad: 'A / B', pocket: 'A' },
-  { action: 'Drop through planks', keys: ['↓', '+ jump'], pad: 'Down + A', pocket: 'Down + A' },
-  { action: 'Attack', keys: ['J', 'X'], pad: 'X / □', pocket: 'B' },
-  { action: 'Special · aim, then let go', keys: ['L', 'C', 'right-click'], pad: 'Y / RB, right stick aims', pocket: 'S stick: drag, let go' },
-  { action: 'Menu', keys: ['Esc'], pad: 'Start', pocket: 'Start' },
-];
-
 function ControlsTab({ pocket }: { pocket: boolean }) {
   if (pocket) {
     return (
       <ul className={`${s.panel} ${s.controlsPocket}`}>
-        {[...CONTROL_ROWS, { action: 'Full screen', keys: [], pad: '', pocket: 'Select' }].map((row) => (
+        {[...CONTROL_ROWS, { action: 'Full screen', pocket: 'Select' }].map((row) => (
           <li key={row.action}>
-            <span className={s.controlAction}>{row.action.split(' · ')[0]}</span>
+            <span className={s.controlAction}>{row.action}</span>
             <span className={s.controlPocket}>{row.pocket}</span>
           </li>
         ))}
@@ -565,15 +550,15 @@ function ControlsTab({ pocket }: { pocket: boolean }) {
       </div>
       {CONTROL_ROWS.map((row) => (
         <div key={row.action} className={s.controlsRow}>
-          <span className={s.controlAction}>{row.action}</span>
+          <span className={s.controlAction}>
+            {row.action}
+            {row.detail && <small className={s.controlDetail}>{row.detail}</small>}
+          </span>
           <span className={s.controlKeys}>
-            {row.keys.map((key) =>
-              key.startsWith('+') || key === 'right-click' ? (
-                <span key={key}>{key}</span>
-              ) : (
-                <Key key={key}>{key}</Key>
-              ),
-            )}
+            {row.keys.map((key) => (
+              <Key key={key}>{key}</Key>
+            ))}
+            {row.keysNote && <span>{row.keysNote}</span>}
           </span>
           <span>{row.pad}</span>
           <span>{row.pocket}</span>

@@ -178,9 +178,13 @@ function steerDialog(button: PadButton, back: () => void): boolean {
       if (at >= 0) items[at]?.click();
       else items[0]?.focus({ preventScroll: true });
       break;
-    case 'b':
-      back();
+    case 'b': {
+      // A page inside the dialog (the menu's controls) has its own way back.
+      const pageBack = dialog.querySelector<HTMLElement>('[data-pad-back]');
+      if (pageBack) pageBack.click();
+      else back();
       break;
+    }
   }
   return true;
 }
