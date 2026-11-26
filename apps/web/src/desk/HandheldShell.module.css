@@ -25,14 +25,15 @@
   flex: 1;
   min-width: 0;
   display: grid;
-  /* Upright: screen on top, then the name, then D-pad | buttons, then SELECT / START. */
+  /* Upright: screen on top, then the name, then SELECT / START, then D-pad | buttons at the
+     bottom where the thumbs rest. */
   grid-template-columns: 1fr 1fr;
   grid-template-rows: minmax(0, 1fr) auto auto auto;
   grid-template-areas:
     'bezel bezel'
     'brand brand'
-    'dpad actions'
-    'select start';
+    'select start'
+    'dpad actions';
   column-gap: 8px;
   padding: 16px 16px 22px;
   border-radius: 30px;
@@ -546,7 +547,7 @@
   justify-items: center;
   align-content: start;
   gap: 10px;
-  padding-top: 18px;
+  padding: 6px 0 14px;
 }
 
 .selectSlot {
@@ -617,8 +618,8 @@
 
 .speaker {
   position: absolute;
-  right: 28px;
-  bottom: 30px;
+  right: 22px;
+  bottom: 16px;
   display: flex;
   gap: 7px;
   transform: rotate(-24deg);
@@ -627,7 +628,7 @@
 
 .speaker span {
   width: 6px;
-  height: 46px;
+  height: 32px;
   border-radius: 4px;
   background: linear-gradient(180deg, #0b150a, #18291a);
   box-shadow:
@@ -678,7 +679,7 @@
   }
 
   .pillSlot {
-    padding-top: 8px;
+    padding: 2px 0 6px;
   }
 
   .speaker {
@@ -686,16 +687,17 @@
   }
 }
 
-/* Sideways: the screen in the middle, the D-pad left, the buttons right. */
+/* Sideways: the screen in the middle, the D-pad left, the buttons right. Select and Start sit
+   up top so the D-pad and buttons drop down to where the thumbs rest. */
 @media (orientation: landscape) {
   .shell {
     grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      'dpad bezel actions'
-      'select bezel start';
-    column-gap: 16px;
-    padding: 10px 16px;
+      'select bezel start'
+      'dpad bezel actions';
+    column-gap: 14px;
+    padding: 16px;
     border-radius: 36px;
   }
 
@@ -724,12 +726,19 @@
   .startSlot {
     justify-self: center;
     margin: 0;
-    padding: 0 0 8px;
+    padding: 6px 0 0;
+  }
+
+  .dpadSlot,
+  .actions {
+    align-self: end;
+    margin-bottom: 6px;
   }
 
   .dpad {
     width: 124px;
     height: 124px;
+    margin-left: 2px;
   }
 
   .actions {
