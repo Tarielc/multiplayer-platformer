@@ -524,7 +524,7 @@
     0 0 14px 3px rgb(242 193 78 / 45%);
 }
 
-/* Your ability (with its recharge ring) set into the cap. */
+/* The recharge ring (with the seconds left) set into the cap. */
 .stickBadge {
   display: grid;
   width: 40px;

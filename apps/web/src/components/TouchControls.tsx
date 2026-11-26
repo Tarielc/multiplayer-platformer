@@ -219,12 +219,12 @@ function JumpButton({ touch }: { touch: TouchInput }) {
   );
 }
 
-/** The local character's ability: its icon in the recharge ring (see `AbilityBadge`). */
+/** The local character's ability: the star in the recharge ring, with the seconds left (see `AbilityBadge`). */
 function SpecialSymbol({ self }: { self: HudPlayer | undefined }) {
   if (!self) return <StarIcon />;
   return (
     <span className={styles.ability}>
-      <AbilityBadge characterId={self.characterId} ability={self.ability} size="fill" />
+      <AbilityBadge characterId={self.characterId} ability={self.ability} size="fill" symbol={<StarIcon />} />
     </span>
   );
 }
@@ -270,7 +270,7 @@ function JumpIcon() {
   );
 }
 
-/** Fallback special symbol (no character yet). */
+/** The special button's mark (also shown before a character is known). */
 function StarIcon() {
   return (
     <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden>

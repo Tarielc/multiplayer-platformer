@@ -1,7 +1,7 @@
 'use client';
 
 import type { CharacterId } from '@platformer/shared';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { abilityIconPath } from '@/game/abilities/abilityArt';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { useTouchDevice } from '@/hooks/useTouchDevice';
@@ -13,15 +13,19 @@ import styles from './AbilityBadge.module.css';
  * seconds left on top while it cools down, solid gold (and a slow glow) once it is ready, moss
  * while in use, and a flash each time fruit tops it up. `size`: `chip` (teammate chips),
  * `button` (your own, large), `fill` (fills its parent, e.g. the touch special button).
+ * `symbol` stands in for the ability's sprite (the phone controls show the button's own mark),
+ * hidden while the seconds count down.
  */
 export function AbilityBadge({
   characterId,
   ability,
   size,
+  symbol,
 }: {
   characterId: CharacterId;
   ability: HudAbility;
   size: 'chip' | 'button' | 'fill';
+  symbol?: ReactNode;
 }) {
   const { name, cooldown, charge, active, refills } = ability;
   const ready = cooldown <= 0;
@@ -41,7 +45,11 @@ export function AbilityBadge({
       <span className={`${styles.frame} px-notch`}>
         <span className={`${styles.ring} px-notch`}>
           <span className={`${styles.face} px-notch`}>
-            <img src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(characterId)}`} alt="" draggable={false} />
+            {symbol === undefined ? (
+              <img src={`${DEFAULT_ASSET_BASE}/${abilityIconPath(characterId)}`} alt="" draggable={false} />
+            ) : (
+              (ready || active) && <span className={styles.symbol}>{symbol}</span>
+            )}
             {!ready && !active && <span className={`${styles.seconds} px-outline`}>{Math.ceil(cooldown)}</span>}
           </span>
         </span>

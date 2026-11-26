@@ -172,7 +172,7 @@ function PadKey({
 
 /**
  * The special: a thumbstick. Drag to aim (the game shows the aim), let go to use it; let go near
- * the middle and it goes straight ahead. Its cap shows your ability and the recharge ring.
+ * the middle and it goes straight ahead. Its cap shows the recharge ring and the seconds left.
  */
 function SpecialStick({ send, buzz, self }: { send: Send; buzz: () => void; self: Self | null }) {
   const drag = useRef<{ id: number; x0: number; y0: number; r: number; x: number; y: number } | null>(null);
@@ -246,7 +246,12 @@ function SpecialStick({ send, buzz, self }: { send: Send; buzz: () => void; self
         <span className={styles.stickCap} aria-hidden>
           {self ? (
             <span className={styles.stickBadge}>
-              <AbilityBadge characterId={self.characterId} ability={self.ability} size="fill" />
+              <AbilityBadge
+                characterId={self.characterId}
+                ability={self.ability}
+                size="fill"
+                symbol={<span className={styles.stickLetter}>S</span>}
+              />
             </span>
           ) : (
             <span className={styles.stickLetter}>S</span>
