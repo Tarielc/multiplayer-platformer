@@ -91,7 +91,10 @@ export interface Collider extends Rect {
   oneWay: boolean;
   /** Landing on top launches the body upward at this speed; 0 = none. */
   bounce: number;
-  /** Low enough to walk up onto (buttons): moving into its side lifts the body on top. */
+  /**
+   * Low enough to walk up onto (buttons): moving into its side lifts the body on top. A one-way
+   * step never blocks sideways (a body it can't lift passes through).
+   */
   step?: boolean;
   /**
    * A jump taken while standing on it leaves at this speed (px/s) when that beats the normal
@@ -460,10 +463,12 @@ function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: 
       }
     }
     for (const c of colliders) {
-      if (c.oneWay || body.y >= c.y + c.height - EPS || body.y + h <= c.y + EPS) continue;
+      if ((c.oneWay && !c.step) || body.y >= c.y + c.height - EPS || body.y + h <= c.y + EPS) continue;
       // Only edges crossed by this move block it (never snap out of something already overlapped).
       if (startX + w <= c.x + EPS && body.x + w > c.x + EPS) {
+        // Low steps lift the body on top; a one-way step it can't climb is passed through.
         if (c.step && stepUp(body, c, ctx, colliders)) continue;
+        if (c.oneWay) continue;
         body.x = c.x - w;
         hit = true;
       }
@@ -478,10 +483,11 @@ function moveX(body: MovementBody, dx: number, ctx: MovementContext, colliders: 
       }
     }
     for (const c of colliders) {
-      if (c.oneWay || body.y >= c.y + c.height - EPS || body.y + h <= c.y + EPS) continue;
+      if ((c.oneWay && !c.step) || body.y >= c.y + c.height - EPS || body.y + h <= c.y + EPS) continue;
       const right = c.x + c.width;
       if (startX >= right - EPS && body.x < right - EPS) {
         if (c.step && stepUp(body, c, ctx, colliders)) continue;
+        if (c.oneWay) continue;
         body.x = right;
         hit = true;
       }

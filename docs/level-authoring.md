@@ -93,7 +93,7 @@ Times are in milliseconds, distances in pixels. Every property is optional.
 | `rockHead` | 32×32 | Point or rect | `axis` (`x` default, `y`), `dir` (first move: `right`/`down` default, or `left`/`up`), `waitMs` (900), `phaseMs` | Solid. Scans the tiles for the walls it hits on its axis, then waits, accelerates, slams into a wall, waits, and goes back. You can ride it. Pinned between it and a wall: crushed (instant death). Needs walls on its axis: map edges count horizontally, but a vertical one needs a real floor and ceiling. |
 | `spikeHead` | 42×42 | Point or rect | – | Solid and static; touching any side costs a heart. |
 | `box` | 20×20 | Point on the floor, or rect | `variant` (1–3: hits to break, and the art) | Solid; players can stand on it. An attack hits it (one hit per swing, 200 ms apart). On the last hit it bursts. Broken boxes stay broken for the rest of the run. |
-| `button` (or `pressurePlate`) | 14×3 (the cap) | Point on the floor | `target` (required; see below), `action` (`on` default, `off`) | A pressure plate. Its cap is solid but low: players walk up onto it and off it (no jump, no fall) and stand 3 px up. Pressed while a player stands on it or a box rests on it. Pressing it switches the traps it links to on (`action = "on"`) or off (`action = "off"`). |
+| `button` (or `pressurePlate`) | 14×3 (the cap) | Point on the floor | `target` (required; see below), `action` (`on` default, `off`) | A pressure plate. Its cap is a low one-way platform: players walk up onto it and off it (no jump, no fall) and stand 3 px up, and jump up through it from below. Pressed while a player stands on it or a box rests on it. Pressing it switches the traps it links to on (`action = "on"`) or off (`action = "off"`). |
 
 ### Buttons
 

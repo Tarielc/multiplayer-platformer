@@ -98,7 +98,7 @@ export interface BoxTrap extends TrapCommon, Rect {
  * Pressure plate on the floor. It is pressed while a player stands on it or a box rests on it.
  * Pressing it switches the traps it is linked to (`targets`, trap ids) on (`action: 'on'`: they
  * only work while it is pressed) or off (`'off'`: they work until it is pressed). The body is its
- * cap: solid and low, so players walk up onto it.
+ * cap: a low one-way platform (jumped up through from below) that players walk up onto.
  */
 export interface ButtonTrap extends TrapCommon, Rect {
   kind: 'button';
@@ -163,7 +163,7 @@ export interface TrapCollider extends Rect {
   oneWay: boolean;
   /** Landing on top launches the body upward at this speed (trampolines, boxes); 0 = none. */
   bounce: number;
-  /** Low enough to walk up onto (buttons). */
+  /** Low enough to walk up onto (buttons), even when one-way. */
   step?: boolean;
 }
 

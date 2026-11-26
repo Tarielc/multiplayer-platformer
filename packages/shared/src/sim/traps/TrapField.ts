@@ -379,7 +379,8 @@ export class TrapField {
         return { ...base, ...rect, oneWay: false, bounce: 0 };
       }
       case 'button':
-        return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: false, bounce: 0, step: true };
+        // One-way (jumped up through from below), and walked up onto from the side.
+        return { ...base, x: trap.x, y: trap.y, width: trap.width, height: trap.height, oneWay: true, bounce: 0, step: true };
       default:
         return null;
     }

@@ -78,8 +78,8 @@ export interface TrapTuning {
   };
   button: {
     /**
-     * The cap (the pressed-down art): solid, low enough to walk up onto. Things standing or
-     * resting on it press it.
+     * The cap (the pressed-down art): one-way like a platform, low enough to walk up onto.
+     * Things standing or resting on it press it.
      */
     width: number;
     height: number;

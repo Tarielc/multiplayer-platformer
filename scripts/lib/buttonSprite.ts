@@ -2,7 +2,7 @@
  * Button sheet (`sprites/traps/button.png`): 2 frames of 24×8 sitting on the floor. Frame 0 is
  * the button up (off, red cap standing 6 px tall), frame 1 pressed down (on, green cap flush with
  * the 3 px base plate, with a lit dot). The simulation body (14×3, `TRAP_TUNING.button`: the
- * pressed cap, solid) sits at (5, 5) inside a frame, so the frame's bottom row is on the floor.
+ * pressed cap, one-way) sits at (5, 5) inside a frame, so the frame's bottom row is on the floor.
  */
 export const BUTTON_FRAME = { width: 24, height: 8, frames: 2 } as const;
 

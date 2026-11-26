@@ -127,6 +127,29 @@ describe('buttons: pressing', () => {
     expect(field.isActive(tramp.id)).toBe(false);
   });
 
+  it('is jumped up through from below, like a one-way platform', () => {
+    // A plank (cols 9-10, top y = 96) with a button on it, right above the player.
+    const rows = [...FLOOR];
+    rows[3] = '         --         ';
+    const level = asciiToLevel({ rows, objects: [obj('trampoline', 500, 160, { name: 't1' }), obj('button', 320, 96, { props: { target: 't1' } })] });
+    const world = new GameWorld({ level, movement: resolveMovement() });
+    world.addPlayer('a', 0);
+    const button = find(level, 'button');
+    const body = world.getPlayer('a')!.body;
+    place(world, 320, 160);
+    ticks(world, 2);
+    let highest = Infinity;
+    for (let i = 0; i < 30; i++) {
+      ticks(world, 1, Button.JUMP);
+      highest = Math.min(highest, body.y + HITBOX.height);
+    }
+    expect(highest).toBeLessThan(button.y); // feet rose above the cap: no head bump
+    ticks(world, 60);
+    expect(body.grounded).toBe(true);
+    expect(body.y + HITBOX.height).toBe(button.y); // landed on top
+    expect(world.trapField.isPressed(button.id)).toBe(true);
+  });
+
   it('is walked up onto, and things on it stand on its cap', () => {
     const world = worldWith([obj('trampoline', 500, 160, { name: 't1' }), obj('button', 320, 160, { props: { target: 't1' } })]);
     const button = find(world.level, 'button');
