@@ -371,3 +371,9 @@ code {
     scroll-behavior: auto !important;
   }
 }
+
+/* The site running on the desk scene's CRT (see desk/SiteShell): a thin phosphor scrollbar. */
+html[data-crt] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--moss) transparent;
+}

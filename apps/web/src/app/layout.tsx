@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Jersey_10, Pixelify_Sans, Silkscreen } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { GAME_TITLE } from '@/components/brand';
+import { SiteShell } from '@/desk/SiteShell';
 import './globals.css';
 
 /** Titles, HUD numbers. */
@@ -27,7 +28,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${ui.variable} ${body.variable}`}>
-      <body>{children}</body>
+      <body>
+        <SiteShell>{children}</SiteShell>
+      </body>
     </html>
   );
 }

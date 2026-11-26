@@ -250,6 +250,22 @@ The levels use `packages/shared/data/tilesets/terrain-tileset.png` (16×16 tiles
 
 The start sign, checkpoint flags and finish trophies are sprite sheets in `packages/shared/data/sprites/markers/` (64×64 frames, one row per animation; layout in `traps/trapArt.ts`). Collectibles are drawn procedurally in `apps/web/src/game/art/textures.ts`. Swap in real images by loading them in `BootScene` and pointing `EntityViews` at the new keys. Tilesets are referenced by the Tiled map, and missing images get a generated fallback.
 
+### The desk scene
+
+On desktop the site sits inside a 3D room: a night-time desk with an old CRT, built in Blender and drawn with Three.js. The whole site, game included, runs on the CRT. The page opens on a wide shot of the desk, then the camera moves in until the screen fills the window. **Lean back** (bottom left) returns to the wide shot, and clicking the screen or the room goes back in.
+
+- `apps/web/src/desk/SiteShell.tsx` decides between the desk and the plain site. Phones and tablets, windows under 900×560, browsers without WebGL 2 and `?flat` in the address all get the plain site.
+- The site on the screen is an iframe of the same app, laid out at the screen's size in the close-up and mapped onto the glass every frame (`desk/homography.ts`). The browser address and tab title follow the iframe, so invite links still work.
+- `apps/web/src/desk/deskScene.ts` loads `public/scene/desk.glb` and `scene.json`, rebuilds Blender's lights and moves the camera.
+
+To change the room, edit `E:/BLENDER/Overgrown.blend` (or your copy) and export it again. The export needs the baked textures in `showcase/textures/web/`; `showcase/blender/make_web_textures.py` makes them.
+
+```powershell
+& "C:\Program Files\Blender Foundation\Blender 5.3\blender.exe" -b E:/BLENDER/Overgrown.blend --python scripts/blender/export_desk_scene.py
+```
+
+The export leaves the .blend unchanged. It replaces the CRT's picture with dark glass, records the glass's exact bounds in `scene.json`, and moves the sticky note off the glass.
+
 ## React ↔ Phaser integration
 
 - `GameCanvas` loads `createGame` with a dynamic `import()` inside an effect, so Phaser never runs during server rendering. A `disposed` flag makes Strict Mode's mount → unmount → mount create exactly one game.

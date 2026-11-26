@@ -1,0 +1,308 @@
+{
+ "units": "metres, Three.js Y-up (converted from Blender Z-up)",
+ "camera": {
+  "position": [
+   0.0,
+   1.1,
+   1.42
+  ],
+  "target": [
+   0.0,
+   1.1,
+   -0.5
+  ],
+  "hfovDeg": 67.38,
+  "near": 0.02,
+  "far": 30,
+  "focusDistance": 1.52,
+  "orbitTarget": [
+   0.0,
+   1.1,
+   -0.1
+  ]
+ },
+ "lights": [
+  {
+   "name": "Lamp_Spot",
+   "type": "spot",
+   "watts": 30.0,
+   "color": [
+    1.0,
+    0.72,
+    0.42
+   ],
+   "position": [
+    -0.83075,
+    1.13786,
+    -0.28318
+   ],
+   "direction": [
+    0.32709,
+    -0.93454,
+    0.14018
+   ],
+   "quaternion": [
+    -0.31241,
+    -0.68738,
+    -0.47378,
+    0.45326
+   ],
+   "angle": 0.8290314078330994,
+   "blend": 0.6000000238418579,
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "Lava_Light",
+   "type": "point",
+   "watts": 6.0,
+   "color": [
+    0.55,
+    1.0,
+    0.25
+   ],
+   "position": [
+    -0.62,
+    1.0,
+    -0.4
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "quaternion": [
+    -0.70711,
+    0.0,
+    0.0,
+    0.70711
+   ],
+   "radius": 0.03999999910593033
+  },
+  {
+   "name": "Neon_Spill",
+   "type": "area",
+   "watts": 8.0,
+   "color": [
+    0.55,
+    1.0,
+    0.25
+   ],
+   "position": [
+    0.0,
+    1.6,
+    -0.615
+   ],
+   "direction": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "quaternion": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.6000000238418579,
+   "height": 0.11999999731779099
+  },
+  {
+   "name": "CRT_Glow",
+   "type": "area",
+   "watts": 6.0,
+   "color": [
+    0.75,
+    1.0,
+    0.8
+   ],
+   "position": [
+    0.0,
+    1.1,
+    -0.06
+   ],
+   "direction": [
+    -0.0,
+    0.0,
+    1.0
+   ],
+   "quaternion": [
+    -0.0,
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "width": 0.36000001430511475,
+   "height": 0.27000001072883606
+  },
+  {
+   "name": "Moon_Key",
+   "type": "area",
+   "watts": 700.0,
+   "color": [
+    0.45,
+    0.6,
+    1.0
+   ],
+   "position": [
+    2.3,
+    2.2,
+    -1.7
+   ],
+   "direction": [
+    -0.67742,
+    -0.45161,
+    0.58065
+   ],
+   "quaternion": [
+    -0.097,
+    0.88369,
+    0.21091,
+    0.40644
+   ],
+   "width": 0.25,
+   "height": 0.25
+  },
+  {
+   "name": "Rim_Magenta",
+   "type": "area",
+   "watts": 35.0,
+   "color": [
+    0.85,
+    0.3,
+    1.0
+   ],
+   "position": [
+    -1.8,
+    2.1,
+    -0.1
+   ],
+   "direction": [
+    0.79612,
+    -0.58382,
+    -0.15922
+   ],
+   "quaternion": [
+    -0.23718,
+    -0.60344,
+    -0.19444,
+    0.73607
+   ],
+   "width": 0.800000011920929,
+   "height": 0.800000011920929
+  },
+  {
+   "name": "Rim_Blue",
+   "type": "area",
+   "watts": 18.0,
+   "color": [
+    0.35,
+    0.5,
+    1.0
+   ],
+   "position": [
+    1.4,
+    1.9,
+    0.6
+   ],
+   "direction": [
+    -0.63298,
+    -0.57544,
+    -0.51789
+   ],
+   "quaternion": [
+    -0.27272,
+    0.40826,
+    0.12923,
+    0.86154
+   ],
+   "width": 0.800000011920929,
+   "height": 0.800000011920929
+  },
+  {
+   "name": "Fill_Cam",
+   "type": "area",
+   "watts": 3.0,
+   "color": [
+    0.6,
+    0.65,
+    1.0
+   ],
+   "position": [
+    0.0,
+    1.3,
+    1.7
+   ],
+   "direction": [
+    0.0,
+    -0.13511,
+    -0.99083
+   ],
+   "quaternion": [
+    -0.06771,
+    0.0,
+    0.0,
+    0.9977
+   ],
+   "width": 1.5,
+   "height": 1.5
+  }
+ ],
+ "background": [
+  0.004,
+  0.005,
+  0.012
+ ],
+ "floaters": [
+  "Vox_Apple",
+  "Vox_Strawberry",
+  "Vox_Melon",
+  "Vox_Pineapple",
+  "Vox_RockHead",
+  "Vox_Saw"
+ ],
+ "loopSeconds": 5.0,
+ "bobMetres": 0.015,
+ "lavaBlobs": [
+  "Lava_Blob_0",
+  "Lava_Blob_1",
+  "Lava_Blob_2",
+  "Lava_Blob_3"
+ ],
+ "screenMaterial": "OG_Screen_Race",
+ "neonMaterial": "OG_Neon",
+ "lightHints": {
+  "Moon_Key": {
+   "as": "spot",
+   "angleDeg": 24,
+   "penumbra": 0.5,
+   "shadow": true,
+   "mapSize": 2048
+  },
+  "Lamp_Spot": {
+   "shadow": true,
+   "mapSize": 1024
+  }
+ },
+ "tuning": {
+  "exposure": 1.0,
+  "area": 1.0,
+  "point": 1.0,
+  "spot": 1.0,
+  "ambient": 0.0,
+  "bloom": {
+   "strength": 0.22,
+   "radius": 0.5,
+   "threshold": 1.2
+  }
+ },
+ "screen": {
+  "center": [
+   0.0,
+   1.1,
+   -0.087
+  ],
+  "width": 0.372,
+  "height": 0.282,
+  "node": "CRT_Screen"
+ }
+}
