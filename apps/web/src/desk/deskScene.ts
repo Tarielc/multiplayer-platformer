@@ -76,8 +76,8 @@ interface SceneConfig {
 }
 
 /** In the close-up the glass takes this share of the window's height (and at most `FIT_W` of its width). */
-const FIT_H = 0.82;
-const FIT_W = 0.9;
+const FIT_H = 0.80;
+const FIT_W = 0.88;
 /** Camera move between the two shots. */
 const MOVE_SECONDS = 1.7;
 /** Settled on the screen only the floaters and the lava lamp move: redraw the room at this rate. */
