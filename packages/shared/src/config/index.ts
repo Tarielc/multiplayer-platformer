@@ -18,6 +18,7 @@ export * from './fall';
 export * from './foes';
 export * from './modes';
 export * from './movement';
+export * from './names';
 export * from './net';
 export * from './players';
 export * from './traps';

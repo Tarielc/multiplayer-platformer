@@ -1,7 +1,9 @@
-import { PLAYER_CONFIG, isCharacterId, sanitizePlayerName, type CharacterId } from '@platformer/shared';
+import { PLAYER_CONFIG, isCharacterId, randomPlayerName, sanitizePlayerName, type CharacterId } from '@platformer/shared';
 
 const CLIENT_ID_KEY = 'platformer.clientId';
-const NAME_KEY = 'platformer.name';
+const NAME_KEY = 'platformer.playerName';
+/** Where names lived before random names: it also held the old "Player" default. */
+const LEGACY_NAME_KEY = 'platformer.name';
 const CHARACTER_KEY = 'platformer.character';
 const CHANNEL = 'platformer.clientId';
 const CLAIM_TIMEOUT_MS = 60;
@@ -52,15 +54,33 @@ async function claimClientId(): Promise<string> {
   return id;
 }
 
-export function loadPlayerName(): string {
-  if (typeof window === 'undefined') return PLAYER_CONFIG.defaultName;
-  return sanitizePlayerName(localStorage.getItem(NAME_KEY) ?? '');
+/** [0, 1) from the browser's CSPRNG (Math.random can repeat across fresh tabs on some engines). */
+function randomUnit(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
 }
 
+/** Cleaned name, or '' when it is missing or blank. */
+const clean = (raw: string | null) => (raw === null ? '' : sanitizePlayerName(raw, PLAYER_CONFIG.nameMaxLength, ''));
+
+/**
+ * This browser's player name. The first visit gets a random one ("MossyNewt42") and keeps it,
+ * so new players aren't all "Player". A name typed before random names existed carries over;
+ * the old "Player" default does not.
+ */
+export function loadPlayerName(): string {
+  if (typeof window === 'undefined') return PLAYER_CONFIG.defaultName;
+  const saved = clean(localStorage.getItem(NAME_KEY));
+  if (saved) return saved;
+  const legacy = clean(localStorage.getItem(LEGACY_NAME_KEY));
+  localStorage.removeItem(LEGACY_NAME_KEY);
+  return savePlayerName(legacy && legacy !== PLAYER_CONFIG.defaultName ? legacy : randomPlayerName(randomUnit));
+}
+
+/** Saves a typed name. A blank one keeps the current name (or, failing that, draws a random one). */
 export function savePlayerName(name: string): string {
-  const clean = sanitizePlayerName(name);
-  localStorage.setItem(NAME_KEY, clean);
-  return clean;
+  const next = clean(name) || clean(localStorage.getItem(NAME_KEY)) || randomPlayerName(randomUnit);
+  localStorage.setItem(NAME_KEY, next);
+  return next;
 }
 
 /** The character this browser last picked, or null (then the server uses the slot default). */
