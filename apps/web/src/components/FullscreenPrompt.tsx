@@ -8,6 +8,7 @@ import {
   isStandalone,
   useFullscreen,
 } from '@/hooks/useFullscreen';
+import { inHandheld } from '@/desk/handheldPad';
 import { useTouchDevice } from '@/hooks/useTouchDevice';
 import { GAME_TITLE } from './brand';
 import { FullscreenIcon } from './FullscreenButton';
@@ -47,7 +48,7 @@ export function FullscreenPrompt({ ready }: { ready: boolean }) {
 
   // Browser-only checks: decide after hydration, once the room is joined.
   useEffect(() => {
-    if (ready && touch) setVariant(pickVariant());
+    if (ready && touch && !inHandheld()) setVariant(pickVariant());
   }, [ready, touch]);
 
   if (!variant || active) return null;

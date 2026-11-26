@@ -138,3 +138,14 @@
     width: min(100%, calc((100dvh - 52px) * 16 / 9));
   }
 }
+
+/* On the phone handheld's screen the stage is the whole screen, without the stone rim. */
+:global(html[data-handheld]) .view {
+  align-items: center;
+  align-content: center;
+}
+:global(html[data-handheld]) .stage {
+  width: min(100%, calc(100vh * 16 / 9));
+  width: min(100%, calc(100dvh * 16 / 9));
+  box-shadow: none;
+}

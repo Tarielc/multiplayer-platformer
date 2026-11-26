@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_AUDIO_SETTINGS,
   loadAudioSettings,
@@ -11,6 +11,7 @@ import { GameBridge, type NetStats } from '@/game/bridge';
 import { DEFAULT_ASSET_BASE, type GameServices } from '@/game/services';
 import type { GameSession } from '@/hooks/useGameSession';
 import { lockLandscape, useFullscreen, useMediaQuery } from '@/hooks/useFullscreen';
+import { inHandheld, useHandheldAbility, useHandheldPad, useInHandheld } from '@/desk/handheldPad';
 import { useTouchDevice } from '@/hooks/useTouchDevice';
 import type { RoomView } from '@/net/RoomStore';
 import { CountdownOverlay } from './CountdownOverlay';
@@ -48,7 +49,8 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
     const stage = stageRef.current;
     if (!stage) return;
     const fit = () => {
-      const k = Math.min(1.5, Math.max(0.6, stage.clientWidth / HUD_REFERENCE_WIDTH));
+      // The handheld's screen is a few hundred pixels wide: let the HUD go smaller there.
+      const k = Math.min(1.5, Math.max(inHandheld() ? 0.36 : 0.6, stage.clientWidth / HUD_REFERENCE_WIDTH));
       stage.style.setProperty('--k', k.toFixed(3));
     };
     fit();
@@ -105,14 +107,19 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
   // Full screen on a phone: keep it sideways while the game runs (released on leaving it).
   const touch = useTouchDevice();
   const fullscreen = useFullscreen();
+  // On the phone handheld's screen its own buttons play, and the handheld follows the phone round.
+  const handheld = useInHandheld();
+  const toggleMenu = useCallback(() => setMenuOpen((open) => !open), []);
+  useHandheldPad(bridge.touch, toggleMenu, handheld);
+  useHandheldAbility(view.hud.find((p) => p.isSelf), handheld);
   useEffect(() => {
-    if (!touch || !fullscreen.active) return;
+    if (!touch || !fullscreen.active || handheld) return;
     return lockLandscape();
-  }, [touch, fullscreen.active]);
+  }, [touch, fullscreen.active, handheld]);
 
   const portrait = useMediaQuery('(orientation: portrait)');
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
-  const showNudge = touch && portrait && !nudgeDismissed && !menuOpen;
+  const showNudge = touch && portrait && !nudgeDismissed && !menuOpen && !handheld;
 
   const solo = room.players.length === 1;
 
@@ -156,7 +163,7 @@ export function GameView({ session, view, onLeave }: { session: GameSession; vie
           onDismiss={() => setNudgeDismissed(true)}
         />
       )}
-      {!menuOpen && <TouchControls touch={bridge.touch} self={view.hud.find((p) => p.isSelf)} />}
+      {!menuOpen && !handheld && <TouchControls touch={bridge.touch} self={view.hud.find((p) => p.isSelf)} />}
     </div>
   );
 }

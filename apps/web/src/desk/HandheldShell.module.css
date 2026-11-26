@@ -1,0 +1,758 @@
+/* The pocket handheld that phones get (see HandheldShell.tsx). Overgrown's own shell: moss-green
+   moulded plastic, a graphite screen surround, bone / moss / gold keys, our name in the case.
+   One light, from the top left: highlights on top edges, the case's side and shadows below. */
+
+.handheld {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  background:
+    radial-gradient(90% 55% at 30% 0%, rgb(169 207 78 / 14%), transparent 70%),
+    radial-gradient(70% 50% at 100% 100%, rgb(120 90 200 / 14%), transparent 70%),
+    radial-gradient(120% 90% at 50% 40%, #142019, #050907 80%);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+.shell {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  /* Upright: screen on top, then the name, then D-pad | buttons, then SELECT / START. */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    'bezel bezel'
+    'brand brand'
+    'dpad actions'
+    'select start';
+  column-gap: 8px;
+  padding: 16px 16px 22px;
+  border-radius: 30px;
+  background:
+    radial-gradient(130% 70% at 15% 0%, rgb(255 255 255 / 13%), transparent 55%),
+    radial-gradient(90% 60% at 100% 100%, rgb(0 0 0 / 22%), transparent 70%),
+    linear-gradient(160deg, #5a8450 0%, #436d3a 34%, #355a2e 70%, #2b4b25 100%);
+  box-shadow:
+    /* the rounded edge catching the light, and turning away from it */
+    inset 0 2px 1px rgb(255 255 255 / 35%),
+    inset 2px 0 2px rgb(255 255 255 / 12%),
+    inset 0 -4px 3px rgb(0 0 0 / 30%),
+    inset -3px 0 3px rgb(0 0 0 / 18%),
+    /* the case's side below it, then its shadow on the table */
+    0 6px 0 #22401d,
+    0 8px 0 #172d14,
+    0 12px 6px rgb(0 0 0 / 50%),
+    0 34px 60px -12px rgb(0 0 0 / 85%);
+  margin-bottom: 8px;
+}
+
+/* Fine texture in the plastic. */
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* The mould's parting line just inside the edge. */
+.seam {
+  position: absolute;
+  inset: 6px;
+  z-index: -1;
+  border-radius: 25px;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 20%),
+    0 0 0 1px rgb(255 255 255 / 7%);
+}
+
+/* --- screen --- */
+
+.bezel {
+  grid-area: bezel;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px 14px;
+  border-radius: 14px 14px 34px 14px;
+  background:
+    linear-gradient(170deg, rgb(255 255 255 / 7%), transparent 30%),
+    linear-gradient(180deg, #2a352d, #1b231d 55%, #141a16);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 16%),
+    inset 0 -2px 1px rgb(0 0 0 / 50%),
+    0 0 0 1px rgb(0 0 0 / 45%),
+    0 2px 0 1px rgb(255 255 255 / 9%),
+    0 6px 10px rgb(0 0 0 / 30%);
+}
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+  flex: none;
+}
+
+/* A little lens with the light behind it. */
+.led {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6cf 0 18%, var(--firefly) 45%, #a8760e 100%);
+  box-shadow:
+    0 0 0 1.5px #0d120f,
+    0 0 10px 2px rgb(242 193 78 / 65%);
+}
+
+.stripe {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--moss-lit) 0 40%, var(--firefly) 40% 70%, #b5533c 70%);
+  opacity: 0.75;
+}
+
+/* Sideways the brand moves up into the strip. */
+.stripName {
+  display: none;
+  font-family: var(--display);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--bone);
+}
+
+/* Screen-printed on the surround. */
+.print {
+  font-family: var(--ui);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(237 230 200 / 62%);
+  white-space: nowrap;
+}
+
+/* Set into the surround: a dark lip, then the panel under glass. */
+.lcd {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--night);
+  box-shadow:
+    0 0 0 2px #070b09,
+    0 0 0 3px rgb(255 255 255 / 7%),
+    0 -2px 0 2px rgb(0 0 0 / 35%);
+}
+
+.frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--night);
+  color-scheme: dark;
+}
+
+.glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(255 255 255 / 11%), transparent 42%),
+    linear-gradient(118deg, transparent 52%, rgb(255 255 255 / 5%) 58%, transparent 66%),
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0%) 0 2px, rgb(0 0 0 / 7%) 2px 3px);
+  box-shadow:
+    inset 0 3px 8px rgb(0 0 0 / 70%),
+    inset 0 0 22px rgb(0 0 0 / 50%);
+}
+
+/* --- the name, moulded into the case --- */
+
+.brand {
+  grid-area: brand;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 0 6px;
+}
+
+.brandName {
+  font-family: var(--display);
+  font-size: 32px;
+  line-height: 1;
+  color: #2c4c26;
+  text-shadow:
+    0 -1px 0 rgb(0 0 0 / 40%),
+    0 1px 0 rgb(255 255 255 / 26%);
+}
+
+.pocket {
+  padding: 3px 7px 2px;
+  border-radius: 4px;
+  font-family: var(--ui);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #1a2a12;
+  background: linear-gradient(180deg, #f7d77e, var(--firefly) 60%, #c9951f);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 55%),
+    0 1px 0 rgb(0 0 0 / 35%);
+}
+
+/* --- labels --- */
+
+.engrave {
+  font-family: var(--ui);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(237 230 200 / 78%);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 50%);
+  white-space: nowrap;
+}
+
+/* --- D-pad: a graphite cross in a round hollow, rocking toward the press --- */
+
+.dpadSlot {
+  grid-area: dpad;
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+}
+
+.dpad {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  touch-action: none;
+}
+
+.dpad::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #1d3419, #29461f 62%, #36592d 100%);
+  box-shadow:
+    inset 0 5px 9px rgb(0 0 0 / 60%),
+    inset 0 -2px 2px rgb(255 255 255 / 12%),
+    0 1px 0 rgb(255 255 255 / 12%);
+}
+
+.cross {
+  position: absolute;
+  inset: 4px;
+  transform: perspective(320px) rotateX(calc(var(--ty, 0) * -11deg)) rotateY(calc(var(--tx, 0) * 11deg));
+  transition: transform 50ms ease-out;
+  filter: drop-shadow(0 5px 0 #0b0e0c) drop-shadow(0 9px 7px rgb(0 0 0 / 50%));
+}
+
+.dpad[data-held]:not([data-held='']) .cross {
+  filter: drop-shadow(0 3px 0 #0b0e0c) drop-shadow(0 5px 4px rgb(0 0 0 / 50%));
+}
+
+.arm {
+  position: absolute;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #424944 0%, #2a302c 45%, #1d221f 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 24%),
+    inset 1px 0 0 rgb(255 255 255 / 8%),
+    inset 0 -3px 0 rgb(0 0 0 / 45%);
+}
+
+.armV {
+  left: 34%;
+  width: 32%;
+  top: 0;
+  height: 100%;
+}
+
+.armH {
+  top: 34%;
+  height: 32%;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(180deg, #3a403c 0%, #2a302c 50%, #1f2421 100%);
+}
+
+/* The centre, with a shallow dish for the thumb (it also hides where the arms meet). */
+.hub {
+  position: absolute;
+  left: 34%;
+  top: 33%;
+  width: 32%;
+  height: 34%;
+  background:
+    radial-gradient(circle at 50% 45%, #171b19 0 30%, #2b312d 44%, transparent 62%),
+    #2a302c;
+}
+
+.arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 14%));
+}
+
+.arrowUp {
+  left: 50%;
+  top: 10%;
+  margin-left: -6px;
+  border-top-width: 0;
+  border-bottom-color: #141816;
+}
+
+.arrowDown {
+  left: 50%;
+  bottom: 10%;
+  margin-left: -6px;
+  border-bottom-width: 0;
+  border-top-color: #141816;
+}
+
+.arrowLeft {
+  top: 50%;
+  left: 10%;
+  margin-top: -6px;
+  border-left-width: 0;
+  border-right-color: #141816;
+}
+
+.arrowRight {
+  top: 50%;
+  right: 10%;
+  margin-top: -6px;
+  border-right-width: 0;
+  border-left-color: #141816;
+}
+
+.dpad[data-held~='up'] .arrowUp {
+  border-bottom-color: var(--moss-lit);
+}
+
+.dpad[data-held~='down'] .arrowDown {
+  border-top-color: var(--moss-lit);
+}
+
+.dpad[data-held~='left'] .arrowLeft {
+  border-right-color: var(--moss-lit);
+}
+
+.dpad[data-held~='right'] .arrowRight {
+  border-left-color: var(--moss-lit);
+}
+
+/* --- S stick, B, A --- */
+
+.actions {
+  grid-area: actions;
+  position: relative;
+  align-self: center;
+  justify-self: center;
+  width: 180px;
+  height: 214px;
+}
+
+.keySlot {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.keySlot[data-key='s'] {
+  left: 0;
+  top: 0;
+}
+
+.keySlot[data-key='b'] {
+  left: 10px;
+  top: 128px;
+}
+
+.keySlot[data-key='a'] {
+  right: 0;
+  top: 62px;
+}
+
+/* The hollow each key sits in. */
+.well {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #1d3319, #2a4824 70%, #33552c);
+  box-shadow:
+    inset 0 3px 6px rgb(0 0 0 / 60%),
+    inset 0 -1px 1px rgb(255 255 255 / 10%),
+    0 1px 0 rgb(255 255 255 / 14%);
+}
+
+/* Domed keys: a lit cap, a darker side under it, a shadow under that. Pressed, they sink. */
+.round {
+  --side: #7a7259;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: 50%;
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1;
+  min-height: 0;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 40ms ease-out,
+    box-shadow 40ms ease-out;
+}
+
+/* `:is(…, *)` lifts these above the global button :hover / :active looks (a tap leaves :hover on). */
+.round:not(:disabled):is(:hover, :active, *) {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 65%),
+    inset 0 -5px 7px rgb(0 0 0 / 22%),
+    0 5px 0 var(--side),
+    0 8px 7px rgb(0 0 0 / 55%);
+}
+
+.round[data-pressed='true']:not(:disabled):is(:hover, :active, *) {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 45%),
+    inset 0 -3px 6px rgb(0 0 0 / 28%),
+    0 1px 0 var(--side),
+    0 2px 3px rgb(0 0 0 / 55%);
+}
+
+.keyB {
+  --side: #7b7358;
+  color: rgb(70 78 58 / 85%);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 55%);
+  background: radial-gradient(circle at 38% 28%, #fffdf1 0 7%, #f0e8c9 22%, #d4caa5 56%, #ada382 100%);
+}
+
+.keyA {
+  --side: #476f1c;
+  width: 66px;
+  height: 66px;
+  color: rgb(30 52 18 / 85%);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 45%);
+  background: radial-gradient(circle at 38% 28%, #f7ffde 0 7%, #cbec82 24%, #92c443 58%, #628f27 100%);
+}
+
+/* The special stick: a gold cap in a ringed hollow. Drag to aim, let go to use. */
+.stickBase {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  background: radial-gradient(circle at 50% 40%, #14241a 0 46%, #1c3219 62%, #2a4824 84%, #33552c 100%);
+  box-shadow:
+    inset 0 5px 10px rgb(0 0 0 / 70%),
+    inset 0 -2px 2px rgb(255 255 255 / 10%),
+    0 1px 0 rgb(255 255 255 / 14%);
+}
+
+/* Aim marks round the hollow; gold while you aim. */
+.stickTicks {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -4deg, rgb(237 230 200 / 26%) 0 8deg, transparent 8deg 45deg);
+  mask: radial-gradient(circle, transparent 0 82%, #000 83% 94%, transparent 95%);
+  -webkit-mask: radial-gradient(circle, transparent 0 82%, #000 83% 94%, transparent 95%);
+}
+
+.stickBase[data-active='true'] .stickTicks {
+  background: repeating-conic-gradient(from -4deg, rgb(242 193 78 / 85%) 0 8deg, transparent 8deg 45deg);
+}
+
+.stickCap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 28%, #fff6d0 0 7%, #f8d877 22%, #e5ad2e 56%, #a87406 100%);
+  transform: translate(calc(var(--sx, 0) * 26px), calc(var(--sy, 0) * 26px - 4px));
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 70%),
+    inset 0 -5px 7px rgb(0 0 0 / 22%),
+    calc(var(--sx, 0) * -3px) calc(5px - var(--sy, 0) * 3px) 0 #7b5300,
+    0 9px 8px rgb(0 0 0 / 55%),
+    0 0 0 3px rgb(242 193 78 / 18%);
+  pointer-events: none;
+}
+
+.stickBase[data-active='true'] .stickCap {
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 70%),
+    inset 0 -5px 7px rgb(0 0 0 / 22%),
+    calc(var(--sx, 0) * -3px) calc(4px - var(--sy, 0) * 3px) 0 #7b5300,
+    0 6px 6px rgb(0 0 0 / 55%),
+    0 0 14px 3px rgb(242 193 78 / 45%);
+}
+
+/* Your ability (with its recharge ring) set into the cap. */
+.stickBadge {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 45%));
+}
+
+.stickLetter {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1;
+  color: rgb(90 58 0 / 85%);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 50%);
+}
+
+/* --- SELECT / START: rubber pills in slanted slots --- */
+
+.pillSlot {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 10px;
+  padding-top: 18px;
+}
+
+.selectSlot {
+  grid-area: select;
+  justify-self: end;
+  margin-right: 14px;
+}
+
+.startSlot {
+  grid-area: start;
+  justify-self: start;
+  margin-left: 14px;
+}
+
+.startSlot .keySlot {
+  position: static;
+  gap: 10px;
+}
+
+.pillWell {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 30px;
+  border-radius: 15px;
+  transform: rotate(-24deg);
+  background: linear-gradient(180deg, #1e3419, #2c4a26);
+  box-shadow:
+    inset 0 3px 5px rgb(0 0 0 / 60%),
+    0 1px 0 rgb(255 255 255 / 14%);
+}
+
+.pill {
+  width: 64px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  min-height: 0;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #7a8c6f, #56684c 55%, #44533c);
+  transition:
+    transform 40ms ease-out,
+    box-shadow 40ms ease-out;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  /* A bigger target than it looks. */
+  outline: 14px solid transparent;
+}
+
+.pill:not(:disabled):is(:hover, *) {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 30%),
+    0 3px 0 #27341f,
+    0 5px 4px rgb(0 0 0 / 45%);
+}
+
+.pill:not(:disabled):is(:active, [data-pressed='true']) {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 20%),
+    0 1px 0 #27341f,
+    0 1px 2px rgb(0 0 0 / 45%);
+}
+
+/* --- speaker: slots cut into the case --- */
+
+.speaker {
+  position: absolute;
+  right: 28px;
+  bottom: 30px;
+  display: flex;
+  gap: 7px;
+  transform: rotate(-24deg);
+  pointer-events: none;
+}
+
+.speaker span {
+  width: 6px;
+  height: 46px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #0b150a, #18291a);
+  box-shadow:
+    inset 0 2px 3px rgb(0 0 0 / 85%),
+    0 1px 0 rgb(255 255 255 / 16%),
+    0 -1px 0 rgb(0 0 0 / 20%);
+}
+
+/* A game on the screen, held upright: a 16:9 screen; the name takes the spare height so the
+   controls stay down by the thumbs. */
+@media (orientation: portrait) {
+  .shell[data-ingame='true'] {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+
+  .shell[data-ingame='true'] .brand {
+    align-self: center;
+  }
+
+  .shell[data-ingame='true'] .lcd {
+    flex: none;
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* Short phones: tighter controls so the screen keeps its room. */
+@media (orientation: portrait) and (max-height: 700px) {
+  .shell {
+    padding: 12px 12px 16px;
+  }
+
+  .brand {
+    padding: 8px 0 0;
+  }
+
+  .brandName {
+    font-size: 26px;
+  }
+
+  .dpad {
+    width: 120px;
+    height: 120px;
+  }
+
+  .actions {
+    transform: scale(0.86);
+    margin: -14px 0;
+  }
+
+  .pillSlot {
+    padding-top: 8px;
+  }
+
+  .speaker {
+    display: none;
+  }
+}
+
+/* Sideways: the screen in the middle, the D-pad left, the buttons right. */
+@media (orientation: landscape) {
+  .shell {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'dpad bezel actions'
+      'select bezel start';
+    column-gap: 16px;
+    padding: 10px 16px;
+    border-radius: 36px;
+  }
+
+  .seam {
+    border-radius: 31px;
+  }
+
+  .brand,
+  .speaker {
+    display: none;
+  }
+
+  .stripName {
+    display: inline;
+  }
+
+  .linkLabel {
+    display: none;
+  }
+
+  .bezel {
+    border-radius: 14px;
+  }
+
+  .selectSlot,
+  .startSlot {
+    justify-self: center;
+    margin: 0;
+    padding: 0 0 8px;
+  }
+
+  .dpad {
+    width: 124px;
+    height: 124px;
+  }
+
+  .actions {
+    width: 170px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 360px) {
+  .dpad {
+    width: 108px;
+    height: 108px;
+  }
+
+  .actions {
+    transform: scale(0.82);
+    margin: -18px -14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cross,
+  .round,
+  .pill {
+    transition: none;
+  }
+}

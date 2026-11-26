@@ -223,3 +223,15 @@
     display: none;
   }
 }
+
+/* On the phone handheld's screen (see desk/handheldPad.ts) the game gets the whole screen:
+   START opens the menu, which has Leave. */
+:global(html[data-handheld]) .screen[data-ingame='true'] {
+  grid-template-rows: 1fr;
+}
+:global(html[data-handheld]) .screen[data-ingame='true'] .bar {
+  display: none;
+}
+:global(html[data-handheld]) .screen[data-ingame='true'] .body {
+  padding: 0;
+}

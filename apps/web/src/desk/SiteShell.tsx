@@ -4,21 +4,28 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { GAME_TITLE } from '@/components/brand';
 import type { DeskScene, DeskView } from './deskScene';
+import { HandheldShell } from './HandheldShell';
 import { quadTransform } from './homography';
 import styles from './SiteShell.module.css';
 
 /**
  * `desk`: the page is the 3D desk, and the site runs inside the CRT (an iframe of this same app).
- * `flat`: the site on its own: inside that iframe, on phones and tablets, small windows, without
- * WebGL, or with `?flat` in the address.
+ * `handheld`: phones get a pocket console instead; the site runs on its screen the same way.
+ * `flat`: the site on its own: inside either iframe, on tablets, small windows, without WebGL,
+ * or with `?flat` in the address.
  */
-type ShellMode = 'pending' | 'flat' | 'desk';
+type ShellMode = 'pending' | 'flat' | 'desk' | 'handheld';
+
+/** A touch screen whose short side is phone-sized. */
+const isPhone = () =>
+  window.matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 600;
 
 let decided: ShellMode | null = null;
 
 function detectMode(): ShellMode {
   if (window.self !== window.top) return 'flat';
   if (new URLSearchParams(window.location.search).has('flat')) return 'flat';
+  if (isPhone()) return 'handheld';
   if (window.matchMedia('(pointer: coarse)').matches) return 'flat';
   if (window.innerWidth < 900 || window.innerHeight < 560) return 'flat';
   try {
@@ -45,10 +52,11 @@ export function SiteShell({ children }: { children: ReactNode }) {
       </>
     );
   }
+  if (mode === 'handheld') return <HandheldShell />;
   return <DeskShell />;
 }
 
-/** Inside the CRT: keep the outer page's address and title in step with the site. */
+/** Inside the CRT or the handheld: keep the outer page's address and title in step with the site. */
 function FramedSync() {
   const pathname = usePathname();
   useEffect(() => {
