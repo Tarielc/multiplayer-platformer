@@ -15,6 +15,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { createWeather } from './weather';
 
 export type DeskView = 'screen' | 'room';
 
@@ -82,8 +83,27 @@ const FIT_W = 0.88;
 const MOVE_SECONDS = 1.7;
 /** Settled on the screen only the floaters and the lava lamp move: redraw the room at this rate. */
 const IDLE_FPS = 20;
+/**
+ * Looking around: with the pointer at the edge of the window the camera turns that way, up to
+ * these angles, and turns back once the pointer leaves the edge. The edge is this share of the
+ * window on each side (the CRT glass ends just inside it, so playing never brushes it).
+ */
+const LOOK_YAW_DEG = 24;
+const LOOK_PITCH_DEG = 12;
+const LOOK_EDGE_X = 0.045;
+const LOOK_EDGE_Y = 0.06;
+/** How quickly the camera turns toward where it should look (per second). */
+const LOOK_RATE = 2.2;
 
 const linear = (rgb: readonly number[]) => new THREE.Color().setRGB(rgb[0]!, rgb[1]!, rgb[2]!, THREE.LinearSRGBColorSpace);
+/**
+ * How far into the edge band a pointer coordinate (-1..1 across the window) is, signed: 0 short
+ * of the band, easing up to ±1 at the window's edge. `band` is the band's width in those units.
+ */
+const edgePull = (p: number, band: number) => {
+  const t = THREE.MathUtils.clamp((Math.abs(p) - (1 - band)) / band, 0, 1);
+  return Math.sign(p) * t * t * (3 - 2 * t);
+};
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 export async function createDeskScene(container: HTMLElement, options: DeskSceneOptions = {}): Promise<DeskScene> {
@@ -186,6 +206,9 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     .map(find)
     .filter((o): o is THREE.Object3D => Boolean(o))
     .map((o, i) => (still(o), { o, pos: o.position.clone(), i }));
+  // The storm outside (weather.ts) replaces the model's still night sky and moon.
+  for (const name of ['Night_Sky', 'Moon']) find(name)?.removeFromParent();
+  const weather = createWeather(scene, { reducedMotion: reduced, windowLight: scene.getObjectByName('Moon_Key') as THREE.Light | undefined });
   mergeStaticMeshes(root, new Set([...cfg.floaters, ...cfg.lavaBlobs]));
   // Nothing else moves: draw the shadow maps once.
   renderer.shadowMap.autoUpdate = false;
@@ -225,6 +248,12 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
   let distance = roomDistance;
   const drift = new THREE.Vector2();
   const pointer = new THREE.Vector2();
+  let pointerIn = false;
+  // -1..1 each way: how far the camera is turned toward the left/right and top/bottom edge.
+  const look = new THREE.Vector2();
+  const lookGoal = new THREE.Vector2();
+  const yawMax = THREE.MathUtils.degToRad(LOOK_YAW_DEG);
+  const pitchMax = THREE.MathUtils.degToRad(LOOK_PITCH_DEG);
 
   const resize = () => {
     width = Math.max(1, container.clientWidth);
@@ -249,6 +278,9 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
   const placeCamera = () => {
     camera.position.set(glass.x + drift.x, glass.y + drift.y, glass.z + distance);
     camera.lookAt(glass.x + drift.x * 0.25, glass.y + drift.y * 0.25, glass.z);
+    // then turn the head: right edge looks right, top edge looks up
+    camera.rotateY(-look.x * yawMax);
+    camera.rotateX(-look.y * pitchMax);
     camera.updateMatrixWorld();
   };
 
@@ -301,6 +333,19 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
       moving = true;
     }
 
+    // at the edge of the window the camera looks around
+    if (reduced || !pointerIn) lookGoal.set(0, 0);
+    else lookGoal.set(edgePull(pointer.x, LOOK_EDGE_X * 2), edgePull(pointer.y, LOOK_EDGE_Y * 2));
+    if (Math.abs(lookGoal.x - look.x) > 1e-4 || Math.abs(lookGoal.y - look.y) > 1e-4) {
+      const k = Math.min(1, dt * LOOK_RATE);
+      look.x += (lookGoal.x - look.x) * k;
+      look.y += (lookGoal.y - look.y) * k;
+      moving = true;
+    } else if (look.x !== lookGoal.x || look.y !== lookGoal.y) {
+      look.copy(lookGoal);
+      moving = true;
+    }
+
     // settled on the screen: the room only needs a slow redraw
     if (!moving && !dirty && view === 'screen' && now - lastDraw < 1000 / IDLE_FPS) return;
     lastDraw = now;
@@ -319,18 +364,32 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     }
     if (neon) (neon as THREE.MeshStandardMaterial).emissiveIntensity = Math.sin(t * 0.7) > 0.995 ? 2.4 : 7;
 
+    weather.update(t);
     placeCamera();
     composer.render();
     reportScreen();
   };
 
   const onPointerMove = (e: PointerEvent) => {
+    // A mouse or pen; and not on one of the shell's own buttons, which sit near the edge.
+    const onControl = e.target instanceof Element && e.target.closest('button, a') !== null;
+    pointerIn = (e.pointerType === 'mouse' || e.pointerType === 'pen') && !onControl;
     pointer.set((e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1);
+  };
+  // The pointer left the page (out of the window, or into the site on the screen, whose moves
+  // this page does not see), or the window lost focus: look back.
+  const onPointerOut = (e: MouseEvent) => {
+    if (!e.relatedTarget || e.relatedTarget instanceof HTMLIFrameElement) pointerIn = false;
+  };
+  const onBlur = () => {
+    pointerIn = false;
   };
   const onVisibility = () => {
     last = 0; // no jump in the animations after a hidden tab
   };
   window.addEventListener('pointermove', onPointerMove);
+  document.addEventListener('mouseout', onPointerOut);
+  window.addEventListener('blur', onBlur);
   document.addEventListener('visibilitychange', onVisibility);
   const ro = new ResizeObserver(resize);
   ro.observe(container);
@@ -359,7 +418,10 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     dispose() {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      weather.dispose();
       window.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('mouseout', onPointerOut);
+      window.removeEventListener('blur', onBlur);
       document.removeEventListener('visibilitychange', onVisibility);
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
