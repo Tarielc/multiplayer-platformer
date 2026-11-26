@@ -210,6 +210,17 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     .map((o, i) => (still(o), { o, pos: o.position.clone(), i }));
   // The storm outside (weather.ts) replaces the model's still night sky and moon.
   for (const name of ['Night_Sky', 'Moon']) find(name)?.removeFromParent();
+  // The handheld's screen lies exactly on its bezel's front face; from across the room the two
+  // fought for each pixel (a flickering diagonal mess). Draw the screen just in front, and let
+  // its light-grey picture glow softer so it reads as a picture instead of a white patch.
+  const pocketScreen = find('Handheld_Screen');
+  if (pocketScreen instanceof THREE.Mesh) {
+    const material = pocketScreen.material as THREE.MeshStandardMaterial;
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = -2;
+    material.polygonOffsetUnits = -2;
+    material.emissiveIntensity *= 0.45;
+  }
   const weather = createWeather(scene, { reducedMotion: reduced, windowLight: scene.getObjectByName('Moon_Key') as THREE.Light | undefined });
   mergeStaticMeshes(root, new Set([...cfg.floaters, ...cfg.lavaBlobs]));
   // Nothing else moves: draw the shadow maps once.
