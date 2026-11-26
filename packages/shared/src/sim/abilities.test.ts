@@ -910,6 +910,33 @@ describe('abilities and foes', () => {
     return world;
   }
 
+  it('foes wake around a drone flown out to its leash, past where they wake for its pilot', () => {
+    const wide = FLOOR.map((row) => row + ' '.repeat(30));
+    const x = 100 + ABILITIES.drone.leash - 40;
+    expect(x - 100).toBeGreaterThan(FOE_TUNING.wakeX);
+    const world = new GameWorld({ level: asciiToLevel({ rows: wide, objects: [foe('mushroom', x, 64)] }), movement: resolveMovement() });
+    world.addPlayer('a', 0, 'virtual-guy');
+    ticks(world, 5);
+    place(world, 'a', 100);
+    ticks(world, 5);
+    const mushroom = world.foeField.foes[0]!;
+    const t = mushroom.t;
+    ticks(world, 30);
+    expect(mushroom.t).toBe(t); // asleep: too far from the pilot
+
+    press(world, 'a');
+    ticks(world, seconds(ABILITIES.drone.deploy + ABILITIES.drone.sit) + 2);
+    const a = world.getPlayer('a')!.body;
+    expect(a.phase).toBe(Phase.DRONE_PILOT);
+    ticks(world, seconds(6), { a: Button.RIGHT });
+    expect(Math.abs(a.droneX - x)).toBeLessThan(FOE_TUNING.wakeX);
+    const startX = mushroom.x;
+    const startT = mushroom.t;
+    ticks(world, 30, { a: Button.RIGHT });
+    expect(mushroom.t).toBeGreaterThan(startT);
+    expect(mushroom.x).not.toBe(startX);
+  });
+
   const foeHurts = (events: GameEvent[]) => events.filter((e): e is Extract<GameEvent, { type: 'foeHurt' }> => e.type === 'foeHurt');
 
   it('the frog catches a foe, swallows it and spits it into another: both are hurt', () => {

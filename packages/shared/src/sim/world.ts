@@ -13,7 +13,7 @@ import type { NetPlayerState, NetWorldState } from '../protocol/state';
 import { circleOverlapsRect, rectsOverlap, type Rect, type Vec2 } from '../util/math';
 import { cellAt } from './collision';
 import type { DeathCause, GameEvent } from './events';
-import { droneDeck, giantActive } from './abilities';
+import { droneDeck, giantActive, isDroneOut } from './abilities';
 import { AbilitySystem, cloneAbilityPlayerState, newAbilityPlayerState, type AbilityHit, type AbilityPlayerState } from './abilitySystem';
 import { attackReachBox, isAttackActive, stepPlayerBody } from './actions';
 import { FoeField, type Foe, type FoeLanding, type FoeSquash } from './foes/FoeField';
@@ -936,7 +936,9 @@ export class GameWorld {
       target.vy = body.vy;
       target.vulnerable = false;
     });
-    for (const strike of foes.step(this.tick, targets)) {
+    // A drone can fly further from its pilot than foes stay awake: the world around it runs too.
+    const drones = players.filter((p) => isDroneOut(p.body, this.abilityTuning)).map((p) => ({ x: p.body.droneX, y: p.body.droneY }));
+    for (const strike of foes.step(this.tick, targets, drones)) {
       const player = this.players.get(strike.targetId);
       if (player) this.foeStrike(player, strike);
     }

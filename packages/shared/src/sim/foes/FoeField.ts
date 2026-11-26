@@ -1,7 +1,7 @@
 import { FOE_TUNING, isBoss, type FoeBox, type FoeCommon, type FoeMelee, type FoeTuning, type ShotKind } from '../../config/foes';
 import { TICK_DT } from '../../config/net';
 import { CellFlag, type LevelData } from '../../level/types';
-import { approach, clamp, rectsOverlap, type Rect } from '../../util/math';
+import { approach, clamp, rectsOverlap, type Rect, type Vec2 } from '../../util/math';
 import { cellAt } from '../collision';
 import { isCaptive, type FoeDef, type FoeState, type FoeStrike, type FoeTarget, type NetFoeState, type NetShotState } from './types';
 
@@ -279,8 +279,11 @@ export class FoeField {
     return count;
   }
 
-  /** One tick: foes think and move, shots fly, and whoever they hit is returned (once per player). */
-  step(tick: number, targets: readonly FoeTarget[]): FoeStrike[] {
+  /**
+   * One tick: foes think and move, shots fly, and whoever they hit is returned (once per player).
+   * `lookouts` are other spots that keep foes near them awake (a drone flown far from its pilot).
+   */
+  step(tick: number, targets: readonly FoeTarget[], lookouts: readonly Vec2[] = []): FoeStrike[] {
     const strikes: FoeStrike[] = [];
     const struck = new Set<string>();
     const strike = (hit: FoeStrike): boolean => {
@@ -298,7 +301,7 @@ export class FoeField {
         continue;
       }
       // A boss, once woken, fights on wherever the players are in its hall.
-      if (foe.state !== 'dead' && !(isBoss(foe.kind) && foe.phase > 0) && !this.awake(foe, targets)) continue;
+      if (foe.state !== 'dead' && !(isBoss(foe.kind) && foe.phase > 0) && !this.awake(foe, targets, lookouts)) continue;
       foe.t += this.dt;
       foe.cooldown = Math.max(0, foe.cooldown - this.dt);
       switch (foe.kind) {
@@ -1161,10 +1164,11 @@ export class FoeField {
 
   // --- movement and the level --------------------------------------------------------------
 
-  /** Asleep while no player is anywhere near (alive or not): nothing changes, nothing is sent. */
-  private awake(foe: Foe, targets: readonly FoeTarget[]): boolean {
+  /** Asleep while no player (alive or not) or lookout is anywhere near: nothing changes, nothing is sent. */
+  private awake(foe: Foe, targets: readonly FoeTarget[], lookouts: readonly Vec2[]): boolean {
     const { wakeX, wakeY } = this.config;
-    return targets.some((t) => Math.abs(centerX(t) - foe.x) <= wakeX && Math.abs(centerY(t) - foe.y) <= wakeY);
+    const near = (x: number, y: number) => Math.abs(x - foe.x) <= wakeX && Math.abs(y - foe.y) <= wakeY;
+    return targets.some((t) => near(centerX(t), centerY(t))) || lookouts.some((p) => near(p.x, p.y));
   }
 
   /** Gravity and tile collisions. Returns true when it ran into a wall sideways. */
