@@ -133,7 +133,7 @@ Foes are objects too: class `mushroom`, `chicken`, `wasp`, `monkey`, `bull` or `
 |---|---|---|---|
 | `mushroom` | 18×18 | 1 | Patrols, turning at walls, drops and hazards. Touching it costs a heart. |
 | `chicken` | 16×20 | 2 | Wanders; on seeing a player at about its height it squawks, chases and pecks. Harmless to touch, only the beak hurts. |
-| `wasp` | 16×14 | 1 | Flies its beat, keeps its distance from a player it sees and fires stingers at them. Touching it costs a heart; it can't be stomped. |
+| `wasp` | 16×14 | 1 | Flies its beat, keeps its distance from a player it sees and fires stingers at them. Touching it costs a heart, but landing on it kills it. |
 | `monkey` | 16×22 | 2 | Clings to a wall, climbs it and throws bananas in an arc; swipes at players who come close. Off a wall, it walks, throws and punches. It can't be stomped. |
 | `bull` | 34×22 | 3 | Paws the ground when it sees a player at its height, then charges; the horns hurt and knock you far. It crashes into walls and stands dazed: that's the time to hit it. Hits don't stop a charge. |
 | `rhino` | 60×46 | 12 | **The boss** (see below). |
@@ -144,7 +144,7 @@ Foes are objects too: class `mushroom`, `chicken`, `wasp`, `monkey`, `bull` or `
 | `range` | all | Pixels it strays from where it starts before turning back (patrol, wasp beat, monkey climb). `0` = no limit. Defaults: mushroom 48, chicken 40, wasp 40, monkey 32, bull 64. |
 | `wall` | monkey | `left`, `right` or `none`. By default it clings to a solid wall within a tile of it; a monkey with `wall` set but no wall there fails the level. |
 
-Players beat foes with attacks (one hit per swing) or, for mushrooms, chickens and bulls, by landing on them (stomp: one damage and a bounce). An attack also knocks a stinger or banana out of the air. Ninja Frog's tongue catches any foe; spat out, it flies until it hits something, and both it and whatever it hits take a hit (a spat player or box hurts the foes it hits too). The drone's claw picks foes up and drops them, into lava for instance. A caught foe can't act or hurt anyone. Beating a foe scores 10–30 (the rhino: 200). Foes sleep until a player is within 600×400 px (a woken boss never does), collide with the tiles only (they pass through traps and players), and avoid hazards, spikes and spike-heads; they die in them if pushed in.
+Players beat foes with attacks (one hit per swing) or, for mushrooms, chickens, wasps and bulls, by landing on them (stomp: one damage and a bounce). An attack also knocks a stinger or banana out of the air. Ninja Frog's tongue catches any foe; spat out, it flies until it hits something, and both it and whatever it hits take a hit (a spat player or box hurts the foes it hits too). The drone's claw picks foes up and drops them, into lava for instance. A caught foe can't act or hurt anyone. Beating a foe scores 10–30 (the rhino: 200). Foes sleep until a player is within 600×400 px (a woken boss never does), collide with the tiles only (they pass through traps and players), and avoid hazards, spikes and spike-heads; they die in them if pushed in.
 
 ### The rhino boss
 

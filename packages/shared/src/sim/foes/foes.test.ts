@@ -203,6 +203,21 @@ describe('foes', () => {
     expect(world.getPlayer('a')!.hp).toBe(PLAYER_CONFIG.maxHp);
   });
 
+  it('landing on a wasp kills it and bounces you up, without losing a heart', () => {
+    const world = worldWith([foe('wasp', 300, 80)]);
+    const wasp = world.foeField.foes[0]!;
+    // Just above it and falling.
+    place(world, wasp.x, wasp.y - FOE_TUNING.wasp.height - 6);
+    world.getPlayer('a')!.body.vy = 200;
+    const events: GameEvent[] = [];
+    for (let i = 0; i < 20 && only(events, 'foeHurt').length === 0; i++) events.push(...tick(world));
+    expect(only(events, 'foeHurt')[0]).toMatchObject({ kind: 'wasp', stomp: true, hp: 0 });
+    expect(world.foeField.foes[0]!.state).toBe('dead');
+    expect(world.getPlayer('a')!.body.vy).toBeLessThan(0);
+    expect(only(events, 'foeHit')).toEqual([]);
+    expect(world.getPlayer('a')!.hp).toBe(PLAYER_CONFIG.maxHp);
+  });
+
   it('a chicken spots you, chases you and pecks', () => {
     const world = worldWith([foe('chicken', 500, 160)]);
     place(world, 400);

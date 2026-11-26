@@ -276,7 +276,8 @@ export const FOE_TUNING: Readonly<FoeTuning> = {
     width: 16,
     height: 14,
     contactDamage: 1,
-    stompable: false,
+    // Its one heart goes to a stomp: landing on a wasp kills it.
+    stompable: true,
     hurtMs: 310,
     deathMs: 660,
     knockbackX: 120,
