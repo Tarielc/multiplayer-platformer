@@ -3,6 +3,8 @@ import { networkInterfaces } from 'node:os';
 import { LEVELS, NET_CONFIG, TICK_MS } from '@platformer/shared';
 import { loadEnv } from './env';
 import { createHttpHandler } from './http';
+import { MongoRunRecorder } from './leaderboard/MongoRunRecorder';
+import { NullRunRecorder, type RunRecorder } from './leaderboard/RunRecorder';
 import { LevelRepository, formatLevelReports } from './levels/LevelRepository';
 import { createLogger, setLogLevel } from './log';
 import { FixedTickLoop } from './loop/FixedTickLoop';
@@ -28,23 +30,41 @@ async function main(): Promise<void> {
   log.info(`loaded ${reports.length} level(s) from ${env.dataDir}`);
   const stopWatching = env.watchLevels ? levels.watch() : () => {};
 
-  // 2. Rooms + the single fixed-rate loop that ticks all of them.
+  // 2. Leaderboard: optional. Without MONGODB_URI (or with the database down) the game still runs.
+  let recorder: RunRecorder = new NullRunRecorder();
+  if (env.mongoUri) {
+    const mongo = new MongoRunRecorder({ uri: env.mongoUri, dbName: env.mongoDb, log: log.child('leaderboard') });
+    recorder = mongo;
+    if (await mongo.init()) log.info(`leaderboard: MongoDB database "${env.mongoDb}"`);
+  } else {
+    log.info('leaderboard off (set MONGODB_URI in apps/server/.env to enable it)');
+  }
+
+  // 3. Rooms + the single fixed-rate loop that ticks all of them.
   const rooms = new RoomManager({
     levels,
     manifest: LEVELS,
     devCommands: env.devCommands,
     maxRooms: env.maxRooms,
     autoCreate: env.autoCreateRooms,
+    recorder,
     log: log.child('rooms'),
   });
   const loop = new FixedTickLoop(TICK_MS, () => rooms.tick(), {
     onLag: (ms) => log.warn(`tick loop fell ${Math.round(ms)} ms behind; dropping backlog`),
   });
 
-  // 3. HTTP API + WebSocket endpoint on one port.
+  // 4. HTTP API + WebSocket endpoint on one port.
   const gateway = new SocketGateway({ rooms, log: log.child('ws'), allowedOrigins: env.allowedOrigins });
   const server = createServer(
-    createHttpHandler({ rooms, levels, corsOrigin: env.corsOrigin, connections: () => gateway.connectionCount }),
+    createHttpHandler({
+      rooms,
+      levels,
+      corsOrigin: env.corsOrigin,
+      connections: () => gateway.connectionCount,
+      leaderboard: recorder,
+      log: log.child('http'),
+    }),
   );
   server.on('upgrade', gateway.handleUpgrade);
   server.on('error', (error: NodeJS.ErrnoException) => {
@@ -60,7 +80,7 @@ async function main(): Promise<void> {
     log.info(`dev commands ${env.devCommands ? 'enabled' : 'disabled'}; auto-create rooms ${env.autoCreateRooms ? 'on' : 'off'}`);
   });
 
-  // 4. Graceful shutdown: tell clients, close sockets, stop the loop.
+  // 5. Graceful shutdown: tell clients, close sockets, stop the loop.
   let stopping = false;
   const shutdown = (signal: string) => {
     if (stopping) return;
@@ -70,6 +90,7 @@ async function main(): Promise<void> {
     stopWatching();
     rooms.shutdown();
     gateway.close();
+    void recorder.close().catch(() => {});
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 1500).unref();
   };

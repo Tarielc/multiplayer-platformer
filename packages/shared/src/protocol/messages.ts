@@ -1,6 +1,7 @@
 import type { CharacterId } from '../config/characters';
 import type { GameMode } from '../config/modes';
 import type { GameEvent } from '../sim/events';
+import type { RunRecordInfo } from './leaderboard';
 import type { NetFoeState, NetShotState } from '../sim/foes/types';
 import type { NetTrapState } from '../sim/traps/types';
 import type { NetPlayerPatch, NetPropState, NetWorldState } from './state';
@@ -40,7 +41,7 @@ export interface LevelResult {
   deaths: number;
   /** Race: finishing place (1-based); `null` if they didn't finish in time (or in co-op). */
   place: number | null;
-  /** Race: time to the trophy; `null` without a place. */
+  /** Race: time to the trophy; `null` without a place. Co-op: the team's time for the level. */
   timeMs: number | null;
   /** Race: campaign points for the place (`racePoints`), added to `campaignScore` with `score`. */
   placePoints: number;
@@ -70,6 +71,11 @@ export interface RoomInfo {
    */
   scaledFor: number | null;
   results: LevelResult[] | null;
+  /**
+   * Leaderboard placings for the level that just ended (and the campaign, after its last level).
+   * Filled in shortly after `results` once the database answers; `null` when nothing was recorded.
+   */
+  records: RunRecordInfo[] | null;
   nextLevelId: string | null;
   /** Set when returning to the lobby after the final level. */
   campaignComplete: boolean;

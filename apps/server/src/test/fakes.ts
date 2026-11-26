@@ -4,11 +4,14 @@ import {
   levelChecksum,
   resolveMovement,
   type LevelManifest,
+  type LeaderboardEntry,
   type LevelManifestEntry,
+  type RunRecordInfo,
   type ServerMessage,
   type ServerMessageOf,
 } from '@platformer/shared';
 import { asciiToLevel } from '@platformer/shared/dev';
+import type { BoardQuery, RunInput, RunRecorder } from '../leaderboard/RunRecorder';
 import type { LevelSource, ServerLevel } from '../levels/LevelRepository';
 import type { PlayerConnection } from '../net/connection';
 
@@ -60,3 +63,32 @@ export function testLevel(entry: LevelManifestEntry, rows: string[] = TEST_ROWS)
 }
 
 export const TEST_LEVELS: LevelSource = new Map(TEST_MANIFEST.entries.map((entry) => [entry.id, testLevel(entry)]));
+
+/** In-memory `RunRecorder`: keeps every recorded batch and answers with fixed placings. */
+export class FakeRunRecorder implements RunRecorder {
+  readonly enabled = true;
+  readonly batches: RunInput[][] = [];
+
+  get runs(): RunInput[] {
+    return this.batches.flat();
+  }
+
+  async record(runs: readonly RunInput[]): Promise<RunRecordInfo[]> {
+    this.batches.push([...runs]);
+    return runs.map((run, i) => ({
+      kind: run.kind,
+      levelId: run.levelId,
+      playerIds: run.playerIds,
+      timeMs: run.timeMs,
+      rank: i + 1,
+      personalBest: true,
+      worldRecord: i === 0,
+    }));
+  }
+
+  async board(_query: BoardQuery): Promise<LeaderboardEntry[]> {
+    return [];
+  }
+
+  async close(): Promise<void> {}
+}

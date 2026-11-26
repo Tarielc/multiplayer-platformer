@@ -9,6 +9,7 @@ import {
   type LevelManifest,
   type NetConfig,
 } from '@platformer/shared';
+import type { RunRecorder } from '../leaderboard/RunRecorder';
 import type { LevelSource } from '../levels/LevelRepository';
 import type { Logger } from '../log';
 import type { PlayerConnection } from '../net/connection';
@@ -24,6 +25,8 @@ export interface RoomManagerOptions {
    * server restart, which in development happens on every code change.
    */
   autoCreate: boolean;
+  /** Where finished runs go (leaderboard); omitted = nothing is recorded. */
+  recorder?: RunRecorder;
   log: Logger;
   net?: Readonly<NetConfig>;
 }
@@ -70,6 +73,7 @@ export class RoomManager {
       levels: this.options.levels,
       manifest: this.options.manifest,
       devCommands: this.options.devCommands,
+      ...(this.options.recorder ? { recorder: this.options.recorder } : {}),
       log: this.options.log.child(id),
       net: this.net,
     });

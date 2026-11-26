@@ -732,6 +732,64 @@
   }
 }
 
+.recordBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: var(--night);
+  background: var(--lichen);
+}
+
+.recordBadge[data-kind='best'] {
+  background: var(--moss-lit);
+}
+
+.recordBadge[data-kind='world'] {
+  background: var(--firefly);
+  animation: recordPulse 900ms steps(2, jump-none) infinite alternate;
+}
+
+@keyframes recordPulse {
+  to {
+    background: var(--firefly-pale);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recordBadge[data-kind='world'] {
+    animation: none;
+  }
+}
+
+.recordLines {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 20px;
+  zoom: clamp(0.7, var(--k, 1), 1.25);
+}
+
+.recordLine {
+  font-family: var(--ui);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recordLine strong {
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--firefly-pale);
+}
+
 .resultsFoot {
   display: flex;
   flex-direction: column;

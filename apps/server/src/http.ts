@@ -1,6 +1,17 @@
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http';
-import { MAX_PLAYERS, NET_CONFIG, PROTOCOL_VERSION } from '@platformer/shared';
+import {
+  LEADERBOARD_MAX_LIMIT,
+  LEVELS,
+  MAX_PLAYERS,
+  NET_CONFIG,
+  PROTOCOL_VERSION,
+  isGameMode,
+  type LevelManifest,
+} from '@platformer/shared';
+import { buildLeaderboard, type LeaderboardRequest } from './leaderboard/boards';
+import { NullRunRecorder, type RunRecorder } from './leaderboard/RunRecorder';
 import type { LevelRepository } from './levels/LevelRepository';
+import type { Logger } from './log';
 import type { RoomManager } from './rooms/RoomManager';
 
 export interface HttpDeps {
@@ -9,6 +20,10 @@ export interface HttpDeps {
   corsOrigin: string;
   connections: () => number;
   startedAt?: number;
+  /** Fastest-runs store; leaderboard requests answer `{ enabled: false }` without one. */
+  leaderboard?: RunRecorder;
+  manifest?: LevelManifest;
+  log?: Logger;
 }
 
 /**
@@ -16,9 +31,12 @@ export interface HttpDeps {
  *   GET  /health        server status (used by the home screen)
  *   POST /rooms         allocate a fresh room code -> { roomId }
  *   GET  /rooms/:code   room summary (exists, phase, player count, joinable)
+ *   GET  /leaderboard   fastest runs: ?mode=race|coop&solo=0|1&limit=1..50
  */
 export function createHttpHandler(deps: HttpDeps): RequestListener {
   const startedAt = deps.startedAt ?? Date.now();
+  const leaderboard = deps.leaderboard ?? new NullRunRecorder();
+  const manifest = deps.manifest ?? LEVELS;
   return (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     res.setHeader('Access-Control-Allow-Origin', deps.corsOrigin);
@@ -55,6 +73,19 @@ export function createHttpHandler(deps: HttpDeps): RequestListener {
       return json(res, 201, { roomId: room.id });
     }
 
+    if (req.method === 'GET' && url.pathname === '/leaderboard') {
+      const request = parseLeaderboardQuery(url.searchParams);
+      if (!request) return json(res, 400, { error: 'BAD_REQUEST' });
+      buildLeaderboard(leaderboard, manifest, deps.levels, request).then(
+        (body) => json(res, 200, body),
+        (error: unknown) => {
+          deps.log?.warn(`leaderboard query failed: ${error instanceof Error ? error.message : String(error)}`);
+          json(res, 503, { error: 'LEADERBOARD_UNAVAILABLE' });
+        },
+      );
+      return;
+    }
+
     const match = /^\/rooms\/([A-Za-z0-9]{3,12})$/.exec(url.pathname);
     if (req.method === 'GET' && match?.[1]) {
       const room = deps.rooms.get(match[1]);
@@ -69,6 +100,18 @@ export function createHttpHandler(deps: HttpDeps): RequestListener {
 
     json(res, 404, { error: 'NOT_FOUND' });
   };
+}
+
+/** `mode` defaults to race, `solo` to all players, `limit` to 10 (clamped to 1..50). */
+export function parseLeaderboardQuery(params: URLSearchParams): LeaderboardRequest | null {
+  const mode = params.get('mode') ?? 'race';
+  if (!isGameMode(mode)) return null;
+  const soloParam = params.get('solo') ?? '0';
+  if (soloParam !== '0' && soloParam !== '1') return null;
+  const limitParam = params.get('limit');
+  const limit = limitParam === null ? 10 : Number.parseInt(limitParam, 10);
+  if (!Number.isFinite(limit)) return null;
+  return { mode, solo: soloParam === '1', limit: Math.min(LEADERBOARD_MAX_LIMIT, Math.max(1, limit)) };
 }
 
 function json(res: ServerResponse, status: number, body: unknown): void {

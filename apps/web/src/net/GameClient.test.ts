@@ -69,6 +69,7 @@ function roomInfo(overrides: Partial<RoomInfo> = {}, me: Partial<RoomPlayerInfo>
     raceEndsInMs: null,
     scaledFor: null,
     results: null,
+    records: null,
     nextLevelId: null,
     campaignComplete: false,
     devCommands: true,

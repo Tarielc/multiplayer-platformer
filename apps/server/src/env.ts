@@ -20,6 +20,10 @@ export interface ServerEnv {
   maxRooms: number;
   logLevel: LogLevel;
   isProduction: boolean;
+  /** MongoDB connection string for the leaderboard; `null` turns the leaderboard off. */
+  mongoUri: string | null;
+  /** Database holding the leaderboard's `runs` collection. */
+  mongoDb: string;
 }
 
 function bool(value: string | undefined, fallback: boolean): boolean {
@@ -63,5 +67,7 @@ export function loadEnv(): ServerEnv {
     maxRooms: int(env.MAX_ROOMS, 500),
     logLevel: ['debug', 'info', 'warn', 'error'].includes(level) ? level : 'info',
     isProduction,
+    mongoUri: env.MONGODB_URI?.trim() || null,
+    mongoDb: env.MONGODB_DB?.trim() || 'platformer',
   };
 }

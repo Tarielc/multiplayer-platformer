@@ -17,22 +17,25 @@ import { useRef, useState, type ReactNode } from 'react';
 import { ABILITY_BLURBS, BACKDROP_URL, abilityName } from '@/components/brand';
 import { CharacterPortrait } from '@/components/CharacterPortrait';
 import { CONTROL_ROWS } from '@/components/controls';
+import { LeaderboardTable } from '@/components/LeaderboardTable';
 import { loadAudioSettings, saveAudioSettings } from '@/game/audio/audioSettings';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { useRoomActions, useServerHealth, type ServerState } from '@/hooks/useHomeActions';
 import { loadPlayerName, loadPreferredCharacter, savePlayerName, savePreferredCharacter } from '@/net/identity';
+import { useLeaderboard } from '@/net/leaderboard';
 import { AbilityTile, Btn, Crumb, Logo, Menu, ServerStatusLine, type MenuItem } from './parts';
 import { useScreenKeys, type ScreenKind } from './screenEnv';
 import { Key, PadA, ScreenStage, useStageKind, type Hint } from './ScreenStage';
 import s from './screens.module.css';
 
-type View = 'title' | 'characters' | 'join' | 'how' | 'settings';
+type View = 'title' | 'characters' | 'join' | 'leaderboard' | 'how' | 'settings';
 
 const MENU: readonly MenuItem[] = [
   { id: 'solo', label: 'Play solo', sub: 'Race the clock' },
   { id: 'create', label: 'Create room', sub: `Invite up to ${MAX_PLAYERS - 1} friends` },
   { id: 'join', label: 'Join room', sub: 'Got a code?' },
   { id: 'characters', label: 'Characters', sub: `${CHARACTER_IDS.length} sprouts, ${CHARACTER_IDS.length} specials` },
+  { id: 'leaderboard', label: 'Leaderboard', sub: 'Fastest runs' },
   { id: 'how', label: 'How to play', sub: 'Modes, levels, controls' },
   { id: 'settings', label: 'Settings', sub: 'Sound, your name' },
 ];
@@ -86,6 +89,7 @@ export function ScreenHome() {
     );
   }
   if (view === 'join') return <JoinView {...shared} error={actions.error} onJoin={actions.joinRoom} />;
+  if (view === 'leaderboard') return <LeaderboardView {...shared} you={name} />;
   if (view === 'how') return <HowView {...shared} />;
   if (view === 'settings') return <SettingsView {...shared} name={name} setName={setName} />;
   return (
@@ -565,6 +569,117 @@ function ControlsTab({ pocket }: { pocket: boolean }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------- leaderboard */
+
+const BOARD_MODES: readonly GameMode[] = ['race', 'coop'];
+
+/**
+ * Fastest runs from the game server: ← → switch Race / Co-op, ↑ ↓ pick the campaign or a level,
+ * confirm (Enter / A) toggles solo-only times.
+ */
+function LeaderboardView({ kind, status, back, you }: ViewProps & { you: string }) {
+  const [mode, setMode] = useState<GameMode>('race');
+  const [board, setBoard] = useState(0);
+  const [solo, setSolo] = useState(false);
+  const pocket = kind === 'pocket';
+  const state = useLeaderboard(mode, solo, pocket ? 10 : 12);
+  const levels = LEVELS.campaign(mode);
+  const boardCount = levels.length + 1; // the campaign, then each level
+  const turn = (delta: number) => {
+    setMode(BOARD_MODES[wrap(BOARD_MODES.indexOf(mode) + delta, BOARD_MODES.length)]!);
+    setBoard(0);
+  };
+  useScreenKeys(
+    (action) => {
+      if (action === 'back') back();
+      else if (action === 'left') turn(-1);
+      else if (action === 'right') turn(1);
+      else if (action === 'up') setBoard(wrap(board - 1, boardCount));
+      else if (action === 'down') setBoard(wrap(board + 1, boardCount));
+      else if (action === 'confirm') setSolo(!solo);
+    },
+  );
+  const data = state.kind === 'ready' && state.data.mode === mode && state.data.solo === solo ? state.data : null;
+  const shown = data ? (board === 0 ? data.campaign : data.levels[board - 1]) : undefined;
+  const boardName = board === 0 ? 'Whole campaign' : (levels[board - 1]?.name ?? '');
+  const table =
+    state.kind === 'offline' ? (
+      <p className={s.boardNote}>Leaderboard offline. The game server has no database configured, or is not running.</p>
+    ) : shown ? (
+      <LeaderboardTable entries={shown.entries} size={pocket ? 'pocket' : 'crt'} you={you} />
+    ) : (
+      <p className={s.boardNote}>Loading…</p>
+    );
+
+  return (
+    <ScreenStage
+      label="Leaderboard"
+      crumb={<Crumb>Leaderboard</Crumb>}
+      status={status}
+      hints={[
+        { controls: ['moveH'], label: 'Mode' },
+        { controls: ['moveV'], label: 'Board' },
+        { controls: ['confirm'], label: solo ? 'All players' : 'Solo only' },
+        { controls: ['back'], label: 'Back' },
+      ]}
+    >
+      <div className={pocket ? s.tabsPocket : s.tabs} role="tablist">
+        {BOARD_MODES.map((m) => (
+          <Btn
+            key={m}
+            role="tab"
+            aria-selected={m === mode}
+            className={s.tab}
+            data-on={m === mode}
+            onClick={() => {
+              setMode(m);
+              setBoard(0);
+            }}
+          >
+            {MODE_CONFIG[m].name}
+          </Btn>
+        ))}
+        <Btn className={s.tab} data-on={solo} aria-pressed={solo} onClick={() => setSolo(!solo)}>
+          {pocket ? 'Solo' : 'Solo only'}
+        </Btn>
+      </div>
+      {pocket ? (
+        <div className={`${s.panel} ${s.boardPocket}`}>
+          <div className={s.boardPocketHead}>
+            <Btn className={s.boardArrow} aria-label="Previous board" onClick={() => setBoard(wrap(board - 1, boardCount))}>
+              ‹
+            </Btn>
+            <span className={mode === 'coop' ? s.labelMoss : s.labelGold}>{boardName}</span>
+            <Btn className={s.boardArrow} aria-label="Next board" onClick={() => setBoard(wrap(board + 1, boardCount))}>
+              ›
+            </Btn>
+          </div>
+          {table}
+        </div>
+      ) : (
+        <>
+          <nav className={`${s.panel} ${s.boardList}`} aria-label="Boards">
+            {['Whole campaign', ...levels.map((e, i) => `${i + 1} · ${e.name}`)].map((label, i) => (
+              <Btn key={label} className={s.boardPick} data-on={i === board} onMouseEnter={() => setBoard(i)} onClick={() => setBoard(i)}>
+                {label}
+              </Btn>
+            ))}
+          </nav>
+          <section className={`${s.panel} ${s.boardPanel}`} aria-live="polite">
+            <div className={s.boardHead}>
+              <span className={mode === 'coop' ? s.labelMoss : s.labelGold}>
+                {MODE_CONFIG[mode].name} · {boardName}
+              </span>
+              <span className={s.label}>{solo ? 'Solo runs' : mode === 'coop' ? 'Team times' : 'All players'}</span>
+            </div>
+            {table}
+          </section>
+        </>
+      )}
+    </ScreenStage>
   );
 }
 

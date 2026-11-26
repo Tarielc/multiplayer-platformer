@@ -24,6 +24,7 @@ export * from './sim/world';
 // Wire protocol
 export * from './protocol/codec';
 export * from './protocol/delta';
+export * from './protocol/leaderboard';
 export * from './protocol/messages';
 export * from './protocol/state';
 export * from './protocol/validate';

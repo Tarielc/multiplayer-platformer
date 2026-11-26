@@ -11,7 +11,8 @@ import {
 } from '@platformer/shared';
 import { describe, expect, it } from 'vitest';
 import { silentLogger } from '../log';
-import { FakeConnection, TEST_LEVELS, TEST_MANIFEST } from '../test/fakes';
+import type { RunRecorder } from '../leaderboard/RunRecorder';
+import { FakeConnection, FakeRunRecorder, TEST_LEVELS, TEST_MANIFEST } from '../test/fakes';
 import { Room } from './Room';
 
 const COUNTDOWN_TICKS = msToTicks(NET_CONFIG.room.countdownMs);
@@ -23,13 +24,14 @@ interface TestClient {
   slot: number;
 }
 
-function createRoom(devCommands = true): Room {
+function createRoom(devCommands = true, recorder?: RunRecorder): Room {
   let n = 0;
   return new Room({
     id: 'TEST1',
     levels: TEST_LEVELS,
     manifest: TEST_MANIFEST,
     devCommands,
+    ...(recorder ? { recorder } : {}),
     log: silentLogger,
     createPlayerId: () => `p${++n}`,
   });
@@ -407,9 +409,13 @@ describe('Room: level flow', () => {
     expect(room.currentPhase).toBe('levelComplete');
     // B starts nearer the coin and takes it; both reached the trophy together.
     expect(room.info().results).toEqual([
-      { playerId: a.id, name: 'A', slot: 0, score: 0, collected: 0, deaths: 0, place: null, timeMs: null, placePoints: 0 },
-      { playerId: b.id, name: 'B', slot: 1, score: 10, collected: 1, deaths: 0, place: null, timeMs: null, placePoints: 0 },
+      { playerId: a.id, name: 'A', slot: 0, score: 0, collected: 0, deaths: 0, place: null, timeMs: expect.any(Number), placePoints: 0 },
+      { playerId: b.id, name: 'B', slot: 1, score: 10, collected: 1, deaths: 0, place: null, timeMs: expect.any(Number), placePoints: 0 },
     ]);
+    // Co-op: both rows carry the team's time for the level.
+    const [ra, rb] = room.info().results!;
+    expect(ra!.timeMs).toBe(rb!.timeMs);
+    expect(ra!.timeMs).toBeGreaterThan(0);
     expect(room.info().players.map((p) => p.campaignScore)).toEqual([0, 10]);
     expect(a.conn.sent.some((m) => (m.t === 'delta' || m.t === 'snapshot') && m.events.some((e) => e.type === 'levelComplete'))).toBe(true);
   });
@@ -592,5 +598,135 @@ describe('Room: game modes', () => {
     expect(totals.get(b.id)).toBe(racePoints(1));
     expect(totals.get(a.id)).toBe(racePoints(2));
     expect(room.info().raceEndsInMs).toBeNull();
+  });
+});
+
+describe('Room: leaderboard', () => {
+  let seq = 0;
+  /** Everyone holds RIGHT until the level ends (they all reach the trophy in about a second). */
+  function runRight(room: Room, clients: TestClient[]): void {
+    for (let i = 0; room.currentPhase === 'playing'; i++) {
+      if (i > 600) throw new Error('level never ended');
+      seq++;
+      for (const client of clients) room.handle(client.id, { t: 'input', seq, buttons: Button.RIGHT });
+      room.tick();
+    }
+  }
+  /** Lets the recorder's promise settle, then ticks once so the room info goes out. */
+  async function settle(room: Room): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    room.tick();
+  }
+  function nextLevel(room: Room): void {
+    tickUntil(room, () => room.currentPhase === 'playing');
+  }
+
+  it('records one run per race finisher and sends the placings to the room', async () => {
+    const recorder = new FakeRunRecorder();
+    const room = createRoom(true, recorder);
+    const a = join(room, 'A');
+    const b = join(room, 'B');
+    room.handle(a.id, { t: 'selectMode', mode: 'race' });
+    startPlaying(room, [a, b]);
+    runRight(room, [a, b]);
+    expect(room.currentPhase).toBe('levelComplete');
+
+    const results = new Map(room.info().results!.map((r) => [r.playerId, r]));
+    expect(recorder.runs).toHaveLength(2);
+    for (const run of recorder.runs) {
+      expect(run).toMatchObject({ kind: 'level', mode: 'race', levelId: 'sprint', playerCount: 2, roomId: 'TEST1' });
+      expect(run.timeMs).toBe(results.get(run.playerIds[0]!)!.timeMs);
+      expect(run.checksum).toBe(TEST_LEVELS.get('sprint')!.checksum);
+    }
+    expect(room.info().records).toBeNull();
+
+    await settle(room);
+    expect(room.info().records).toHaveLength(2);
+    expect(a.conn.last('room')?.room.records?.[0]).toMatchObject({ kind: 'level', levelId: 'sprint', rank: 1 });
+
+    nextLevel(room);
+    expect(room.info().records).toBeNull(); // placings belong to the results screen they came with
+  });
+
+  it('records one team run in co-op, timed by the world clock', () => {
+    const recorder = new FakeRunRecorder();
+    const room = createRoom(true, recorder);
+    const a = join(room, 'A');
+    const b = join(room, 'B');
+    startPlaying(room, [a, b]);
+    runRight(room, [a, b]);
+    expect(recorder.runs).toEqual([
+      expect.objectContaining({
+        kind: 'level',
+        mode: 'coop',
+        levelId: 'first',
+        playerIds: [a.id, b.id],
+        names: ['A', 'B'],
+        timeMs: room.info().results![0]!.timeMs,
+      }),
+    ]);
+  });
+
+  it('adds campaign totals after the last level of a campaign played from the start', async () => {
+    const recorder = new FakeRunRecorder();
+    const room = createRoom(true, recorder);
+    const a = join(room, 'A');
+    startSolo(room, a);
+    runRight(room, [a]);
+    const first = room.info().results![0]!.timeMs!;
+    nextLevel(room);
+    runRight(room, [a]);
+    const second = room.info().results![0]!.timeMs!;
+
+    expect(recorder.batches).toHaveLength(2);
+    const [campaign] = recorder.batches[1]!.filter((r) => r.kind === 'campaign');
+    expect(campaign).toMatchObject({ mode: 'race', levelId: null, playerIds: [a.id], playerCount: 1, timeMs: first + second });
+    expect(campaign!.checksum).not.toBe(TEST_LEVELS.get('dash')!.checksum);
+
+    tickUntil(room, () => room.currentPhase === 'lobby');
+    await settle(room);
+    // The campaign-complete lobby still shows the final placings.
+    expect(room.info().records?.map((r) => r.kind)).toEqual(['level', 'campaign']);
+  });
+
+  it('records no campaign run when the campaign started midway', () => {
+    const recorder = new FakeRunRecorder();
+    const room = createRoom(true, recorder);
+    const a = join(room, 'A');
+    room.handle(a.id, { t: 'selectMode', mode: 'race' });
+    room.handle(a.id, { t: 'selectLevel', levelId: 'dash' });
+    startPlaying(room, [a]);
+    runRight(room, [a]);
+    expect(recorder.runs.map((r) => r.kind)).toEqual(['level']);
+  });
+
+  it('keeps levels skipped with dev commands, and their campaign, off the board', () => {
+    const recorder = new FakeRunRecorder();
+    const room = createRoom(true, recorder);
+    const a = join(room, 'A');
+    startSolo(room, a);
+    room.handle(a.id, { t: 'dev', cmd: 'skipLevel' });
+    room.tick();
+    expect(room.currentPhase).toBe('levelComplete');
+    expect(recorder.runs).toEqual([]);
+
+    nextLevel(room);
+    runRight(room, [a]);
+    // The clean second level counts on its own; the campaign does not.
+    expect(recorder.runs.map((r) => [r.kind, r.levelId])).toEqual([['level', 'dash']]);
+  });
+
+  it('gives a player who dropped in midway no race campaign time', () => {
+    const recorder = new FakeRunRecorder();
+    const room = createRoom(true, recorder);
+    const a = join(room, 'A');
+    startSolo(room, a);
+    runRight(room, [a]);
+    nextLevel(room);
+    const b = join(room, 'B');
+    tickUntil(room, () => room.currentPhase === 'playing');
+    runRight(room, [a, b]);
+    const campaign = recorder.runs.filter((r) => r.kind === 'campaign');
+    expect(campaign.map((r) => r.playerIds)).toEqual([[a.id]]);
   });
 });

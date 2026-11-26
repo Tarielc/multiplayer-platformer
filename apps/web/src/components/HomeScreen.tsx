@@ -21,6 +21,8 @@ import { ABILITY_BLURBS, BACKDROP_URL, GAME_TITLE, abilityName } from './brand';
 import { CharacterPicker } from './CharacterPicker';
 import { CharacterPortrait } from './CharacterPortrait';
 import { CONTROL_ROWS, ControlKeys } from './controls';
+import { useLeaderboard } from '@/net/leaderboard';
+import { LeaderboardTable } from './LeaderboardTable';
 import { Fireflies } from './Fireflies';
 import { MossCap } from './PixelIcons';
 import styles from './HomeScreen.module.css';
@@ -257,6 +259,8 @@ export function HomeScreen() {
         ))}
       </section>
 
+      <LeaderboardSection you={name} />
+
       <section id="controls" className={styles.section} aria-labelledby="controls-title">
         <header className={styles.sectionHead}>
           <span className={styles.kicker}>Controls</span>
@@ -325,8 +329,76 @@ const SECTIONS = [
   ['characters', 'Characters'],
   ['modes', 'Modes'],
   ['levels', 'Levels'],
+  ['leaderboard', 'Leaderboard'],
   ['controls', 'Controls'],
 ] as const;
+
+/** Fastest runs per campaign and level, from the game server's leaderboard. */
+function LeaderboardSection({ you }: { you: string }) {
+  const [mode, setMode] = useState<GameMode>('race');
+  const [solo, setSolo] = useState(false);
+  const [board, setBoard] = useState(0);
+  const state = useLeaderboard(mode, solo);
+  const levels = LEVELS.campaign(mode);
+  const data = state.kind === 'ready' && state.data.mode === mode && state.data.solo === solo ? state.data : null;
+  const shown = data ? (board === 0 ? data.campaign : data.levels[board - 1]) : undefined;
+  return (
+    <section id="leaderboard" className={styles.section} aria-labelledby="leaderboard-title">
+      <header className={styles.sectionHead}>
+        <span className={styles.kicker}>Leaderboard</span>
+        <h2 id="leaderboard-title" className="px-outline">
+          Fastest runs.
+        </h2>
+      </header>
+      <div className={styles.boardControls}>
+        <div className={styles.segmented} role="group" aria-label="Mode">
+          {(['race', 'coop'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className="px-notch"
+              aria-pressed={m === mode}
+              onClick={() => {
+                setMode(m);
+                setBoard(0);
+              }}
+            >
+              {MODE_CONFIG[m].name}
+            </button>
+          ))}
+        </div>
+        <div className={styles.segmented} role="group" aria-label="Players">
+          <button type="button" className="px-notch" aria-pressed={!solo} onClick={() => setSolo(false)}>
+            All players
+          </button>
+          <button type="button" className="px-notch" aria-pressed={solo} onClick={() => setSolo(true)}>
+            Solo only
+          </button>
+        </div>
+      </div>
+      <div className={styles.boardWrap}>
+        <ol className={styles.boardTabs} aria-label="Boards">
+          {['Whole campaign', ...levels.map((e, i) => `${i + 1} · ${e.name}`)].map((label, i) => (
+            <li key={label}>
+              <button type="button" className="px-notch" aria-pressed={i === board} onClick={() => setBoard(i)}>
+                {label}
+              </button>
+            </li>
+          ))}
+        </ol>
+        <div className={`${styles.board} px-panel`} aria-live="polite">
+          {state.kind === 'offline' ? (
+            <p className={styles.boardNote}>The leaderboard is offline: the game server has no database configured, or is not running.</p>
+          ) : shown ? (
+            <LeaderboardTable entries={shown.entries} you={you} />
+          ) : (
+            <p className={styles.boardNote}>Loading…</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function MenuGlyph({ open }: { open: boolean }) {
   return (

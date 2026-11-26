@@ -32,8 +32,11 @@ import {
   type NetWorldState,
   type RoomInfo,
   type RoomPhase,
+  type RunRecordInfo,
   type ServerMessage,
 } from '@platformer/shared';
+import type { RunInput, RunRecorder } from '../leaderboard/RunRecorder';
+import { campaignChecksum } from '../leaderboard/runs';
 import type { LevelSource, ServerLevel } from '../levels/LevelRepository';
 import type { Logger } from '../log';
 import type { PlayerConnection } from '../net/connection';
@@ -46,6 +49,8 @@ export interface RoomOptions {
   devCommands: boolean;
   log: Logger;
   net?: Readonly<NetConfig>;
+  /** Leaderboard store: finished level and campaign times are recorded here. */
+  recorder?: RunRecorder;
   /** Override for deterministic ids in tests. */
   createPlayerId?: () => string;
 }
@@ -60,6 +65,9 @@ interface RoomPlayer {
   ready: boolean;
   menuOpen: boolean;
   campaignScore: number;
+  /** Race: summed finish times this campaign; `null` once a level went unfinished (or they dropped in). */
+  campaignTimeMs: number | null;
+  campaignDeaths: number;
   characterId: CharacterId;
   connection: PlayerConnection | null;
   /** Ticks left before a disconnected player loses their slot. */
@@ -106,6 +114,7 @@ export class Room {
   private readonly log: Logger;
   private readonly net: Readonly<NetConfig>;
   private readonly createPlayerId: () => string;
+  private readonly recorder: RunRecorder | null;
 
   private readonly players = new Map<string, RoomPlayer>();
   private readonly byClientId = new Map<string, RoomPlayer>();
@@ -125,6 +134,17 @@ export class Room {
   private results: LevelResult[] | null = null;
   private nextLevelId: string | null = null;
   private campaignComplete = false;
+  /** Leaderboard placings of the level / campaign that just ended (arrive asynchronously). */
+  private records: RunRecordInfo[] | null = null;
+  /** The campaign started at its first level (only those count for the campaign board). */
+  private campaignFromStart = false;
+  /** A dev command was used this campaign / this level: nothing it touches is recorded. */
+  private campaignTainted = false;
+  private levelTainted = false;
+  /** Checksums of the levels finished this campaign, in order. */
+  private campaignChecksums: string[] = [];
+  /** Co-op: team time this campaign, wiped attempts included. */
+  private campaignTeamTicks = 0;
 
   private lastBroadcast: NetWorldState | null = null;
   private snapshotsSent = 0;
@@ -143,6 +163,7 @@ export class Room {
     this.log = options.log;
     this.net = options.net ?? NET_CONFIG;
     this.createPlayerId = options.createPlayerId ?? (() => `p${randomBytes(4).toString('hex')}`);
+    this.recorder = options.recorder?.enabled ? options.recorder : null;
     this.selectedLevelId = this.manifest.firstLevelFor(this.mode) ?? this.manifest.firstLevelId;
   }
 
@@ -202,6 +223,7 @@ export class Room {
       raceEndsInMs: this.raceEndsInMs(),
       scaledFor: this.level ? this.scaledFor : null,
       results: this.results,
+      records: this.records,
       nextLevelId: this.nextLevelId,
       campaignComplete: this.campaignComplete,
       devCommands: this.devCommands,
@@ -257,6 +279,9 @@ export class Room {
       ready: false,
       menuOpen: false,
       campaignScore: 0,
+      // Dropping into a running campaign misses levels: no campaign time for this one.
+      campaignTimeMs: this.phase === 'lobby' ? 0 : null,
+      campaignDeaths: 0,
       characterId: pickFreeCharacter(request.characterId ?? defaultCharacterForSlot(slot), taken),
       connection: null,
       graceTicks: 0,
@@ -381,7 +406,16 @@ export class Room {
   private startCampaign(): void {
     this.campaignComplete = false;
     this.results = null;
-    for (const player of this.players.values()) player.campaignScore = 0;
+    this.records = null;
+    this.campaignFromStart = this.selectedLevelId === this.manifest.firstLevelFor(this.mode);
+    this.campaignTainted = false;
+    this.campaignChecksums = [];
+    this.campaignTeamTicks = 0;
+    for (const player of this.players.values()) {
+      player.campaignScore = 0;
+      player.campaignTimeMs = 0;
+      player.campaignDeaths = 0;
+    }
     this.startLevel(this.selectedLevelId, true);
   }
 
@@ -411,6 +445,8 @@ export class Room {
     this.broadcastNow = true;
     this.countdownFromLobby = fromLobby;
     this.results = null;
+    this.records = null;
+    this.levelTainted = false;
     this.nextLevelId = null;
     this.setPhase('countdown', Math.max(1, msToTicks(this.net.room.countdownMs)));
     const scaled = this.scaledFor !== null && this.scaledFor > 1 ? `, foes scaled for ${this.scaledFor}` : '';
@@ -453,6 +489,8 @@ export class Room {
 
   /** Co-op team wipe: a short "wiped out" pause, then the same level from the start (no points). */
   private failLevel(): void {
+    // The wiped attempt still counts towards the team's campaign time.
+    this.campaignTeamTicks += this.world?.tick ?? 0;
     this.broadcastNow = true; // final positions + the teamWipe event
     this.setPhase('levelFailed', Math.max(1, msToTicks(this.net.room.levelFailedMs)));
     this.log.info(`team wiped out on "${this.level?.entry.id}"; restarting it`);
@@ -466,11 +504,14 @@ export class Room {
   }
 
   private finishLevel(world: GameWorld): void {
+    const race = MODE_CONFIG[this.mode].race !== null;
+    const teamTimeMs = Math.round(ticksToMs(world.tick));
     const results: LevelResult[] = world.listPlayers().map((wp) => {
       const player = this.players.get(wp.id);
       const place = wp.place > 0 ? wp.place : null;
       const placePoints = racePoints(place, this.mode);
       if (player) player.campaignScore += campaignPoints(this.mode, wp.score, place);
+      const timeMs = race ? (place === null ? null : Math.round(ticksToMs(wp.finishTick))) : teamTimeMs;
       return {
         playerId: wp.id,
         name: player?.name ?? 'Player',
@@ -479,11 +520,12 @@ export class Room {
         collected: wp.collected,
         deaths: wp.deaths,
         place,
-        timeMs: place === null ? null : Math.round(ticksToMs(wp.finishTick)),
+        timeMs,
         placePoints,
       };
     });
     this.results = results;
+    this.recordLevel(world, results);
     this.nextLevelId = this.level?.entry.next ?? null;
     this.broadcastNow = true; // final positions + the levelComplete event
     this.setPhase('levelComplete', Math.max(1, msToTicks(this.net.room.levelCompleteMs)));
@@ -504,7 +546,10 @@ export class Room {
     this.pendingEvents = [];
     this.nextLevelId = null;
     this.campaignComplete = campaignComplete;
-    if (!campaignComplete) this.results = null;
+    if (!campaignComplete) {
+      this.results = null;
+      this.records = null;
+    }
     for (const player of this.players.values()) {
       player.menuOpen = false;
       if (campaignComplete) player.ready = false;
@@ -528,6 +573,86 @@ export class Room {
       if (!p.menuOpen) return false;
     }
     return connected > 0;
+  }
+
+  // --- leaderboard ---------------------------------------------------------------------------
+
+  /**
+   * Turns the level that just ended into leaderboard runs: one per finisher in race, one for the
+   * whole team in co-op. After a campaign's last level, campaign totals are added. Recording is
+   * asynchronous; the placings reach clients through `RoomInfo.records` once the store answers.
+   */
+  private recordLevel(world: GameWorld, results: LevelResult[]): void {
+    const level = this.level;
+    if (!level) return;
+    const race = MODE_CONFIG[this.mode].race !== null;
+    const byId = new Map(results.map((r) => [r.playerId, r]));
+    const team = this.playersBySlot().filter((p) => byId.has(p.id));
+
+    // Campaign bookkeeping (kept even without a recorder).
+    this.campaignChecksums.push(level.checksum);
+    this.campaignTeamTicks += world.tick;
+    for (const player of this.players.values()) {
+      const result = byId.get(player.id);
+      player.campaignDeaths += result?.deaths ?? 0;
+      if (!race) continue;
+      const timeMs = result?.timeMs ?? null;
+      player.campaignTimeMs = player.campaignTimeMs === null || timeMs === null ? null : player.campaignTimeMs + timeMs;
+    }
+
+    if (!this.recorder || this.levelTainted || team.length === 0) return;
+    const base = { mode: this.mode, playerCount: this.players.size, roomId: this.id };
+    const solo = (player: RoomPlayer) => ({
+      playerIds: [player.id],
+      names: [player.name],
+      characters: [player.characterId],
+    });
+    const whole = {
+      playerIds: team.map((p) => p.id),
+      names: team.map((p) => p.name),
+      characters: team.map((p) => p.characterId),
+    };
+
+    const runs: RunInput[] = [];
+    const levelRun = { ...base, kind: 'level' as const, levelId: level.entry.id, checksum: level.checksum };
+    if (race) {
+      for (const player of team) {
+        const result = byId.get(player.id)!;
+        if (result.timeMs !== null) runs.push({ ...levelRun, ...solo(player), timeMs: result.timeMs, deaths: result.deaths });
+      }
+    } else {
+      const deaths = team.reduce((sum, p) => sum + (byId.get(p.id)?.deaths ?? 0), 0);
+      runs.push({ ...levelRun, ...whole, timeMs: Math.round(ticksToMs(world.tick)), deaths });
+    }
+
+    if (level.entry.next === null && this.campaignFromStart && !this.campaignTainted) {
+      const campaignRun = { ...base, kind: 'campaign' as const, levelId: null, checksum: campaignChecksum(this.campaignChecksums) };
+      if (race) {
+        for (const player of team) {
+          if (player.campaignTimeMs === null) continue;
+          runs.push({ ...campaignRun, ...solo(player), timeMs: player.campaignTimeMs, deaths: player.campaignDeaths });
+        }
+      } else if ([...this.players.values()].every((p) => p.campaignTimeMs !== null)) {
+        // Co-op counts only teams that played the whole campaign (nobody dropped in midway).
+        const deaths = team.reduce((sum, p) => sum + p.campaignDeaths, 0);
+        runs.push({ ...campaignRun, ...whole, timeMs: Math.round(ticksToMs(this.campaignTeamTicks)), deaths });
+      }
+    }
+    if (runs.length > 0) this.submitRuns(runs);
+  }
+
+  private submitRuns(runs: RunInput[]): void {
+    const run = this.run;
+    this.recorder!.record(runs).then(
+      (records) => {
+        // Only the results of the same run (or the campaign-complete lobby after it) show them.
+        const showing = this.phase === 'levelComplete' || (this.phase === 'lobby' && this.campaignComplete);
+        if (this.closed || this.run !== run || !showing || records.length === 0) return;
+        this.records = records;
+        this.markRoomDirty();
+      },
+      (error: unknown) => this.log.warn(`recording runs failed: ${error instanceof Error ? error.message : String(error)}`),
+    );
   }
 
   // --- lobby actions -------------------------------------------------------------------------
@@ -584,6 +709,11 @@ export class Room {
   private runDevCommand(player: RoomPlayer, cmd: DevCommand): void {
     if (!this.devCommands) return this.reject(player, 'NOT_ALLOWED', 'Dev commands are disabled on this server.');
     this.log.info(`dev command "${cmd}" from ${describe(player)}`);
+    // Dev shortcuts keep that level (and the campaign) off the leaderboard.
+    if (this.phase !== 'lobby') {
+      this.levelTainted = true;
+      this.campaignTainted = true;
+    }
     switch (cmd) {
       case 'skipLevel':
         if (this.phase === 'playing') this.world?.complete();

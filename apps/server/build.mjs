@@ -1,5 +1,5 @@
 // Production bundle: one ESM file with @platformer/shared inlined (it ships TypeScript source).
-// `ws` stays external and is installed as a normal dependency.
+// `ws` and `mongodb` stay external and are installed as normal dependencies.
 import { rmSync } from 'node:fs';
 import { build } from 'esbuild';
 
@@ -13,6 +13,6 @@ await build({
   format: 'esm',
   target: 'node22',
   sourcemap: true,
-  external: ['ws', 'bufferutil', 'utf-8-validate'],
+  external: ['ws', 'bufferutil', 'utf-8-validate', 'mongodb'],
   logLevel: 'info',
 });

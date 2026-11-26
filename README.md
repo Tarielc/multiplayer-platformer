@@ -88,6 +88,7 @@ apps/
     src/rooms/       Room state machine, InputQueue, RoomManager
     src/net/         WebSocket gateway, connection wrapper, rate limiting
     src/levels/      LevelRepository: load, validate and hot-reload maps
+    src/leaderboard/ fastest-runs store (MongoDB) and the /leaderboard boards
     scripts/         bots.ts, validate-levels.ts
   web/               Next.js App Router + Phaser 4
     src/app/         routes: / and /room/[roomId]
@@ -166,6 +167,18 @@ The host picks a mode in the lobby; it applies to the whole campaign, and each m
 | Team wipe | If every player is down at once (2+ players), the level restarts after 3 s | Never: each racer just respawns |
 
 In a race, a player who reaches the trophy gets a place and leaves play, and their camera follows a player still racing. The HUD shows places and the time left. The rules are in `packages/shared/src/config/modes.ts`.
+
+### Leaderboard
+
+The game server keeps the fastest runs in MongoDB. It records them itself when a level ends, so times are server-authoritative and no client can post one.
+
+- **Level boards:** every race finisher's time, and in co-op the team's time (the level clock, pauses excluded).
+- **Campaign boards:** the total of a whole campaign played from its first level. In co-op that total includes attempts lost to a team wipe. Players who drop in midway get no campaign time.
+- **One row per entrant:** each player (or co-op team, by its names) appears once, with their best time. Every entry shows how many players were in the room, and boards can be filtered to solo runs.
+- **Map changes:** runs are keyed by the level checksum, so editing a map starts its board afresh.
+- **Excluded runs:** anything that used a dev command (skip level, respawn) stays off the boards.
+
+Players see their placing (`New record!`, `Best · #3`, `#7`) on the results screen. The boards are on the home page: the Leaderboard menu on the CRT and handheld, and a section on the plain page. The code is in `apps/server/src/leaderboard/`; without `MONGODB_URI` the boards show as offline and everything else works as before.
 
 In co-op, each player after the first gives foes **+40% health** (bosses **+60%**) and makes them attack **15% more often**. Health is rounded and never drops below the tuned value. Sizes, speeds, reach and damage stay the same, and traps and player hearts never scale. The team is counted when a level starts, so a player who drops in mid-level makes the *next* level harder. The lobby and the level countdown say how much tougher the foes are. Tune it in `MODE_CONFIG.coop.scaling`.
 
@@ -297,16 +310,16 @@ The export leaves the .blend unchanged. It replaces the CRT's picture with dark 
 
 ## Configuration
 
-Server (`apps/server/.env`, see `.env.example`): `PORT`, `HOST`, `CORS_ORIGIN`, `ALLOWED_ORIGINS` (WebSocket origin allow-list), `DATA_DIR`, `DEV_COMMANDS`, `WATCH_LEVELS`, `AUTO_CREATE_ROOMS`, `MAX_ROOMS`, `LOG_LEVEL`.
+Server (`apps/server/.env`, see `.env.example`): `PORT`, `HOST`, `CORS_ORIGIN`, `ALLOWED_ORIGINS` (WebSocket origin allow-list), `DATA_DIR`, `DEV_COMMANDS`, `WATCH_LEVELS`, `AUTO_CREATE_ROOMS`, `MAX_ROOMS`, `LOG_LEVEL`, and for the leaderboard `MONGODB_URI` (a local `mongodb://127.0.0.1:27017` or an Atlas `mongodb+srv://…` string; unset = leaderboard off) and `MONGODB_DB` (default `platformer`, collection `runs`).
 
 Web (`apps/web/.env.local`): `NEXT_PUBLIC_GAME_SERVER_URL`. It defaults to the page's own hostname on port 3001, which also makes **LAN play** work: open `http://<your-ip>:3000` on another device. If Next.js blocks the dev origin, add it to `allowedDevOrigins` in `apps/web/next.config.ts`.
 
-Server endpoints: `GET /health`, `POST /rooms` → `{ roomId }`, `GET /rooms/:code`, and WebSocket `/ws`.
+Server endpoints: `GET /health`, `POST /rooms` → `{ roomId }`, `GET /rooms/:code`, `GET /leaderboard?mode=race|coop&solo=0|1&limit=1..50`, and WebSocket `/ws`.
 
 ## Deploying
 
 - **Web:** any Next.js host (for example Vercel). Set `NEXT_PUBLIC_GAME_SERVER_URL=https://game.example.com`; the client switches to `wss://` automatically.
-- **Game server:** needs a long-running Node process with WebSockets (a VPS, Fly.io, Railway, a container…). It does not fit serverless functions, because rooms live in memory and the tick loop never stops. `npm run build -w @platformer/server` produces a single `dist/index.js` (only `ws` stays external) that reads maps from `DATA_DIR`. Set `NODE_ENV=production` (dev commands off), `ALLOWED_ORIGINS` and `CORS_ORIGIN`.
+- **Game server:** needs a long-running Node process with WebSockets (a VPS, Fly.io, Railway, a container…). It does not fit serverless functions, because rooms live in memory and the tick loop never stops. `npm run build -w @platformer/server` produces a single `dist/index.js` (`ws` and `mongodb` stay external) that reads maps from `DATA_DIR`. Set `NODE_ENV=production` (dev commands off), `ALLOWED_ORIGINS` and `CORS_ORIGIN`, plus `MONGODB_URI` for the leaderboard. On Atlas, allow the server's IP in the project's network access list.
 - **Scaling:** one process handles many rooms (each costs about 60 simulation steps per second per player). To go beyond one process, route each room code to a fixed instance, for example with a small lookup service or consistent hashing at the proxy.
 
 ## Troubleshooting

@@ -1,6 +1,15 @@
 'use client';
 
-import { LEVELS, MODE_CONFIG, PLAYER_SLOTS, ordinal, type CharacterId, type LevelResult, type RoomInfo } from '@platformer/shared';
+import {
+  LEVELS,
+  MODE_CONFIG,
+  PLAYER_SLOTS,
+  ordinal,
+  type CharacterId,
+  type LevelResult,
+  type RoomInfo,
+  type RunRecordInfo,
+} from '@platformer/shared';
 import { useState, type CSSProperties } from 'react';
 import { CharacterPortrait } from './CharacterPortrait';
 import { formatRaceTime } from './format';
@@ -44,6 +53,12 @@ export function LevelCompleteOverlay({
   const teamScore = results.reduce((sum, r) => sum + r.score, 0);
   const teamTotal = results.reduce((sum, r) => sum + (totals.get(r.playerId) ?? r.score), 0);
   const elapsed = Math.min(totalSeconds, Math.max(0, totalSeconds - left));
+  const records = room.records ?? [];
+  const levelRecord = new Map<string, RunRecordInfo>();
+  for (const record of records) if (record.kind === 'level') for (const id of record.playerIds) levelRecord.set(id, record);
+  const teamRecord = race ? undefined : records.find((r) => r.kind === 'level');
+  const campaignRecords = records.filter((r) => r.kind === 'campaign');
+  const nameOf = new Map(results.map((r) => [r.playerId, r.name]));
 
   return (
     <div className={`${viewStyles.overlay} ${styles.resultsOverlay}`}>
@@ -100,7 +115,12 @@ export function LevelCompleteOverlay({
                         )}
                       </td>
                     )}
-                    {race && <td>{r.timeMs !== null ? formatRaceTime(r.timeMs) : <span className={styles.dnf}>DNF</span>}</td>}
+                    {race && (
+                      <td>
+                        {r.timeMs !== null ? formatRaceTime(r.timeMs) : <span className={styles.dnf}>DNF</span>}
+                        <RecordBadge record={levelRecord.get(r.playerId)} />
+                      </td>
+                    )}
                     {!race && <td className={styles.num}>{r.score}</td>}
                     {!race && <td className={styles.num}>{r.collected}</td>}
                     <td className={styles.num}>{r.deaths}</td>
@@ -129,6 +149,24 @@ export function LevelCompleteOverlay({
         </section>
       </div>
 
+      {(teamRecord || campaignRecords.length > 0 || (!race && results[0]?.timeMs != null)) && (
+        <div className={styles.recordLines}>
+          {!race && results[0]?.timeMs != null && (
+            <span className={`${styles.recordLine} px-outline-sm`}>
+              Team time <strong>{formatRaceTime(results[0].timeMs)}</strong>
+              <RecordBadge record={teamRecord} />
+            </span>
+          )}
+          {campaignRecords.map((record) => (
+            <span key={record.playerIds.join('+')} className={`${styles.recordLine} px-outline-sm`}>
+              {race ? `${record.playerIds.map((id) => nameOf.get(id) ?? '?').join(' · ')} · campaign` : 'Campaign'}{' '}
+              <strong>{formatRaceTime(record.timeMs)}</strong>
+              <RecordBadge record={record} />
+            </span>
+          ))}
+        </div>
+      )}
+
       <footer className={styles.resultsFoot}>
         <span className={`${styles.nextLine} px-outline-sm`}>
           {next ? (
@@ -155,6 +193,26 @@ export function LevelCompleteOverlay({
         </div>
       </footer>
     </div>
+  );
+}
+
+/** Leaderboard placing of a run that just ended: new #1, personal best, or plain rank. */
+function RecordBadge({ record }: { record: RunRecordInfo | undefined }) {
+  if (!record) return null;
+  const text = record.worldRecord
+    ? 'New record!'
+    : record.personalBest
+      ? record.rank !== null
+        ? `Best · #${record.rank}`
+        : 'Personal best'
+      : record.rank !== null
+        ? `#${record.rank}`
+        : null;
+  if (!text) return null;
+  return (
+    <span className={`${styles.recordBadge} px-notch`} data-kind={record.worldRecord ? 'world' : record.personalBest ? 'best' : 'rank'}>
+      {text}
+    </span>
   );
 }
 

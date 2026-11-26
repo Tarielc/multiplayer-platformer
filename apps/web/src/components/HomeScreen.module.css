@@ -492,6 +492,88 @@ li[data-final='true'] .levelNo {
   box-shadow: inset 0 2px 0 var(--rule);
 }
 
+/* -- leaderboard */
+
+.boardControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.segmented button,
+.boardTabs button {
+  padding: 10px 16px 8px;
+  border: 0;
+  font-family: var(--ui);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mist);
+  background: var(--canopy);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed='true'],
+.boardTabs button[aria-pressed='true'] {
+  color: var(--night);
+  background: var(--moss-lit);
+  box-shadow: none;
+}
+
+.boardWrap {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.boardTabs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.boardTabs button {
+  width: 100%;
+}
+
+.board {
+  padding: 14px 20px;
+  min-height: 160px;
+}
+
+.boardNote {
+  margin: 0;
+  padding: 18px 4px;
+  font-size: 16px;
+  color: var(--lichen);
+}
+
+@media (max-width: 767px) {
+  .boardWrap {
+    grid-template-columns: 1fr;
+  }
+
+  .boardTabs {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .boardTabs button {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
 .footer {
   margin-top: 40px;
   background: #0b1813;
