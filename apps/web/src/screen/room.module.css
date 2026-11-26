@@ -1,0 +1,718 @@
+/* A room on the CRT (960 × 720) or the handheld (300 × 404): see ScreenRoom.tsx. Design pixels. */
+
+/* --- connecting / errors --- */
+
+.message,
+.messagePocket {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.message {
+  left: 160px;
+  right: 160px;
+  top: 220px;
+  padding: 30px 34px;
+}
+
+.messagePocket {
+  left: 12px;
+  right: 12px;
+  top: 110px;
+  gap: 8px;
+  padding: 16px;
+}
+
+.messageTitle {
+  font-family: var(--display);
+  font-size: 48px;
+  line-height: 1;
+  text-shadow: var(--o);
+}
+
+.messagePocket .messageTitle {
+  font-size: 28px;
+}
+
+.messageText,
+.messageDim {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--mist);
+}
+
+.messageDim {
+  font-size: 14px;
+  color: var(--lichen);
+}
+
+.messagePocket .messageText {
+  font-size: 12px;
+}
+
+.messagePocket .messageDim {
+  font-size: 10px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  background: var(--firefly);
+  animation: blink 0.9s steps(2, jump-none) infinite;
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.15;
+  }
+}
+
+/* --- room code --- */
+
+.codeRow {
+  position: absolute;
+  left: 44px;
+  top: 52px;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.code {
+  font-family: var(--display);
+  font-size: 60px;
+  line-height: 0.8;
+  letter-spacing: 0.08em;
+  color: var(--firefly);
+  text-shadow: var(--o);
+}
+
+.invite {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--mist);
+}
+
+.invite:hover {
+  text-decoration: underline;
+}
+
+.codePocket {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 30px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.codePocket .code {
+  font-size: 40px;
+}
+
+.codeNote {
+  font-size: 10px;
+  color: var(--mist);
+}
+
+/* --- player slots --- */
+
+.players {
+  position: absolute;
+  left: 44px;
+  top: 128px;
+  width: 430px;
+  height: 380px;
+}
+
+.slot,
+.slotPocket,
+.slotEmpty,
+.slotEmptyPocket {
+  position: absolute;
+  clip-path: var(--notch);
+}
+
+.slot {
+  left: 0;
+  right: 0;
+  height: 82px;
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 0 16px 0 14px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--slot) 20%, transparent), var(--canopy) 40%);
+  box-shadow:
+    inset 4px 0 0 var(--slot),
+    inset 0 0 0 2px var(--stone-lo);
+}
+
+.slotPocket {
+  width: 134px;
+  height: 66px;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 6px;
+  align-items: center;
+  padding-left: 8px;
+  clip-path: var(--notch-sm);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--slot) 20%, transparent), var(--canopy) 60%);
+  box-shadow:
+    inset 3px 0 0 var(--slot),
+    inset 0 0 0 2px var(--stone-lo);
+}
+
+.slot[aria-disabled='true'],
+.slotPocket[aria-disabled='true'] {
+  cursor: default;
+}
+
+.slot[aria-disabled='true'] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--slot) 20%, transparent), var(--canopy) 40%);
+  box-shadow:
+    inset 4px 0 0 var(--slot),
+    inset 0 0 0 2px var(--stone-lo);
+}
+
+.slotPocket[aria-disabled='true'] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--slot) 20%, transparent), var(--canopy) 60%);
+  box-shadow:
+    inset 3px 0 0 var(--slot),
+    inset 0 0 0 2px var(--stone-lo);
+}
+
+.slot.slot[data-focus='true'],
+.slotPocket.slotPocket[data-focus='true'] {
+  box-shadow:
+    inset 4px 0 0 var(--slot),
+    inset 0 0 0 3px var(--firefly);
+}
+
+.slotEmpty,
+.slotEmptyPocket {
+  display: grid;
+  place-items: center;
+  font-family: var(--ui);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stone-hi);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+  background: repeating-linear-gradient(135deg, transparent 0 10px, rgb(255 255 255 / 2%) 10px 20px);
+}
+
+.slotEmpty {
+  left: 0;
+  right: 0;
+  height: 82px;
+  font-size: 11px;
+}
+
+.slotEmptyPocket {
+  width: 134px;
+  height: 66px;
+  font-size: 7px;
+  clip-path: var(--notch-sm);
+}
+
+.slotPortrait {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  background: var(--night);
+  clip-path: var(--notch-sm);
+}
+
+.slotPocket .slotPortrait {
+  width: 44px;
+  height: 44px;
+  background: none;
+}
+
+.slotBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.slotTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag {
+  padding: 2px 6px;
+  font-family: var(--ui);
+  font-size: 10px;
+  color: var(--night);
+  background: var(--slot);
+  clip-path: var(--notch-sm);
+}
+
+.slotPocket .tag {
+  padding: 1px 4px;
+  font-size: 7px;
+  justify-self: start;
+}
+
+.host {
+  font-family: var(--ui);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.slotName {
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.slotPocket .slotName {
+  font-size: 20px;
+}
+
+.you {
+  font-family: var(--ui);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.slotMeta {
+  font-size: 12px;
+  color: var(--lichen);
+}
+
+.state {
+  padding: 6px 10px;
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--lichen);
+  background: var(--stone-lo);
+  clip-path: var(--notch-sm);
+}
+
+.state[data-state='ready'] {
+  color: var(--night);
+  background: var(--moss-lit);
+}
+
+.state[data-state='away'] {
+  color: var(--night);
+  background: var(--firefly);
+}
+
+.slotPocket .state {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  padding: 2px 4px;
+  font-size: 7px;
+  clip-path: none;
+}
+
+.slotPrev,
+.slotNext {
+  position: absolute;
+  top: 50%;
+  margin-top: -7px;
+  border: 7px solid transparent;
+}
+
+.slotPrev {
+  left: -1px;
+  border-right: 8px solid var(--firefly);
+  border-left: 0;
+  display: none;
+}
+
+.slotNext {
+  right: 4px;
+  border-left: 8px solid var(--firefly);
+  border-right: 0;
+}
+
+.slot .slotNext {
+  right: auto;
+  left: 82px;
+  top: auto;
+  bottom: 6px;
+  margin: 0;
+  border-width: 5px 0 5px 7px;
+}
+
+.slotPocket .slotNext {
+  top: auto;
+  bottom: 6px;
+  right: 6px;
+  margin: 0;
+  border-width: 5px 0 5px 7px;
+}
+
+/* --- mode and level --- */
+
+.modePanel,
+.levelPanel {
+  left: 498px;
+  right: 44px;
+  padding: 16px;
+}
+
+.modePanel {
+  top: 128px;
+  height: 172px;
+}
+
+.levelPanel {
+  top: 312px;
+  height: 176px;
+}
+
+.modePanel[data-focus='true'],
+.levelPanel[data-focus='true'] {
+  box-shadow:
+    inset 0 0 0 3px var(--firefly),
+    inset 0 3px 0 3px var(--stone-hi);
+}
+
+.modeCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.modeCard {
+  position: relative;
+  height: 118px;
+  overflow: hidden;
+  clip-path: var(--notch);
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+
+.modeCard[data-on='true'] {
+  opacity: 1;
+  filter: none;
+}
+
+.modeCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: var(--notch);
+}
+
+.modeCard[data-on='true']::after {
+  box-shadow: inset 0 0 0 4px var(--firefly);
+}
+
+.modeCard img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modeName {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+  text-shadow: var(--o);
+}
+
+.on {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 2px 6px;
+  font-family: var(--ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--night);
+  background: var(--firefly);
+  clip-path: var(--notch-sm);
+}
+
+.levelPicker {
+  display: grid;
+  grid-template-columns: 30px 1fr 30px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.arrowPrev,
+.arrowNext {
+  position: relative;
+  width: 30px;
+  height: 40px;
+}
+
+.arrowPrev::before,
+.arrowNext::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  border: 10px solid transparent;
+}
+
+.arrowPrev::before {
+  left: 6px;
+  border-right: 14px solid var(--firefly);
+  border-left: 0;
+}
+
+.arrowNext::before {
+  right: 6px;
+  border-left: 14px solid var(--firefly);
+  border-right: 0;
+}
+
+.arrowPrev[aria-disabled='true']::before {
+  border-right-color: var(--stone);
+}
+
+.arrowNext[aria-disabled='true']::before {
+  border-left-color: var(--stone);
+}
+
+.levelThumb {
+  position: relative;
+  display: block;
+  height: 92px;
+  background-color: #0a1a12;
+  background-size: 128px 128px;
+  image-rendering: pixelated;
+  clip-path: var(--notch-sm);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+}
+
+.levelNo {
+  position: absolute;
+  left: 10px;
+  bottom: 4px;
+  font-family: var(--display);
+  font-size: 50px;
+  line-height: 1;
+  text-shadow: var(--o);
+}
+
+.levelTag {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 2px 6px;
+  font-family: var(--ui);
+  font-size: 10px;
+  color: var(--night);
+  background: var(--firefly);
+  clip-path: var(--notch-sm);
+}
+
+.levelName {
+  margin-top: 8px;
+  font-family: var(--display);
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+}
+
+/* --- ready --- */
+
+.readyRow {
+  position: absolute;
+  left: 498px;
+  right: 44px;
+  top: 504px;
+  height: 120px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.readyText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--mist);
+}
+
+.warn {
+  color: var(--firefly);
+}
+
+.win {
+  font-weight: 400;
+  color: var(--firefly);
+}
+
+.ready,
+.readyPocket {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--display);
+  line-height: 1;
+  color: var(--night);
+  background: var(--moss-lit);
+  clip-path: var(--notch);
+  box-shadow:
+    inset 0 -6px 0 var(--moss),
+    inset 0 4px 0 var(--moss-pale);
+}
+
+.ready {
+  width: 180px;
+  height: 76px;
+  font-size: 38px;
+}
+
+.ready[data-ready='true'],
+.readyPocket[data-ready='true'] {
+  color: var(--bone);
+  background: var(--stone);
+  box-shadow:
+    inset 0 -6px 0 var(--stone-lo),
+    inset 0 4px 0 var(--stone-hi);
+}
+
+.ready[data-focus='true'],
+.readyPocket[data-focus='true'] {
+  outline: 3px solid var(--firefly);
+  outline-offset: -3px;
+}
+
+.readyKey {
+  background: var(--night);
+  color: var(--moss-lit);
+  box-shadow: none;
+}
+
+.readyPocket {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 324px;
+  height: 46px;
+  font-size: 28px;
+}
+
+.readyGlyph {
+  width: 22px;
+  height: 22px;
+  font-size: 18px;
+  background: var(--night);
+  color: var(--moss-lit);
+}
+
+/* --- pocket: mode and level side by side --- */
+
+.setupPocket {
+  left: 12px;
+  right: 12px;
+  top: 222px;
+  height: 94px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  padding: 8px 10px;
+}
+
+.cell {
+  min-width: 0;
+}
+
+.cellLabel {
+  font-family: var(--ui);
+  font-size: 7px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.cell[data-focus='true'] .cellLabel {
+  color: var(--firefly);
+}
+
+.setupPocket .modeCard {
+  display: block;
+  width: 100%;
+  height: 50px;
+  margin-top: 4px;
+  clip-path: var(--notch-sm);
+}
+
+.setupPocket .modeCard::after {
+  clip-path: var(--notch-sm);
+}
+
+.setupPocket .modeName {
+  left: 6px;
+  bottom: 3px;
+  font-size: 20px;
+}
+
+.cell[data-focus='true'] .modeCard::after,
+.cell[data-focus='true'] .levelThumb {
+  box-shadow: inset 0 0 0 3px var(--firefly);
+}
+
+.cell:not([data-focus='true']) .modeCard[data-on='true']::after {
+  box-shadow: inset 0 0 0 2px var(--stone-hi);
+}
+
+.levelBox {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.setupPocket .levelThumb {
+  height: 50px;
+  background-size: 64px 64px;
+}
+
+.setupPocket .levelNo {
+  left: 6px;
+  bottom: 2px;
+  font-size: 28px;
+}
+
+.setupPocket .levelTag {
+  right: 4px;
+  top: 4px;
+  padding: 1px 3px;
+  font-size: 6px;
+}
+
+.setupLine {
+  grid-column: span 2;
+  overflow: hidden;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--mist);
+}

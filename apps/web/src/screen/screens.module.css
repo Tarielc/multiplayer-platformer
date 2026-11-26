@@ -1,0 +1,1299 @@
+/* The screens on the CRT (960 × 720) and the handheld (300 × 404), in design pixels: the stage
+   scales as a whole (see ScreenStage). Positions follow the "On the screens" design boards; a
+   *Pocket class is the handheld's version of the class without it. */
+
+/* ------------------------------------------------------------ shared */
+
+/* A clickable thing on a screen (see Btn): no look of its own, so any class styles it. */
+:where(.bare) {
+  display: block;
+  cursor: pointer;
+}
+
+:where(.bare[aria-disabled='true']) {
+  cursor: default;
+}
+
+.panel {
+  position: absolute;
+  background: linear-gradient(180deg, rgb(15 33 25 / 94%), rgb(10 24 18 / 94%));
+  clip-path: var(--notch);
+  box-shadow:
+    inset 0 0 0 3px var(--stone-lo),
+    inset 0 3px 0 3px var(--stone-hi);
+}
+
+.label,
+.labelGold,
+.labelMoss {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.labelGold {
+  color: var(--firefly);
+}
+
+.labelMoss {
+  color: var(--moss-lit);
+}
+
+.logo {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 0.8;
+  letter-spacing: 0.02em;
+  color: var(--bone);
+  text-shadow:
+    0 4px 0 var(--night),
+    4px 0 0 var(--night),
+    -4px 0 0 var(--night),
+    0 -4px 0 var(--night),
+    4px 4px 0 var(--night),
+    -4px 4px 0 var(--night),
+    0 10px 0 rgb(0 0 0 / 45%);
+}
+
+.logo i {
+  font-style: normal;
+  color: var(--moss-lit);
+}
+
+.badge {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  background: var(--night);
+  clip-path: var(--notch-sm);
+  box-shadow: inset 0 0 0 3px var(--firefly);
+}
+
+.heading,
+.headingPocket {
+  position: absolute;
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: var(--o);
+}
+
+.heading {
+  left: 44px;
+  top: 50px;
+  font-size: 40px;
+}
+
+.headingPocket {
+  left: 0;
+  right: 0;
+  top: 30px;
+  font-size: 24px;
+  text-align: center;
+}
+
+.field {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--body);
+  font-size: 20px;
+  color: var(--bone);
+  background: var(--night);
+  box-shadow:
+    inset 0 0 0 2px var(--stone),
+    inset 0 3px 0 2px #000;
+  outline: none;
+  caret-color: var(--firefly);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.field:focus {
+  box-shadow:
+    inset 0 0 0 2px var(--firefly),
+    inset 0 3px 0 2px #000,
+    0 0 14px rgb(242 193 78 / 25%);
+}
+
+.field::placeholder {
+  color: var(--stone-hi);
+}
+
+.fieldNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lichen);
+}
+
+.error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ember);
+}
+
+/* --- the menu: a cursor you move through a list --- */
+
+.menu {
+  position: absolute;
+  display: grid;
+  isolation: isolate;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding-left: 30px;
+  font-family: var(--display);
+  font-size: 40px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--mist);
+  text-shadow: var(--o);
+}
+
+.item[data-on='true'] {
+  color: var(--bone);
+}
+
+.item::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -12px;
+  right: -180px;
+  top: 2px;
+  bottom: 2px;
+  background: linear-gradient(90deg, rgb(169 207 78 / 26%), rgb(169 207 78 / 0%));
+  box-shadow: inset 3px 0 0 var(--moss-lit);
+  opacity: 0;
+}
+
+.item[data-on='true']::before {
+  opacity: 1;
+}
+
+.cur {
+  position: absolute;
+  left: 6px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 9px 0 9px 13px;
+  border-color: transparent transparent transparent var(--firefly);
+  opacity: 0;
+}
+
+[data-on='true'] > .cur {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgb(242 193 78 / 70%));
+}
+
+.sub {
+  margin-left: 16px;
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lichen);
+  text-shadow: none;
+  opacity: 0;
+}
+
+.item[data-on='true'] .sub {
+  opacity: 1;
+}
+
+.menuCrt {
+  left: 48px;
+  top: 262px;
+}
+
+.menuPocket {
+  left: 16px;
+  top: 176px;
+  width: 230px;
+}
+
+.menuPocket .item {
+  height: 27px;
+  padding-left: 20px;
+  font-size: 24px;
+}
+
+.menuPocket .item::before {
+  left: -8px;
+  right: -40px;
+  top: 1px;
+  bottom: 1px;
+}
+
+.menuPocket .cur {
+  left: 4px;
+  border-width: 6px 0 6px 9px;
+}
+
+/* ------------------------------------------------------------ title */
+
+.titleBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 70% 50%;
+}
+
+.titleBackdropPocket {
+  position: absolute;
+  left: -330px;
+  top: 0;
+  height: 404px;
+  width: auto;
+  max-width: none;
+}
+
+.titleScrim,
+.titleScrimPocket {
+  position: absolute;
+  inset: 0;
+}
+
+.titleScrim {
+  background:
+    linear-gradient(90deg, rgb(7 17 13 / 92%) 0 34%, rgb(7 17 13 / 40%) 62%, rgb(7 17 13 / 10%)),
+    linear-gradient(0deg, rgb(7 17 13 / 70%), transparent 30%);
+}
+
+.titleScrimPocket {
+  background: linear-gradient(180deg, rgb(7 17 13 / 30%), rgb(7 17 13 / 55%) 40%, rgb(7 17 13 / 88%) 62%);
+}
+
+.hero {
+  position: absolute;
+  left: 646px;
+  top: 438px;
+  width: 192px;
+  height: 192px;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 26px;
+  top: 184px;
+  width: 140px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 45%);
+}
+
+.heroPocket {
+  position: absolute;
+  right: 18px;
+  top: 108px;
+  width: 64px;
+  height: 64px;
+}
+
+.logoCrt {
+  position: absolute;
+  left: 44px;
+  top: 70px;
+  font-size: 128px;
+}
+
+.logoPocket {
+  position: absolute;
+  left: 14px;
+  top: 40px;
+  width: 150px;
+  font-size: 64px;
+  text-shadow:
+    0 3px 0 var(--night),
+    3px 0 0 var(--night),
+    -3px 0 0 var(--night),
+    0 -3px 0 var(--night),
+    0 6px 0 rgb(0 0 0 / 45%);
+}
+
+.logoPocket i {
+  display: block;
+}
+
+.blurb {
+  position: absolute;
+  left: 48px;
+  top: 186px;
+  max-width: 420px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--mist);
+}
+
+.youCard {
+  right: 44px;
+  top: 70px;
+  width: 256px;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.youPortrait {
+  grid-row: span 3;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  background: var(--night);
+  clip-path: var(--notch-sm);
+}
+
+.youName {
+  font-family: var(--display);
+  font-size: 26px;
+  line-height: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.youAbility {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--mist);
+}
+
+.titleNote,
+.titleNotePocket {
+  position: absolute;
+  margin: 0;
+  color: var(--firefly);
+  text-shadow: var(--o);
+}
+
+.titleNote {
+  left: 48px;
+  top: 560px;
+  max-width: 560px;
+  font-size: 15px;
+}
+
+.titleNotePocket {
+  left: 16px;
+  right: 16px;
+  top: 344px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+/* ------------------------------------------------------- characters */
+
+.pedestal {
+  position: absolute;
+  top: 104px;
+  width: 180px;
+}
+
+.pedestal[data-on='true'] {
+  top: 94px;
+}
+
+.pedestalArrow {
+  position: absolute;
+  left: 50%;
+  top: -22px;
+  margin-left: -9px;
+  border: 9px solid transparent;
+  border-top: 12px solid var(--firefly);
+  border-bottom: 0;
+  filter: drop-shadow(0 0 6px rgb(242 193 78 / 70%));
+}
+
+.alcove {
+  display: grid;
+  place-items: end center;
+  height: 200px;
+  padding-bottom: 14px;
+  clip-path: var(--notch);
+  background: radial-gradient(circle at 50% 70%, var(--fern), var(--night) 70%);
+  box-shadow: inset 0 0 0 3px var(--stone-lo);
+}
+
+.pedestal[data-on='true'] .alcove {
+  background: radial-gradient(circle at 50% 70%, rgb(169 207 78 / 28%), var(--night) 70%);
+  box-shadow: inset 0 0 0 4px var(--firefly);
+}
+
+.pedestal:not([data-on='true']) .alcove > * {
+  opacity: 0.8;
+}
+
+.plinth {
+  display: block;
+  height: 16px;
+  margin: 0 10px;
+  background: linear-gradient(180deg, var(--stone-hi), var(--stone) 40%, var(--stone-lo));
+  clip-path: var(--notch-sm);
+}
+
+.pedestalName {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+  text-align: center;
+  color: var(--lichen);
+  text-shadow: var(--o);
+}
+
+.pedestal[data-on='true'] .pedestalName {
+  color: var(--bone);
+}
+
+.pedestalAbility {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-family: var(--ui);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.info {
+  left: 44px;
+  right: 44px;
+  top: 446px;
+  height: 178px;
+  display: grid;
+  grid-template-columns: 96px 1fr 290px;
+  gap: 22px;
+  align-items: start;
+  padding: 22px 26px;
+}
+
+.infoPocket {
+  left: 12px;
+  right: 12px;
+  top: 250px;
+  height: 118px;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+}
+
+.bigBadge {
+  box-shadow:
+    inset 0 0 0 5px var(--firefly),
+    0 0 24px rgb(242 193 78 / 30%);
+}
+
+.abilityName {
+  margin: 6px 0 8px;
+  font-family: var(--display);
+  font-size: 42px;
+  line-height: 0.95;
+}
+
+.abilityBlurb {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--mist);
+}
+
+.infoPocket .labelGold {
+  font-size: 7px;
+}
+
+.infoPocket .abilityName {
+  margin: 2px 0 4px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.infoPocket .abilityBlurb {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.nameBox {
+  display: grid;
+  gap: 8px;
+}
+
+.carouselPrev,
+.carouselNext {
+  position: absolute;
+  top: 110px;
+  width: 36px;
+  height: 36px;
+}
+
+.carouselPrev {
+  left: 10px;
+}
+
+.carouselNext {
+  right: 10px;
+}
+
+.carouselPrev::before,
+.carouselNext::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  border: 10px solid transparent;
+}
+
+.carouselPrev::before {
+  left: 8px;
+  border-right: 14px solid var(--stone-hi);
+  border-left: 0;
+}
+
+.carouselNext::before {
+  right: 8px;
+  border-left: 14px solid var(--firefly);
+  border-right: 0;
+}
+
+.carouselStage {
+  position: absolute;
+  left: 70px;
+  top: 64px;
+  width: 160px;
+  height: 128px;
+  display: grid;
+  place-items: end center;
+  padding-bottom: 4px;
+  clip-path: var(--notch);
+  background: radial-gradient(circle at 50% 75%, rgb(169 207 78 / 28%), var(--night) 70%);
+  box-shadow: inset 0 0 0 3px var(--firefly);
+}
+
+.carouselName {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 200px;
+  font-family: var(--display);
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: var(--o);
+}
+
+.dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 234px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--stone);
+}
+
+.dots span[data-on='true'] {
+  background: var(--firefly);
+}
+
+/* -------------------------------------------------------------- join */
+
+.join,
+.joinPocket {
+  display: grid;
+  align-content: start;
+}
+
+.join {
+  left: 44px;
+  top: 120px;
+  width: 560px;
+  gap: 14px;
+  padding: 26px 28px 28px;
+}
+
+.joinPocket {
+  left: 12px;
+  right: 12px;
+  top: 70px;
+  gap: 8px;
+  padding: 14px;
+}
+
+.joinLabel {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.codeField {
+  height: 80px;
+  font-family: var(--display);
+  font-size: 60px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.joinPocket .codeField {
+  height: 52px;
+  padding: 0 10px;
+  font-size: 38px;
+}
+
+.joinPocket .fieldNote {
+  font-size: 10px;
+}
+
+.joinPocket .error {
+  font-size: 10px;
+}
+
+.go {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 60px;
+  padding: 0 24px 0 16px;
+  font-family: var(--display);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--night);
+  background: var(--moss-lit);
+  clip-path: var(--notch);
+  box-shadow:
+    inset 0 -6px 0 var(--moss),
+    inset 0 4px 0 var(--moss-pale, #d6ee8a);
+}
+
+.go[aria-disabled='true'] {
+  filter: saturate(0.3) brightness(0.7);
+}
+
+.joinPocket .go {
+  justify-self: stretch;
+  justify-content: center;
+  height: 42px;
+  font-size: 26px;
+}
+
+.goKey {
+  background: var(--night);
+  color: var(--moss-lit);
+  box-shadow: none;
+}
+
+.goGlyph {
+  width: 20px;
+  height: 20px;
+  font-size: 16px;
+  background: var(--night);
+  color: var(--moss-lit);
+}
+
+/* ------------------------------------------------------- how to play */
+
+.tabs,
+.tabsPocket {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+}
+
+.tabs {
+  left: 44px;
+  top: 52px;
+}
+
+.tabsPocket {
+  left: 12px;
+  top: 28px;
+  gap: 4px;
+}
+
+.tab {
+  padding: 8px 16px 6px;
+  font-family: var(--display);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--lichen);
+  background: var(--canopy);
+  clip-path: var(--notch-sm);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+}
+
+.tab[data-on='true'] {
+  color: var(--night);
+  background: var(--moss-lit);
+  box-shadow: none;
+}
+
+.tabsPocket .tab {
+  padding: 4px 9px 3px;
+  font-size: 16px;
+}
+
+.modes,
+.modesPocket {
+  position: absolute;
+  display: grid;
+}
+
+.modes {
+  left: 44px;
+  right: 44px;
+  top: 120px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.modesPocket {
+  left: 12px;
+  right: 12px;
+  top: 58px;
+  gap: 8px;
+}
+
+.modeCard {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 10px 10px 16px;
+  clip-path: var(--notch);
+  background: var(--canopy);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+}
+
+.modeCard[data-on='true'] {
+  box-shadow:
+    inset 0 0 0 4px var(--firefly),
+    0 0 24px rgb(242 193 78 / 20%);
+}
+
+.modeArt {
+  position: relative;
+  display: block;
+  height: 240px;
+  overflow: hidden;
+  clip-path: var(--notch-sm);
+}
+
+.modeArt img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modeName {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  font-family: var(--display);
+  font-size: 44px;
+  line-height: 1;
+  text-shadow: var(--o);
+}
+
+.modeMeta {
+  padding: 0 6px;
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--firefly);
+}
+
+.modeCard[data-mode='coop'] .modeMeta {
+  color: var(--moss-lit);
+}
+
+.modeSummary {
+  padding: 0 6px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--mist);
+}
+
+.modesPocket .modeCard {
+  gap: 5px;
+  padding: 5px 5px 8px;
+}
+
+.modesPocket .modeArt {
+  height: 74px;
+}
+
+.modesPocket .modeName {
+  left: 6px;
+  bottom: 3px;
+  font-size: 24px;
+}
+
+.modesPocket .modeMeta {
+  padding: 0 3px;
+  font-size: 7px;
+}
+
+.modesPocket .modeSummary {
+  padding: 0 3px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.levelRow,
+.levelRowPocket {
+  position: absolute;
+  left: 44px;
+  right: 44px;
+}
+
+.levelRowPocket {
+  left: 12px;
+  right: 12px;
+}
+
+.levelCards {
+  display: flex;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.levelRowPocket .levelCards {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.levelRowPocket .labelGold,
+.levelRowPocket .labelMoss {
+  font-size: 7px;
+}
+
+.levelCard {
+  flex: none;
+  width: 64px;
+}
+
+.levelThumb {
+  position: relative;
+  display: block;
+  height: 104px;
+  background-color: #0a1a12;
+  background-size: 128px 128px;
+  image-rendering: pixelated;
+  clip-path: var(--notch);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+}
+
+.levelCard[data-on='true'] .levelThumb {
+  box-shadow: inset 0 0 0 4px var(--firefly);
+}
+
+.levelRowPocket .levelThumb {
+  height: 46px;
+  background-size: 64px 64px;
+  clip-path: var(--notch-sm);
+}
+
+.levelRowPocket .levelCard[data-on='true'] .levelThumb {
+  box-shadow: inset 0 0 0 3px var(--firefly);
+}
+
+.levelNo {
+  position: absolute;
+  left: 12px;
+  bottom: 6px;
+  font-family: var(--display);
+  font-size: 56px;
+  line-height: 1;
+  color: var(--bone);
+  text-shadow: var(--o);
+}
+
+.levelRowPocket .levelNo {
+  left: 6px;
+  bottom: 2px;
+  font-size: 28px;
+}
+
+.levelTag {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 2px 6px;
+  font-family: var(--ui);
+  font-size: 10px;
+  color: var(--night);
+  background: var(--firefly);
+  clip-path: var(--notch-sm);
+}
+
+.levelRowPocket .levelTag {
+  right: 4px;
+  top: 4px;
+  padding: 1px 3px;
+  font-size: 6px;
+}
+
+.levelName {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--mist);
+}
+
+.levelCard[data-on='true'] .levelName {
+  color: var(--bone);
+}
+
+.levelInfo {
+  left: 44px;
+  right: 44px;
+  top: 540px;
+  height: 118px;
+  padding: 16px 22px;
+}
+
+.levelInfoPocket {
+  left: 12px;
+  right: 12px;
+  top: 204px;
+  height: 160px;
+  padding: 12px;
+}
+
+.levelInfoName {
+  margin: 4px 0 6px;
+  font-family: var(--display);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.levelInfoText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--mist);
+}
+
+.levelInfoPocket .label {
+  font-size: 7px;
+}
+
+.levelInfoPocket .levelInfoName {
+  font-size: 26px;
+}
+
+.levelInfoPocket .levelInfoText {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.controls {
+  left: 44px;
+  right: 44px;
+  top: 120px;
+  padding: 14px 22px 18px;
+}
+
+.controlsHead,
+.controlsRow {
+  display: grid;
+  grid-template-columns: 290px 1fr 210px 160px;
+  gap: 16px;
+  align-items: center;
+}
+
+.controlsHead {
+  height: 34px;
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lichen);
+  box-shadow: inset 0 -2px 0 var(--rule);
+}
+
+.controlsRow {
+  min-height: 62px;
+  font-size: 15px;
+  color: var(--mist);
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+.controlsRow:last-child {
+  box-shadow: none;
+}
+
+.controlAction {
+  font-size: 16px;
+  color: var(--bone);
+}
+
+.controlKeys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.controlsPocket {
+  left: 12px;
+  right: 12px;
+  top: 58px;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+}
+
+.controlsPocket li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  height: 40px;
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+.controlsPocket li:last-child {
+  box-shadow: none;
+}
+
+.controlsPocket .controlAction {
+  font-size: 13px;
+}
+
+.controlPocket {
+  font-family: var(--ui);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--firefly);
+}
+
+/* ---------------------------------------------------------- settings */
+
+.settings {
+  left: 44px;
+  top: 120px;
+  width: 620px;
+  padding: 14px 22px;
+}
+
+.settingsPocket {
+  left: 12px;
+  right: 12px;
+  top: 64px;
+  padding: 8px 10px;
+}
+
+.setting {
+  position: relative;
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  height: 72px;
+  padding-left: 30px;
+  cursor: pointer;
+  isolation: isolate;
+}
+
+.setting + .setting {
+  box-shadow: inset 0 2px 0 var(--rule);
+}
+
+.setting::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 4px -8px;
+  background: linear-gradient(90deg, rgb(169 207 78 / 20%), rgb(169 207 78 / 0%));
+  box-shadow: inset 3px 0 0 var(--moss-lit);
+  opacity: 0;
+}
+
+.setting[data-on='true']::before {
+  opacity: 1;
+}
+
+.setting .cur {
+  top: 50%;
+  margin-top: -9px;
+}
+
+.settingName {
+  font-family: var(--display);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--mist);
+  text-shadow: var(--o);
+}
+
+.setting[data-on='true'] .settingName {
+  color: var(--bone);
+}
+
+.toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.toggle span {
+  padding: 6px 14px 4px;
+  font-family: var(--display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--lichen);
+  background: var(--canopy);
+  clip-path: var(--notch-sm);
+  box-shadow: inset 0 0 0 2px var(--stone-lo);
+}
+
+.toggle[data-on='true'] span:first-child,
+.toggle[data-on='false'] span:last-child {
+  color: var(--night);
+  background: var(--moss-lit);
+  box-shadow: none;
+}
+
+.toggle[data-on='false'] span:last-child {
+  background: var(--ember);
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stepper {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  text-align: center;
+  color: var(--firefly);
+}
+
+.meter {
+  display: flex;
+  gap: 4px;
+}
+
+.meter span {
+  width: 18px;
+  height: 26px;
+  background: var(--stone-lo);
+}
+
+.meter span[data-on='true'] {
+  background: var(--moss-lit);
+  box-shadow: inset 0 -4px 0 var(--moss);
+}
+
+.settingField {
+  max-width: 340px;
+}
+
+.settingsNote,
+.settingsNotePocket {
+  position: absolute;
+  margin: 0;
+  color: var(--lichen);
+}
+
+.settingsNote {
+  left: 48px;
+  top: 384px;
+  font-size: 14px;
+}
+
+.settingsNotePocket {
+  left: 14px;
+  right: 14px;
+  top: 250px;
+  font-size: 10px;
+}
+
+.settingsPocket .setting {
+  grid-template-columns: 70px 1fr;
+  height: 50px;
+  padding-left: 18px;
+}
+
+.settingsPocket .setting .cur {
+  left: 2px;
+  margin-top: -6px;
+  border-width: 6px 0 6px 9px;
+}
+
+.settingsPocket .settingName {
+  font-size: 20px;
+}
+
+.settingsPocket .toggle span {
+  padding: 4px 8px 3px;
+  font-size: 15px;
+}
+
+.settingsPocket .volume {
+  gap: 4px;
+}
+
+.settingsPocket .stepper {
+  width: 20px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.settingsPocket .meter {
+  gap: 2px;
+}
+
+.settingsPocket .meter span {
+  width: 8px;
+  height: 16px;
+}
+
+.settingsPocket .settingField {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 14px;
+}

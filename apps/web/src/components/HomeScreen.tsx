@@ -8,16 +8,14 @@ import {
   MAX_PLAYERS,
   MODE_CONFIG,
   PLAYER_CONFIG,
-  isRoomCode,
-  normalizeRoomCode,
   type CharacterId,
   type GameMode,
 } from '@platformer/shared';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { abilityIconPath } from '@/game/abilities/abilityArt';
 import { DEFAULT_ASSET_BASE } from '@/game/services';
 import { loadPlayerName, loadPreferredCharacter, savePlayerName, savePreferredCharacter } from '@/net/identity';
+import { useRoomActions, useServerHealth, type ServerState } from '@/hooks/useHomeActions';
 import { gameServerHttpUrl } from '@/net/serverUrl';
 import { ABILITY_BLURBS, BACKDROP_URL, GAME_TITLE, abilityName } from './brand';
 import { CharacterPicker } from './CharacterPicker';
@@ -26,28 +24,18 @@ import { Fireflies } from './Fireflies';
 import { MossCap } from './PixelIcons';
 import styles from './HomeScreen.module.css';
 
-interface Health {
-  rooms: number;
-  connectedPlayers: number;
-  levels: { id: string; name: string }[];
-}
-
-type ServerState = { kind: 'checking' } | { kind: 'online'; health: Health } | { kind: 'offline' };
-
 const MODE_ART: Record<GameMode, { image: string; alt: string }> = {
   coop: { image: '/ui/mode-coop.png', alt: "Four players face the rhino boss in the Rhino Coliseum" },
   race: { image: '/ui/mode-race.png', alt: 'Three racers run through Orchard Hills' },
 };
 
 export function HomeScreen() {
-  const router = useRouter();
   const [name, setName] = useState('');
   // null until picked: the server then uses the slot default (P1 Bunny Man, P2 Virtual Guy, …).
   const [character, setCharacter] = useState<CharacterId | null>(null);
   const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [server, setServer] = useState<ServerState>({ kind: 'checking' });
+  const server = useServerHealth();
+  const { busy, error, createRoom, joinRoom: join } = useRoomActions(() => savePlayerName(name));
   const [menuOpen, setMenuOpen] = useState(false);
 
   // The phone menu closes with Esc, like the game's.
@@ -70,52 +58,10 @@ export function HomeScreen() {
     savePreferredCharacter(id);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const response = await fetch(`${gameServerHttpUrl()}/health`, { cache: 'no-store' });
-        if (!response.ok) throw new Error(String(response.status));
-        const health = (await response.json()) as Health;
-        if (!cancelled) setServer({ kind: 'online', health });
-      } catch {
-        if (!cancelled) setServer({ kind: 'offline' });
-      }
-    };
-    void check();
-    const timer = setInterval(check, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
-
-  const createRoom = async (solo: boolean) => {
-    setBusy(true);
-    setError(null);
-    savePlayerName(name);
-    try {
-      const response = await fetch(`${gameServerHttpUrl()}/rooms`, { method: 'POST' });
-      if (!response.ok) throw new Error(response.status === 503 ? 'The server is full.' : `HTTP ${response.status}`);
-      const { roomId } = (await response.json()) as { roomId: string };
-      router.push(`/room/${roomId}${solo ? '?solo=1' : ''}`);
-    } catch (err) {
-      setError(`Could not create a room: ${err instanceof Error ? err.message : String(err)}`);
-      setBusy(false);
-    }
-  };
-
   const joinRoom = (event: FormEvent) => {
     event.preventDefault();
-    const normalized = normalizeRoomCode(code);
-    if (!isRoomCode(normalized)) {
-      setError('Enter a room code (letters and digits).');
-      return;
-    }
-    savePlayerName(name);
-    router.push(`/room/${normalized}`);
+    join(code);
   };
-
 
   const levelCount = LEVELS.entries.length;
   const coopCount = LEVELS.campaign('coop').length;

@@ -224,14 +224,14 @@
   }
 }
 
-/* On the phone handheld's screen (see desk/handheldPad.ts) the game gets the whole screen:
-   START opens the menu, which has Leave. */
-:global(html[data-handheld]) .screen[data-ingame='true'] {
+/* On the CRT or the phone handheld's screen (see desk/SiteShell) the game gets the whole
+   screen: Esc / START opens the menu, which has Leave. */
+:global(html[data-crt]) .screen[data-ingame='true'] {
   grid-template-rows: 1fr;
 }
-:global(html[data-handheld]) .screen[data-ingame='true'] .bar {
+:global(html[data-crt]) .screen[data-ingame='true'] .bar {
   display: none;
 }
-:global(html[data-handheld]) .screen[data-ingame='true'] .body {
+:global(html[data-crt]) .screen[data-ingame='true'] .body {
   padding: 0;
 }

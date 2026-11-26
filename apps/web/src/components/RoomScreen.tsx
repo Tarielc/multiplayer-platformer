@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useGameSession, useRoomView } from '@/hooks/useGameSession';
 import { gameServerHttpUrl } from '@/net/serverUrl';
+import { ScreenRoom } from '@/screen/ScreenRoom';
+import { useScreenKind } from '@/screen/screenEnv';
 import { BACKDROP_URL, GAME_TITLE } from './brand';
 import { FullscreenButton } from './FullscreenButton';
 import { FullscreenPrompt } from './FullscreenPrompt';
@@ -18,6 +20,7 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
   const session = useGameSession(roomId, solo);
   const view = useRoomView(session.store);
   const [copied, setCopied] = useState(false);
+  const framed = useScreenKind() !== null;
   const { room, fatal, status } = view;
   const inGame = room !== null && room.phase !== 'lobby';
 
@@ -36,6 +39,16 @@ export function RoomScreen({ roomId, solo }: { roomId: string; solo: boolean }) 
     session.client.leave();
     router.push('/');
   };
+
+  // On the CRT or the handheld, a room outside a game is a screen of its own.
+  if (framed && !inGame) {
+    return (
+      <>
+        <ScreenRoom roomId={roomId} session={session} view={view} onLeave={leave} />
+        <Toasts store={session.store} notices={view.notices} />
+      </>
+    );
+  }
 
   return (
     <div className={styles.screen} data-ingame={inGame}>
