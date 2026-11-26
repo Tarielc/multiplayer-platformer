@@ -45,6 +45,35 @@
   color-scheme: dark;
 }
 
+/* Switched off: dark glass (the site loads behind it, out of sight). */
+.desk[data-power='off'] .frame {
+  visibility: hidden;
+}
+
+/* Switched on: the picture opens out from a bright line across the middle, like a warming tube. */
+.desk[data-power='on'] .frame {
+  animation: crtOn 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes crtOn {
+  0% {
+    transform: scale(0.6, 0.004);
+    filter: brightness(6) saturate(0);
+  }
+  35% {
+    transform: scale(1, 0.012);
+    filter: brightness(4) saturate(0.2);
+  }
+  70% {
+    transform: scale(1, 1);
+    filter: brightness(1.6);
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+
 /* Glass over the picture: faint scanlines, a curved-tube vignette and a reflection. */
 .glass {
   position: absolute;
@@ -72,6 +101,49 @@
 .screenCatcher:focus-visible {
   outline: 4px solid var(--firefly);
   outline-offset: -4px;
+}
+
+.desk[data-power='off'] .controls {
+  display: none;
+}
+
+/* Off: the whole page is the power switch. */
+.powerCatcher {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 0 16px 28px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.powerCatcher:focus-visible {
+  outline: none;
+}
+
+.powerHint {
+  padding: 10px 16px;
+  background: rgb(7 17 13 / 82%);
+  color: var(--bone);
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: hintPulse 2.4s steps(4) infinite;
+}
+
+.powerCatcher:focus-visible .powerHint {
+  outline: 3px solid var(--firefly);
+  outline-offset: 3px;
+}
+
+@keyframes hintPulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 
 .controls {
@@ -169,5 +241,10 @@
 @media (prefers-reduced-motion: reduce) {
   .bar i {
     transition: none;
+  }
+
+  .desk[data-power='on'] .frame,
+  .powerHint {
+    animation: none;
   }
 }

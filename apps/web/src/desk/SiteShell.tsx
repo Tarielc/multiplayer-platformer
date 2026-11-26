@@ -93,6 +93,9 @@ function DeskShell() {
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState<DeskView>('room');
   const [moving, setMoving] = useState(false);
+  // The computer waits switched off in the room; a click (or a key) turns it on and sits down.
+  const [on, setOn] = useState(false);
+  const onRef = useRef(false);
 
   useEffect(() => {
     let disposed = false;
@@ -101,6 +104,7 @@ function DeskShell() {
       .then(({ createDeskScene }) =>
         createDeskScene(stageRef.current!, {
           reducedMotion,
+          startOff: true,
           onProgress: setProgress,
           onLayout: (w, h) => {
             sizeRef.current = { w, h };
@@ -125,8 +129,6 @@ function DeskShell() {
         if (disposed) return scene.dispose();
         sceneRef.current = scene;
         setReady(true);
-        // A beat on the wide shot, then into the screen.
-        window.setTimeout(() => goTo('screen'), reducedMotion ? 0 : 500);
       })
       .catch((error: unknown) => {
         console.error('[desk] could not load the scene', error);
@@ -147,9 +149,26 @@ function DeskShell() {
     scene.setView(next);
   };
 
-  // Keys pressed while the outer page has focus belong to the game on the screen.
+  const powerOn = () => {
+    const scene = sceneRef.current;
+    if (!scene || onRef.current) return;
+    onRef.current = true;
+    setOn(true);
+    scene.setPower(true);
+    goTo('screen');
+  };
+
+  // Keys pressed while the outer page has focus belong to the game on the screen; with the
+  // computer still off, any key switches it on.
   useEffect(() => {
-    const onKey = () => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!onRef.current) {
+        if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.key === 'Tab') return;
+        if (!sceneRef.current) return;
+        event.preventDefault();
+        powerOn();
+        return;
+      }
       if (sceneRef.current?.view === 'screen') frameRef.current?.contentWindow?.focus();
     };
     window.addEventListener('keydown', onKey);
@@ -163,7 +182,7 @@ function DeskShell() {
 
   const atScreen = view === 'screen' && !moving;
   return (
-    <div className={styles.desk} data-view={view} data-ready={ready}>
+    <div className={styles.desk} data-view={view} data-ready={ready} data-power={on ? 'on' : 'off'}>
       <div ref={stageRef} className={styles.stage} aria-hidden onClick={() => view === 'room' && goTo('screen')} />
 
       <div ref={screenRef} className={styles.screen}>
@@ -178,10 +197,16 @@ function DeskShell() {
           }}
         />
         <div className={styles.glass} aria-hidden />
-        {view === 'room' && !moving && (
+        {on && view === 'room' && !moving && (
           <button type="button" className={styles.screenCatcher} onClick={() => goTo('screen')} aria-label="Sit down at the computer" />
         )}
       </div>
+
+      {ready && !on && (
+        <button type="button" className={styles.powerCatcher} onClick={powerOn} autoFocus>
+          <span className={`${styles.powerHint} px-notch`}>Click anywhere to turn on the computer</span>
+        </button>
+      )}
 
       <div className={styles.controls}>
         <button
@@ -200,7 +225,7 @@ function DeskShell() {
           <span className={styles.bar} aria-hidden>
             <i style={{ width: `${Math.round(progress * 100)}%` }} />
           </span>
-          <span className={styles.loaderText}>Switching on the computer…</span>
+          <span className={styles.loaderText}>Setting up the room…</span>
         </div>
       )}
     </div>

@@ -33,11 +33,15 @@ export interface DeskSceneOptions {
   onLayout?: (width: number, height: number) => void;
   /** A camera move finished. */
   onSettled?: (view: DeskView) => void;
+  /** Start with the computer switched off (its glow on the room dark) until `setPower(true)`. */
+  startOff?: boolean;
 }
 
 export interface DeskScene {
   setView(view: DeskView, instant?: boolean): void;
   readonly view: DeskView;
+  /** Switch the computer on or off: its screen's glow on the room fades in or out. */
+  setPower(on: boolean): void;
   dispose(): void;
 }
 
@@ -82,6 +86,8 @@ const FIT_H = 0.80;
 const FIT_W = 0.88;
 /** Camera move between the two shots. */
 const MOVE_SECONDS = 1.7;
+/** How long the CRT takes to warm up (or fade) when the computer is switched on (or off). */
+const POWER_SECONDS = 0.7;
 /** Settled on the screen only the floaters and the lava lamp move: redraw the room at this rate. */
 const IDLE_FPS = 20;
 /**
@@ -310,6 +316,12 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
 
   // ---------------------------------------------------------------- loop
   let dirty = true;
+  // The CRT's glow on the room follows the power switch (0 off … 1 on), warming up over POWER_SECONDS.
+  const crtGlow = scene.getObjectByName('CRT_Glow') as THREE.Light | undefined;
+  const crtGlowFull = crtGlow?.intensity ?? 0;
+  let power = options.startOff ? 0 : 1;
+  let powerGoal = power;
+  if (crtGlow) crtGlow.intensity = crtGlowFull * power;
   let raf = 0;
   let last = 0;
   let lastDraw = 0;
@@ -336,6 +348,15 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
         options.onSettled?.(view);
       }
     }
+    if (power !== powerGoal) {
+      const step = reduced ? 1 : dt / POWER_SECONDS;
+      power = powerGoal > power ? Math.min(powerGoal, power + step) : Math.max(powerGoal, power - step);
+      // A tube warming up: a quick flash, then settling to its glow.
+      const flash = powerGoal > 0 && !reduced ? Math.sin(power * Math.PI) * 0.8 : 0;
+      if (crtGlow) crtGlow.intensity = crtGlowFull * (power + flash);
+      moving = true;
+    }
+
     // in the wide shot the camera drifts a little after the pointer
     const goal = view === 'room' && !reduced ? pointer : null;
     const gx = goal ? goal.x * 0.09 : 0;
@@ -427,6 +448,10 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
       } else {
         moveStart = performance.now();
       }
+    },
+    setPower(on) {
+      powerGoal = on ? 1 : 0;
+      dirty = true;
     },
     dispose() {
       cancelAnimationFrame(raf);
