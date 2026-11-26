@@ -82,8 +82,8 @@ interface SceneConfig {
 }
 
 /** In the close-up the glass takes this share of the window's height (and at most `FIT_W` of its width). */
-const FIT_H = 0.80;
-const FIT_W = 0.88;
+const FIT_H = 0.66;
+const FIT_W = 0.74;
 /** Camera move between the two shots. */
 const MOVE_SECONDS = 1.7;
 /** How long the CRT takes to warm up (or fade) when the computer is switched on (or off). */
@@ -93,14 +93,14 @@ const IDLE_FPS = 20;
 /**
  * Looking around: with the pointer at the edge of the window the camera turns that way, up to
  * these angles, and turns back once the pointer leaves the edge. The edge is this share of the
- * window on each side (the CRT glass ends just inside it, so playing never brushes it).
+ * window on each side (the CRT glass ends well inside it, so playing never brushes it).
  */
-const LOOK_YAW_DEG = 24;
-const LOOK_PITCH_DEG = 12;
+const LOOK_YAW_DEG = 14;
+const LOOK_PITCH_DEG = 7;
 const LOOK_EDGE_X = 0.045;
 const LOOK_EDGE_Y = 0.06;
 /** How quickly the camera turns toward where it should look (per second). */
-const LOOK_RATE = 2.2;
+const LOOK_RATE = 1.6;
 
 const linear = (rgb: readonly number[]) => new THREE.Color().setRGB(rgb[0]!, rgb[1]!, rgb[2]!, THREE.LinearSRGBColorSpace);
 /**
