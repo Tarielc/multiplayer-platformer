@@ -12,17 +12,21 @@ import {
 } from 'react';
 import { GAME_TITLE } from '@/components/brand';
 import type { DeskHit, DeskScene, DeskView } from './deskScene';
-import { HandheldShell } from './HandheldShell';
+import { HandheldShell, type Send, type Self } from './HandheldShell';
+import { isScreenMessage, type PadMessage } from './handheldPad';
+import { PhonePad, phonePadInset } from './PhonePad';
 import { quadTransform } from './homography';
 import styles from './SiteShell.module.css';
 
 /**
  * `desk`: the page is the 3D desk, and the site runs inside the CRT (an iframe of this same app).
- * `handheld`: phones get a pocket console instead; the site runs on its screen the same way.
+ * `phone`: the same desk on a phone: the CRT fills the top (or the middle, sideways) and a pad
+ * over the room plays (the site on the screen runs as on the handheld, see handheldPad.ts).
+ * `handheld`: phones without WebGL 2 get a pocket console instead; the site runs on its screen.
  * `flat`: the site on its own: inside either iframe, on tablets, small windows, without WebGL,
  * or with `?flat` in the address.
  */
-type ShellMode = 'pending' | 'flat' | 'desk' | 'handheld';
+type ShellMode = 'pending' | 'flat' | 'desk' | 'phone' | 'handheld';
 
 /** A touch screen whose short side is phone-sized. */
 const isPhone = () =>
@@ -33,15 +37,16 @@ let decided: ShellMode | null = null;
 function detectMode(): ShellMode {
   if (window.self !== window.top) return 'flat';
   if (new URLSearchParams(window.location.search).has('flat')) return 'flat';
-  if (isPhone()) return 'handheld';
+  let webgl2 = false;
+  try {
+    webgl2 = Boolean(document.createElement('canvas').getContext('webgl2'));
+  } catch {
+    webgl2 = false;
+  }
+  if (isPhone()) return webgl2 ? 'phone' : 'handheld';
   if (window.matchMedia('(pointer: coarse)').matches) return 'flat';
   if (window.innerWidth < 900 || window.innerHeight < 560) return 'flat';
-  try {
-    if (!document.createElement('canvas').getContext('webgl2')) return 'flat';
-  } catch {
-    return 'flat';
-  }
-  return 'desk';
+  return webgl2 ? 'desk' : 'flat';
 }
 
 // Decided once per page load: switching later would restart the site (and drop a room).
@@ -61,7 +66,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
     );
   }
   if (mode === 'handheld') return <HandheldShell />;
-  return <DeskShell />;
+  return <DeskShell phone={mode === 'phone'} />;
 }
 
 /** Inside the CRT or the handheld: keep the outer page's address and title in step with the site. */
@@ -89,7 +94,7 @@ function FramedSync() {
   return null;
 }
 
-function DeskShell() {
+function DeskShell({ phone }: { phone: boolean }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -113,6 +118,36 @@ function DeskShell() {
   const [hover, setHover] = useState<DeskHit | null>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  // Fingers on the stage while an item is held: two of them pinch it closer or further.
+  const fingers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef(0);
+  // On a phone: whose ability is on the pad's S stick (the game on the screen says).
+  const [self, setSelf] = useState<Self | null>(null);
+
+  // On a phone the site on the screen runs as on the handheld: pocket-sized screens, played with
+  // the pad (handheldPad.ts reads this before the frame loads).
+  useEffect(() => {
+    if (!phone) return;
+    const root = document.documentElement;
+    root.dataset.shell = 'handheld';
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow || event.origin !== window.location.origin) return;
+      if (!isScreenMessage(event.data)) return;
+      const { inGame, self: next } = event.data;
+      if (!inGame) setSelf(null);
+      else if (next !== undefined) setSelf(next);
+    };
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      delete root.dataset.shell;
+    };
+  }, [phone]);
+
+  const send: Send = (button, down, extra) => {
+    const message: PadMessage = { type: 'overgrown:pad', button, down, ...extra };
+    frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -122,6 +157,8 @@ function DeskShell() {
         createDeskScene(stageRef.current!, {
           reducedMotion,
           startOff: true,
+          phone,
+          fitInset: phone ? phonePadInset : undefined,
           onProgress: setProgress,
           onLayout: (w, h) => {
             sizeRef.current = { w, h };
@@ -214,13 +251,29 @@ function DeskShell() {
 
   // The room under the pointer: pick things up, flip the power switch, sit down at the screen.
   const onStagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    drag.current = { x: event.clientX, y: event.clientY, moved: false };
+    fingers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (fingers.current.size === 1) drag.current = { x: event.clientX, y: event.clientY, moved: false };
+    else if (drag.current) drag.current.moved = true; // a second finger: a pinch, not a tap
+    pinch.current = 0;
     if (heldRef.current) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onStagePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    fingers.current.delete(event.pointerId);
+    pinch.current = 0;
   };
 
   const onStagePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const scene = sceneRef.current;
     if (!scene) return;
+    if (fingers.current.has(event.pointerId)) fingers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (heldRef.current && fingers.current.size >= 2) {
+      const [a, b] = [...fingers.current.values()];
+      const spread = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+      if (pinch.current > 0) scene.zoomItem(spread / pinch.current);
+      pinch.current = spread;
+      return;
+    }
     const d = drag.current;
     if (d && heldRef.current && event.buttons) {
       const dx = event.clientX - d.x;
@@ -309,6 +362,7 @@ function DeskShell() {
       data-held={held !== null}
       data-lifted={lifted}
       data-hover={hover?.kind ?? 'none'}
+      data-phone={phone}
     >
       <div
         ref={stageRef}
@@ -316,6 +370,8 @@ function DeskShell() {
         aria-hidden
         onPointerDown={onStagePointerDown}
         onPointerMove={onStagePointerMove}
+        onPointerUp={onStagePointerEnd}
+        onPointerCancel={onStagePointerEnd}
         onPointerLeave={onStageLeave}
         onClick={onStageClick}
         onWheel={(event) => heldRef.current && sceneRef.current?.zoomItem(Math.exp(-event.deltaY * 0.0015))}
@@ -348,7 +404,7 @@ function DeskShell() {
       {ready && !on && !held && (
         <div className={styles.powerBar}>
           <button type="button" className={`${styles.powerHint} px-notch`} onClick={powerOn} autoFocus>
-            Click anywhere to turn on the computer
+            {phone ? 'Tap anywhere to turn on the computer' : 'Click anywhere to turn on the computer'}
           </button>
           <span className={styles.powerTip}>Things on the desk can be picked up</span>
         </div>
@@ -357,12 +413,16 @@ function DeskShell() {
       {held && (
         <div className={`${styles.inspectBar} px-notch`} role="dialog" aria-label={held}>
           <span className={styles.inspectName}>{held}</span>
-          <span className={styles.inspectHelp}>Drag or arrow keys to turn · Scroll to zoom</span>
+          <span className={styles.inspectHelp}>
+            {phone ? 'Drag to turn · Pinch to zoom' : 'Drag or arrow keys to turn · Scroll to zoom'}
+          </span>
           <button type="button" className={`${styles.putBack} px-notch`} onClick={putBack} autoFocus>
             Put back
           </button>
         </div>
       )}
+
+      {phone && on && atScreen && !held && <PhonePad send={send} self={self} onLeanBack={() => goTo('room')} />}
 
       <div className={styles.controls}>
         <button

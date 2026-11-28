@@ -9,8 +9,10 @@ import styles from './HandheldShell.module.css';
 
 const FRAME_ALLOW = 'fullscreen; gamepad; clipboard-write; autoplay';
 type Dir = 'left' | 'right' | 'up' | 'down';
-type Send = (button: PadButton, down: boolean, extra?: Pick<PadMessage, 'x' | 'y' | 'cancel'>) => void;
-type Self = NonNullable<ScreenMessage['self']>;
+export type Send = (button: PadButton, down: boolean, extra?: Pick<PadMessage, 'x' | 'y' | 'cancel'>) => void;
+export type Self = NonNullable<ScreenMessage['self']>;
+/** The pad's look: a CSS module with the handheld's class names (the desk on phones has its own). */
+export type PadSkin = Record<string, string>;
 
 /**
  * Phones: the site in a pocket handheld. Its screen is an iframe of this same app; the D-pad,
@@ -119,7 +121,7 @@ export function HandheldShell() {
 }
 
 /** A button that reports press and release (several thumbs at once are fine). */
-function PadKey({
+export function PadKey({
   button,
   label,
   caption,
@@ -128,6 +130,7 @@ function PadKey({
   pill = false,
   send,
   buzz,
+  skin = styles,
 }: {
   button: PadButton;
   label?: string;
@@ -137,7 +140,9 @@ function PadKey({
   pill?: boolean;
   send: Send;
   buzz: () => void;
+  skin?: PadSkin;
 }) {
+  const styles = skin;
   const pressed = useRef(false);
   const set = (event: ReactPointerEvent<HTMLButtonElement>, down: boolean) => {
     if (pressed.current === down) return;
@@ -174,7 +179,8 @@ function PadKey({
  * The special: a thumbstick. Drag to aim (the game shows the aim), let go to use it; let go near
  * the middle and it goes straight ahead. Its cap shows the recharge ring and the seconds left.
  */
-function SpecialStick({ send, buzz, self }: { send: Send; buzz: () => void; self: Self | null }) {
+export function SpecialStick({ send, buzz, self, skin = styles }: { send: Send; buzz: () => void; self: Self | null; skin?: PadSkin }) {
+  const styles = skin;
   const drag = useRef<{ id: number; x0: number; y0: number; r: number; x: number; y: number } | null>(null);
   const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
   const sendRef = useRef(send);
@@ -264,7 +270,8 @@ function SpecialStick({ send, buzz, self }: { send: Send; buzz: () => void; self
 }
 
 /** The cross: one thumb, sliding between arms (diagonals press two). It rocks toward the press. */
-function DPad({ send, buzz }: { send: Send; buzz: () => void }) {
+export function DPad({ send, buzz, skin = styles }: { send: Send; buzz: () => void; skin?: PadSkin }) {
+  const styles = skin;
   const ref = useRef<HTMLDivElement>(null);
   const held = useRef(new Set<Dir>());
 

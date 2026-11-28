@@ -39,6 +39,13 @@ export interface DeskSceneOptions {
   onPutBack?: () => void;
   /** The camera moved and something else is under the (still) pointer now (see `DeskScene.hover`). */
   onHoverChange?: (hit: DeskHit | null) => void;
+  /**
+   * A phone: lighter rendering, and in the close-up the glass fills the part of the window that
+   * `fitInset` leaves free (the rest holds the touch controls) instead of the middle of it.
+   */
+  phone?: boolean;
+  /** CSS px kept clear of the glass on each side in the close-up (read on every resize). */
+  fitInset?: () => { top: number; right: number; bottom: number; left: number };
 }
 
 /** What is under the pointer: something on the desk to pick up, or one of the computer's power switches. */
@@ -105,6 +112,10 @@ interface SceneConfig {
 /** In the close-up the glass takes this share of the window's height (and at most `FIT_W` of its width). */
 const FIT_H = 0.66;
 const FIT_W = 0.74;
+/** On a phone the glass fills nearly all of the space it is given. */
+const PHONE_FIT = 0.97;
+/** Upright windows still see at least this much of the room across (degrees). */
+const MIN_HFOV_DEG = 46;
 /** Camera move between the two shots. */
 const MOVE_SECONDS = 1.7;
 /** How long the CRT takes to warm up (or fade) when the computer is switched on (or off). */
@@ -168,7 +179,7 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
 
   // ---------------------------------------------------------------- renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, options.phone ? 1.25 : 1.5));
   renderer.toneMapping = THREE.AgXToneMapping;
   renderer.toneMappingExposure = tune.exposure ?? 1;
   renderer.shadowMap.enabled = true;
@@ -362,6 +373,8 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
   let width = 1;
   let height = 1;
   let screenDistance = roomDistance * 1;
+  // In the close-up the glass sits in the middle of the free region: this far off the window's middle (px).
+  const fitShift = new THREE.Vector2();
 
   let view: DeskView = 'room';
   let from = roomDistance;
@@ -382,14 +395,27 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     height = Math.max(1, container.clientHeight);
     const aspect = width / height;
     camera.aspect = aspect;
-    // Blender's horizontal framing on wide windows; stop widening on narrow ones.
-    camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hfov / 2) / Math.max(aspect, 1.25)));
+    // Blender's horizontal framing on wide windows; stop widening on narrow ones, but an upright
+    // window still sees a fair share of the room across.
+    const vfov = 2 * Math.atan(Math.tan(hfov / 2) / Math.max(aspect, 1.25));
+    const vfovUpright = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(MIN_HFOV_DEG) / 2) / aspect);
+    camera.fov = THREE.MathUtils.radToDeg(Math.min(Math.max(vfov, vfovUpright), THREE.MathUtils.degToRad(84)));
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
     composer.setSize(width, height);
     bloom.resolution.set(width, height);
     const k = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-    screenDistance = Math.max(cfg.screen.height / (FIT_H * k), cfg.screen.width / (FIT_W * k * aspect));
+    const inset = options.fitInset?.() ?? { top: 0, right: 0, bottom: 0, left: 0 };
+    const freeW = Math.max(1, width - inset.left - inset.right);
+    const freeH = Math.max(1, height - inset.top - inset.bottom);
+    const fitH = options.phone ? PHONE_FIT : FIT_H;
+    const fitW = options.phone ? PHONE_FIT : FIT_W;
+    // The glass is screen.height / (k * d) of the window's height at distance d: keep it inside the free region.
+    screenDistance = Math.max(
+      (cfg.screen.height * height) / (fitH * k * freeH),
+      (cfg.screen.width * width) / (fitW * k * aspect * freeW),
+    );
+    fitShift.set(inset.left + freeW / 2 - width / 2, inset.top + freeH / 2 - height / 2);
     if (moveStart < 0) distance = view === 'screen' ? screenDistance : roomDistance;
     if (view === 'screen') to = screenDistance;
     const pxPerMetre = height / (k * screenDistance);
@@ -404,6 +430,15 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     camera.rotateY(-look.x * yawMax);
     camera.rotateX(-look.y * pitchMax);
     camera.updateMatrixWorld();
+    // slide the picture so the glass lands in the middle of its free region (all the way in the close-up)
+    const f = closeness();
+    if (fitShift.lengthSq() > 0 && f > 0) camera.setViewOffset(width, height, -fitShift.x * f, -fitShift.y * f, width, height);
+    else if (camera.view?.enabled) camera.clearViewOffset();
+  };
+  /** 0 in the wide shot … 1 in the close-up. */
+  const closeness = () => {
+    const span = roomDistance - screenDistance;
+    return span > 0 ? THREE.MathUtils.clamp((roomDistance - distance) / span, 0, 1) : 0;
   };
 
   const v = new THREE.Vector3();
@@ -481,7 +516,9 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     if (!held) return;
     const e = ease(lift);
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-    const d = Math.max(held.radius / (tanHalf * HOLD_FILL) / zoom, held.radius * 1.7 + 0.05);
+    // sized by the window's narrower side (an upright phone is narrow)
+    const fit = tanHalf * Math.min(1, camera.aspect) * (camera.aspect < 1 ? 1.45 : 1);
+    const d = Math.max(held.radius / (fit * HOLD_FILL) / zoom, held.radius * 1.7 + 0.05);
     holdPos.set(0, 0, -d).applyQuaternion(camera.quaternion).add(camera.position);
     holdQuat.copy(camera.quaternion).multiply(turn);
     held.pivot.position.lerpVectors(held.rest, holdPos, e);
@@ -489,7 +526,7 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     held.pivot.quaternion.slerpQuaternions(identity, holdQuat, e);
     // the backdrop: just behind the item, filling the view
     const back = d + held.radius * 1.2 + 0.05;
-    const h = 2 * tanHalf * back * 1.25;
+    const h = 2 * tanHalf * back * 1.7; // generous: the picture may be slid off-centre (fitInset)
     backdrop.position.set(0, 0, -back).applyQuaternion(camera.quaternion).add(camera.position);
     backdrop.quaternion.copy(camera.quaternion);
     backdrop.scale.set(h * camera.aspect, h, 1);
@@ -624,8 +661,7 @@ export async function createDeskScene(container: HTMLElement, options: DeskScene
     weather.update(t);
     placeCamera();
     // Closer to the screen, the room around it dims (and blooms less) so the game stands out.
-    const span = roomDistance - screenDistance;
-    const focus = span > 0 ? THREE.MathUtils.clamp((roomDistance - distance) / span, 0, 1) : 0;
+    const focus = closeness();
     renderer.toneMappingExposure = (tune.exposure ?? 1) * (1 - FOCUS_DIM * focus);
     bloom.strength = (bloomCfg.strength ?? 0.3) * (1 - 0.5 * focus);
     // the camera turned under a still pointer: what is under it now?

@@ -309,6 +309,51 @@
   color: var(--night);
 }
 
+/* --- on a phone --- */
+
+.desk[data-phone='true'] {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* At the screen the pad has its own "Lean back". */
+.desk[data-phone='true'][data-view='screen'] .controls {
+  display: none;
+}
+
+.desk[data-phone='true'] .controls {
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.desk[data-phone='true'] .powerBar {
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
+  width: calc(100% - 24px);
+}
+
+.desk[data-phone='true'] .powerHint {
+  white-space: normal;
+  text-align: center;
+}
+
+.desk[data-phone='true'] .inspectBar {
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: calc(100% - 24px);
+  max-width: 520px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  white-space: normal;
+}
+
+.desk[data-phone='true'] .inspectHelp {
+  order: 3;
+  flex-basis: 100%;
+}
+
 .loader {
   position: absolute;
   inset: 0;
