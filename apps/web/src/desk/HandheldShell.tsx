@@ -14,6 +14,40 @@ export type Self = NonNullable<ScreenMessage['self']>;
 /** The pad's look: a CSS module with the handheld's class names (the desk on phones has its own). */
 export type PadSkin = Record<string, string>;
 
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * How big the pad is drawn: a factor on its CSS sizes (the `--pad-k` the stylesheets zoom by).
+ * Upright it goes by the phone's width, and only a little by its height, so the browser's
+ * address and navigation bars (gone in full screen) don't shrink the keys; sideways the height is
+ * what there is. It is divided by the page's zoom, so a page the browser zoomed out still gets
+ * thumb-sized keys.
+ */
+export function padScale(): number {
+  const vv = window.visualViewport;
+  const zoom = vv && vv.scale > 0 ? vv.scale : 1;
+  const w = (vv?.width ?? window.innerWidth) * zoom;
+  const h = (vv?.height ?? window.innerHeight) * zoom;
+  const k = h >= w ? Math.min(clamp(w / 400, 0.82, 1.2), clamp(h / 600, 0.82, 1.2)) : clamp(h / 380, 0.8, 1.1);
+  return Math.round((k / zoom) * 100) / 100;
+}
+
+/** `padScale()`, kept current as the window turns, resizes or zooms. */
+export function usePadScale(): number {
+  const [k, setK] = useState(padScale);
+  useEffect(() => {
+    const update = () => setK(padScale());
+    update();
+    window.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('resize', update);
+    };
+  }, []);
+  return k;
+}
+
 /**
  * Phones: the site in a pocket handheld. Its screen is an iframe of this same app; the D-pad,
  * buttons and the S thumbstick are the touch controls (handheldPad.ts turns them into game input
@@ -52,9 +86,10 @@ export function HandheldShell({ onSwitch }: { onSwitch?: () => void } = {}) {
     frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
   };
   const buzz = () => navigator.vibrate?.(8);
+  const padK = usePadScale();
 
   return (
-    <div className={styles.handheld} onContextMenu={(event) => event.preventDefault()}>
+    <div className={styles.handheld} style={{ '--pad-k': padK } as CSSProperties} onContextMenu={(event) => event.preventDefault()}>
       <div className={styles.shell} data-ingame={inGame}>
         <span className={styles.grain} aria-hidden />
         <span className={styles.seam} aria-hidden />

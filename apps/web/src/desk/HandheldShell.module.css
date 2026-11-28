@@ -670,6 +670,14 @@
     0 -1px 0 rgb(0 0 0 / 20%);
 }
 
+/* The controls are drawn at --pad-k (padScale() in HandheldShell.tsx): sized to the phone itself,
+   not to whatever height the browser's bars leave, nor shrunk if the page is zoomed out. */
+.dpadSlot,
+.actions,
+.pillSlot {
+  zoom: var(--pad-k, 1);
+}
+
 /* A game on the screen, held upright: a 16:9 screen; the name takes the spare height so the
    controls stay down by the thumbs. */
 @media (orientation: portrait) {
@@ -687,7 +695,7 @@
   }
 }
 
-/* Short phones: tighter controls so the screen keeps its room. */
+/* Short phones: a tighter case so the screen keeps its room. */
 @media (orientation: portrait) and (max-height: 700px) {
   .shell {
     padding: 12px 12px 16px;
@@ -699,16 +707,6 @@
 
   .brandName {
     font-size: 26px;
-  }
-
-  .dpad {
-    width: 120px;
-    height: 120px;
-  }
-
-  .actions {
-    transform: scale(0.86);
-    margin: -14px 0;
   }
 
   .pillSlot {
@@ -776,18 +774,6 @@
 
   .actions {
     width: 170px;
-  }
-}
-
-@media (orientation: landscape) and (max-height: 360px) {
-  .dpad {
-    width: 108px;
-    height: 108px;
-  }
-
-  .actions {
-    transform: scale(0.82);
-    margin: -18px -14px;
   }
 }
 

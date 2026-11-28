@@ -1,7 +1,8 @@
 'use client';
 
 import { useFullscreen } from '@/hooks/useFullscreen';
-import { DPad, PadKey, SpecialStick, type Send, type Self } from './HandheldShell';
+import type { CSSProperties } from 'react';
+import { DPad, PadKey, SpecialStick, padScale, usePadScale, type Send, type Self } from './HandheldShell';
 import styles from './PhonePad.module.css';
 
 /**
@@ -13,8 +14,9 @@ import styles from './PhonePad.module.css';
 export function PhonePad({ send, self, onLeanBack }: { send: Send; self: Self | null; onLeanBack: () => void }) {
   const fullscreen = useFullscreen();
   const buzz = () => navigator.vibrate?.(8);
+  const padK = usePadScale();
   return (
-    <div className={styles.pad} onContextMenu={(event) => event.preventDefault()}>
+    <div className={styles.pad} style={{ '--pad-k': padK } as CSSProperties} onContextMenu={(event) => event.preventDefault()}>
       <button type="button" className={`${styles.leanBack} px-notch`} onClick={onLeanBack}>
         Lean back
       </button>
@@ -55,7 +57,8 @@ export function PhonePad({ send, self, onLeanBack }: { send: Send; self: Self | 
 export function phonePadInset(): { top: number; right: number; bottom: number; left: number } {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  if (h >= w) return { top: 64, right: 8, bottom: Math.min(340, Math.round(h * 0.42)), left: 8 };
-  const side = Math.min(196, Math.round(w * 0.23));
+  const k = padScale();
+  if (h >= w) return { top: Math.round(16 + 48 * k), right: 8, bottom: Math.min(Math.round(340 * k), Math.round(h * 0.46)), left: 8 };
+  const side = Math.min(Math.round(196 * k), Math.round(w * 0.25));
   return { top: 8, right: side, bottom: 8, left: side };
 }

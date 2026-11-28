@@ -23,6 +23,8 @@ export const viewport: Viewport = {
   themeColor: '#07110d',
   // Edge to edge on notched phones; screens pad with env(safe-area-inset-*) where it matters.
   viewportFit: 'cover',
+  // Never zoomed out to fit something wide: on a phone that shrinks the touch controls.
+  minimumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

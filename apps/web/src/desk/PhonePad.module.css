@@ -34,6 +34,15 @@
   }
 }
 
+/* Every control is drawn at --pad-k (padScale() in HandheldShell.tsx): sized to the phone itself,
+   not to whatever height the browser's bars leave, nor shrunk if the page is zoomed out. */
+.system,
+.leanBack,
+.dpadSlot,
+.actions {
+  zoom: var(--pad-k, 1);
+}
+
 /* --- the top row: lean back, SELECT, START --- */
 
 .system {
@@ -406,30 +415,6 @@
     right: max(10px, env(safe-area-inset-right));
     bottom: 10px;
     width: 170px;
-  }
-}
-
-@media (orientation: landscape) and (max-height: 380px) {
-  .dpad {
-    width: 108px;
-    height: 108px;
-  }
-
-  .actions {
-    transform: scale(0.82);
-    transform-origin: 100% 100%;
-  }
-}
-
-@media (orientation: portrait) and (max-height: 700px) {
-  .dpad {
-    width: 118px;
-    height: 118px;
-  }
-
-  .actions {
-    transform: scale(0.86);
-    transform-origin: 100% 100%;
   }
 }
 
