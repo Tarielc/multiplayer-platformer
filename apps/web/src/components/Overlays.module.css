@@ -177,6 +177,8 @@
 
 .tablet {
   width: min(540px, 100%);
+  /* Never wider than the stage (a sideways phone's screen is small): the rows give way instead. */
+  min-width: 0;
   padding: 30px 32px 20px;
   display: flex;
   flex-direction: column;
@@ -316,7 +318,9 @@
 }
 
 .volume {
+  flex: 0 1 160px;
   width: 160px;
+  min-width: 72px;
 }
 
 .devTag {
@@ -723,6 +727,13 @@
   padding-top: 8px;
   font-size: 56px;
   color: var(--bronze);
+}
+
+/* A small stage (a phone's screen): the menu tablet keeps less stone around its rows. */
+@container stage (max-width: 520px) {
+  .tablet {
+    padding: 24px 14px 14px;
+  }
 }
 
 /* Small stage: no room for the podium beside the table. */
