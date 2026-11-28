@@ -20,7 +20,7 @@ export type PadSkin = Record<string, string>;
  * on the other side). Held upright the controls sit under the screen; turned sideways they split
  * left and right.
  */
-export function HandheldShell() {
+export function HandheldShell({ onSwitch }: { onSwitch?: () => void } = {}) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [src] = useState(() => window.location.pathname + window.location.search + window.location.hash);
   const fullscreen = useFullscreen();
@@ -60,12 +60,23 @@ export function HandheldShell() {
         <span className={styles.seam} aria-hidden />
 
         <div className={styles.bezel}>
-          <div className={styles.strip} aria-hidden>
-            <span className={styles.led} />
-            <span className={styles.print}>Power</span>
-            <span className={styles.stripe} />
-            <span className={styles.stripName}>{GAME_TITLE}</span>
-            <span className={`${styles.print} ${styles.linkLabel}`}>4-player link</span>
+          <div className={styles.strip}>
+            <span className={styles.led} aria-hidden />
+            <span className={styles.print} aria-hidden>
+              Power
+            </span>
+            <span className={styles.stripe} aria-hidden />
+            <span className={styles.stripName} aria-hidden>
+              {GAME_TITLE}
+            </span>
+            <span className={`${styles.print} ${styles.linkLabel}`} aria-hidden>
+              4-player link
+            </span>
+            {onSwitch && (
+              <button type="button" className={styles.roomSwitch} onClick={onSwitch} aria-label="Switch to the computer room">
+                Room
+              </button>
+            )}
           </div>
           <div className={styles.lcd}>
             <iframe ref={frameRef} className={styles.frame} src={src} title={GAME_TITLE} allow={FRAME_ALLOW} />

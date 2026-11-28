@@ -22,7 +22,9 @@ import styles from './SiteShell.module.css';
  * `desk`: the page is the 3D desk, and the site runs inside the CRT (an iframe of this same app).
  * `phone`: the same desk on a phone: the CRT fills the top (or the middle, sideways) and a pad
  * over the room plays (the site on the screen runs as on the handheld, see handheldPad.ts).
- * `handheld`: phones without WebGL 2 get a pocket console instead; the site runs on its screen.
+ * `handheld`: the pocket console: phones without WebGL 2, or ones switched to it (a phone can
+ * switch between the desk and the handheld; the choice is remembered). The site runs on its
+ * screen the same way.
  * `flat`: the site on its own: inside either iframe, on tablets, small windows, without WebGL,
  * or with `?flat` in the address.
  */
@@ -33,26 +35,58 @@ const isPhone = () =>
   window.matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 600;
 
 let decided: ShellMode | null = null;
+let webgl2: boolean | null = null;
+
+const hasWebgl2 = () => {
+  if (webgl2 === null) {
+    try {
+      webgl2 = Boolean(document.createElement('canvas').getContext('webgl2'));
+    } catch {
+      webgl2 = false;
+    }
+  }
+  return webgl2;
+};
+
+/** Which look a phone was last switched to (the desk unless it chose the handheld). */
+const PHONE_SHELL_KEY = 'overgrown:phone-shell';
+
+function phoneChoice(): 'phone' | 'handheld' {
+  try {
+    return window.localStorage.getItem(PHONE_SHELL_KEY) === 'handheld' ? 'handheld' : 'phone';
+  } catch {
+    return 'phone';
+  }
+}
 
 function detectMode(): ShellMode {
   if (window.self !== window.top) return 'flat';
   if (new URLSearchParams(window.location.search).has('flat')) return 'flat';
-  let webgl2 = false;
-  try {
-    webgl2 = Boolean(document.createElement('canvas').getContext('webgl2'));
-  } catch {
-    webgl2 = false;
-  }
-  if (isPhone()) return webgl2 ? 'phone' : 'handheld';
+  if (isPhone()) return hasWebgl2() ? phoneChoice() : 'handheld';
   if (window.matchMedia('(pointer: coarse)').matches) return 'flat';
   if (window.innerWidth < 900 || window.innerHeight < 560) return 'flat';
-  return webgl2 ? 'desk' : 'flat';
+  return hasWebgl2() ? 'desk' : 'flat';
 }
 
-// Decided once per page load: switching later would restart the site (and drop a room).
+// Decided once per page load, except that a phone can switch between the desk and the handheld
+// (which restarts the site on the new screen, at the same address).
 const getMode = () => (decided ??= detectMode());
 const getServerMode = (): ShellMode => 'pending';
-const subscribe = () => () => {};
+const listeners = new Set<() => void>();
+const subscribe = (onChange: () => void) => {
+  listeners.add(onChange);
+  return () => listeners.delete(onChange);
+};
+
+function switchPhoneShell(next: 'phone' | 'handheld') {
+  try {
+    window.localStorage.setItem(PHONE_SHELL_KEY, next);
+  } catch {
+    // not remembered (private mode): it still switches for now
+  }
+  decided = next;
+  for (const onChange of listeners) onChange();
+}
 
 export function SiteShell({ children }: { children: ReactNode }) {
   const mode = useSyncExternalStore(subscribe, getMode, getServerMode);
@@ -65,7 +99,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       </>
     );
   }
-  if (mode === 'handheld') return <HandheldShell />;
+  if (mode === 'handheld') return <HandheldShell onSwitch={hasWebgl2() ? () => switchPhoneShell('phone') : undefined} />;
   return <DeskShell phone={mode === 'phone'} />;
 }
 
@@ -424,6 +458,13 @@ function DeskShell({ phone }: { phone: boolean }) {
 
       {phone && on && atScreen && !held && <PhonePad send={send} self={self} onLeanBack={() => goTo('room')} />}
 
+      {phone && ready && view === 'room' && !moving && !held && (
+        <button type="button" className={`${styles.shellSwitch} px-notch`} onClick={() => switchPhoneShell('handheld')}>
+          <HandheldIcon />
+          Handheld
+        </button>
+      )}
+
       <div className={styles.controls}>
         <button
           type="button"
@@ -445,5 +486,14 @@ function DeskShell({ phone }: { phone: boolean }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** A little pocket console (the switch to the handheld look). */
+function HandheldIcon() {
+  return (
+    <svg className={styles.shellIcon} viewBox="0 0 16 16" aria-hidden>
+      <path fill="currentColor" fillRule="evenodd" d="M3 1h10v14H3zM5 3v5h6V3zM6 10h1v1h1v1H7v1H6v-1H5v-1h1zM10 10h1v1h-1zM9 12h1v1H9z" />
+    </svg>
   );
 }

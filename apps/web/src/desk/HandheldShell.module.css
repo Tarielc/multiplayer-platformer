@@ -145,6 +145,39 @@
   white-space: nowrap;
 }
 
+/* A small printed key on the surround: over to the computer room instead. */
+.roomSwitch {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 18px;
+  min-height: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: rgb(237 230 200 / 12%);
+  box-shadow: inset 0 0 0 1px rgb(237 230 200 / 30%);
+  color: rgb(237 230 200 / 85%);
+  font-family: var(--ui);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  outline: 10px solid transparent; /* a bigger target than it looks */
+}
+
+.roomSwitch:active {
+  background: var(--moss-lit);
+  color: var(--night);
+}
+
+.roomSwitch:focus-visible {
+  outline: 2px solid var(--firefly);
+  outline-offset: 2px;
+}
+
 /* Set into the surround: a dark lip, then the panel under glass. */
 .lcd {
   position: relative;

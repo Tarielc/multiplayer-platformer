@@ -329,6 +329,36 @@
   bottom: max(16px, env(safe-area-inset-bottom));
 }
 
+/* Over to the pocket handheld instead (remembered). */
+.shellSwitch {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: rgb(7 17 13 / 82%);
+  color: var(--bone);
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shellSwitch:focus-visible {
+  outline: 3px solid var(--firefly);
+  outline-offset: 3px;
+}
+
+.shellIcon {
+  width: 16px;
+  height: 16px;
+  color: var(--moss-lit);
+}
+
 .desk[data-phone='true'] .powerBar {
   bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
   width: calc(100% - 24px);
